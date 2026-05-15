@@ -1,0 +1,40 @@
+# Example East Fork (OH) watershed configuration (synthetic data)
+verbose: true
+outputs: ./outputs
+
+random_seed: 42
+
+# Required geospatial inputs
+domain: ./examples/inputs/domain.gpkg
+parcels: ./examples/inputs/parcels.gpkg
+outlet_loc: ./examples/inputs/outlet_loc.gpkg
+
+# Drainage and selection
+parcel_out: ./examples/inputs/parcel_out.csv
+parcel_up: ./examples/inputs/parcel_up.csv
+parcel_p: ./examples/inputs/parcel_p.csv
+
+# Pollutants and BMPs
+pollutants: ["nitrogen","phosphorus","sediment"]
+cps: [340,329,590,412,656]
+
+# Required distributions
+pollutant_yield: ./examples/inputs/pollutant_yield.csv
+bmp_efficiency: ./examples/inputs/bmp_efficiency.csv
+
+# Optional distributions (enable cost-limited runs, selection weighting, and plotting x-axis)
+bmp_cost: ./examples/inputs/bmp_cost.csv
+
+# Optional delivery ratios and targets/means for plotting y-axes
+delivery_ratios: ./examples/inputs/delivery_ratios.csv
+outlet_target: ./examples/inputs/outlet_target.csv
+outlet_mean: ./examples/inputs/outlet_mean.csv
+
+# Scenario controls
+n_scenarios: 3
+# Choose one of:
+# bmp_limit_n: 10
+bmp_limit_usd: 50000
+
+# Optional buffer depth (ft) for grassed waterways/two-stage ditches
+buffer_depth_ft: 35

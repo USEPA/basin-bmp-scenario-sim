@@ -1,0 +1,23 @@
+2026-05-15 13:48:49,900 [DEBUG] Logger initialized
+2026-05-15 13:48:49,900 [INFO] Starting model run
+2026-05-15 13:48:49,900 [INFO] Config: examples\east_fork.yaml
+2026-05-15 13:48:49,900 [INFO] Logging to: outputs\log_20260515_134849.txt
+2026-05-15 13:48:51,260 [INFO] Scenario 1/3
+2026-05-15 13:48:51,262 [DEBUG] Sampled value 23.2187 from stats={'min': np.float64(5.0), 'max': np.float64(30.0), 'mean': np.float64(15.0), 'p50': np.float64(15.0)} kind=yield low=0.0 high=None
+2026-05-15 13:48:51,263 [DEBUG] Sampled value 1.81664 from stats={'min': np.float64(0.5), 'max': np.float64(5.0), 'mean': np.float64(2.0), 'p50': np.float64(2.0)} kind=yield low=0.0 high=None
+2026-05-15 13:48:51,264 [DEBUG] Sampled value 329.299 from stats={'min': np.float64(50.0), 'max': np.float64(400.0), 'mean': np.float64(150.0), 'p50': np.float64(150.0)} kind=yield low=0.0 high=None
+2026-05-15 13:48:51,266 [DEBUG] Sampled value 20.921 from stats={'min': np.float64(5.0), 'max': np.float64(30.0), 'mean': np.float64(15.0), 'p50': np.float64(15.0)} kind=yield low=0.0 high=None
+2026-05-15 13:48:51,267 [DEBUG] Sampled value 0.782532 from stats={'min': np.float64(0.5), 'max': np.float64(5.0), 'mean': np.float64(2.0), 'p50': np.float64(2.0)} kind=yield low=0.0 high=None
+2026-05-15 13:48:51,268 [DEBUG] Sampled value 387.811 from stats={'min': np.float64(50.0), 'max': np.float64(400.0), 'mean': np.float64(150.0), 'p50': np.float64(150.0)} kind=yield low=0.0 high=None
+2026-05-15 13:48:51,269 [DEBUG] Sampled value 22.8342 from stats={'min': np.float64(5.0), 'max': np.float64(30.0), 'mean': np.float64(15.0), 'p50': np.float64(15.0)} kind=yield low=0.0 high=None
+2026-05-15 13:48:51,270 [DEBUG] Sampled value 3.71639 from stats={'min': np.float64(0.5), 'max': np.float64(5.0), 'mean': np.float64(2.0), 'p50': np.float64(2.0)} kind=yield low=0.0 high=None
+2026-05-15 13:48:51,270 [DEBUG] Sampled value 75.6227 from stats={'min': np.float64(50.0), 'max': np.float64(400.0), 'mean': np.float64(150.0), 'p50': np.float64(150.0)} kind=yield low=0.0 high=None
+2026-05-15 13:48:51,271 [DEBUG] Sampled value 14.0077 from stats={'min': np.float64(5.0), 'max': np.float64(30.0), 'mean': np.float64(15.0), 'p50': np.float64(15.0)} kind=yield low=0.0 high=None
+2026-05-15 13:48:51,272 [DEBUG] Sampled value 1.61239 from stats={'min': np.float64(0.5), 'max': np.float64(5.0), 'mean': np.float64(2.0), 'p50': np.float64(2.0)} kind=yield low=0.0 high=None
+2026-05-15 13:48:51,273 [DEBUG] Sampled value 363.382 from stats={'min': np.float64(50.0), 'max': np.float64(400.0), 'mean': np.float64(150.0), 'p50': np.float64(150.0)} kind=yield low=0.0 high=None
+2026-05-15 13:48:51,274 [DEBUG] Sampled value 19.316 from stats={'min': np.float64(5.0), 'max': np.float64(30.0), 'mean': np.float64(15.0), 'p50': np.float64(15.0)} kind=yield low=0.0 high=None
+2026-05-15 13:48:51,275 [DEBUG] Sampled value 3.93657 from stats={'min': np.float64(0.5), 'max': np.float64(5.0), 'mean': np.float64(2.0), 'p50': np.float64(2.0)} kind=yield low=0.0 high=None
+2026-05-15 13:48:51,276 [DEBUG] Sampled value 138.683 from stats={'min': np.float64(50.0), 'max': np.float64(400.0), 'mean': np.float64(150.0), 'p50': np.float64(150.0)} kind=yield low=0.0 high=None
+2026-05-15 13:48:51,276 [DEBUG] Sampled value 9.54477 from stats={'min': np.float64(5.0), 'max': np.float64(30.0), 'mean': np.float64(15.0), 'p50': np.float64(15.0)} kind=yield low=0.0 high=None
+2026-05-15 13:48:51,277 [DEBUG] Sampled value 2.32751 from stats={'min': np.float64(0.5), 'max': np.float64(5.0), 'mean': np.float64(2.0), 'p50': np.float64(2.0)} kind=yield low=0.0 high=None
+2026-05-15 13:48:51,278 [DEBUG] Sampled value 62.7635 from stats={'min': np.float64(50.0), 'max': np.float64(400.0), 'mean': np.float64(150.0), 'p50': np.float64(150.0)} kind=yield low=0.0 high=None
