@@ -1,0 +1,24 @@
+{
+  "name": "Open Source Projects",
+  "organization": "U.S. Environmental Protection Agency",
+  "description": "Contains files for teams to reuse when working in and with EPA Open Source projects.",
+  "permissions": {
+    "licenses": [
+      {
+        "name": "MIT",
+        "URL": "https://github.com/USEPA/open-source-projects/blob/main/license.md"
+      }
+    ],
+    "usageType": "openSource"
+  },
+  "tags": [
+    "EPA",
+    "opensource"
+  ],
+  "contact": {
+    "email": "griffin.connor@epa.gov",
+    "name": "Connor Griffin"
+  },
+  "repositoryURL": "https://github.com/USEPA/open-source-projects",
+  "vcs": "git"
+}
