@@ -34,8 +34,12 @@ def _piecewise_quantile_sample(
     rng: Generator,
     stats: Dict[str, float],
     size: int = 1,
+    verbose_logger: Optional[logging.Logger] = None,
 ) -> np.ndarray:
     """Sample from a piecewise linear distribution defined by percentiles."""
+
+    if verbose_logger:
+        verbose_logger.debug(f"calling _piecewise_quantile_sample with stats={stats} size={size}")
     # stats includes min/max and possibly percentiles like p5, p50, p90
     cols = {k.lower(): v for k, v in stats.items()}
     # Collect points (p, q)
@@ -73,6 +77,8 @@ def _piecewise_quantile_sample(
                     t = (ui - p0) / (p1 - p0)
                     samples[i] = q0 + t * (q1 - q0)
                 break
+    if verbose_logger:
+        verbose_logger.debug(f"Sampled values {samples} from piecewise quantiles with stats={stats}")
     return samples
 
 def sample_from_stats(
@@ -87,6 +93,9 @@ def sample_from_stats(
     quantiles if percentiles exist, otherwise truncated normal when mean/sd are
     available, or uniform sampling when only min/max are provided.
     """
+    if verbose_logger:
+        verbose_logger.debug(f"calling sample_from_stats with stats={stats} kind={kind}")
+
     cols = {k.lower(): v for k, v in stats.items()}
     # Prefer piecewise if min/max with any percentiles are provided
     has_min = any(k in cols for k in ("min","minimum","p0"))
@@ -105,7 +114,7 @@ def sample_from_stats(
         low = 0.0
 
     if has_min and has_max and has_percentiles:
-        s = _piecewise_quantile_sample(rng, cols, size=1)[0]
+        s = _piecewise_quantile_sample(rng, cols, size=1, verbose_logger=verbose_logger)[0]
     elif has_min and has_max and has_mean and not has_sd:
         mn = float(cols.get("mean", cols.get("average", cols.get("avg"))))
         lo = float(cols.get("min", cols.get("minimum", cols.get("p0"))))
@@ -124,12 +133,15 @@ def sample_from_stats(
         s = _trunc_normal(rng, mn, sd, low=low, high=high)[0]
     else:
         raise ValueError("Insufficient distribution statistics to sample")
+    if verbose_logger:
+        verbose_logger.debug(f"Sampled value {s:.6g} from stats={stats} kind={kind}")
 
     if low is not None and s < low:
+        if verbose_logger:
+            verbose_logger.debug(f"Sampled value {s:.6g} less than bound minimum ({low}), reducing to {low}")
         s = low
     if high is not None and s > high:
+        if verbose_logger:
+            verbose_logger.debug(f"Sampled value {s:.6g} greater than bound maximum ({high}), reducing to {high}")
         s = high
-
-    if verbose_logger:
-        verbose_logger.debug(f"Sampled value {s:.6g} from stats={stats} kind={kind} low={low} high={high}")
     return float(s)

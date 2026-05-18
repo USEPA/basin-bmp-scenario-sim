@@ -14,6 +14,17 @@ def normalize_columns(df: Any) -> Any:
     df.columns = [str(c).strip().lower() for c in df.columns]
     return df
 
+
+def normalize_pollutant_label(label: str) -> str:
+    """Normalize pollutant labels to a canonical form used by the model."""
+    from .constants import POLLUTANT_ALIAS_MAP
+
+    canonical = POLLUTANT_ALIAS_MAP.get(str(label).strip().lower())
+    if canonical is None:
+        raise ValueError(f"Unknown pollutant label: {label}")
+    return canonical
+
+
 def parse_percent_keys(cols: Iterable[Any]) -> Dict[int, Any]:
     """Return a mapping from percentile column names to integer keys."""
     # Return a mapping for 'p5', 'p10', etc.

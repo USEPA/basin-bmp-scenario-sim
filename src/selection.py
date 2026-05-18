@@ -3,6 +3,7 @@ import pandas as pd
 from numpy.random import Generator
 from typing import Any, Dict, Iterable, List, Optional, Sequence, Union
 
+from .constants import COL_CPS, COL_UNIT, COL_PROBABILITY
 from .sampling import sample_from_stats
 
 def _select_cost_rate_median(rng: Generator, row: pd.Series) -> float:
@@ -35,11 +36,11 @@ def estimate_costs_for_probabilities(
     overrides = overrides or {}
     rows: list[Dict[str, float]] = []
     for cps in cps_list:
-        sub = bmp_cost_df[bmp_cost_df["cps"].astype(int) == int(cps)]
+        sub = bmp_cost_df[bmp_cost_df[COL_CPS].astype(int) == int(cps)]
         if sub.empty:
             continue
         r = sub.iloc[0]
-        unit = str(r["unit"]).lower().strip()
+        unit = str(r[COL_UNIT]).lower().strip()
         rate = _select_cost_rate_median(rng, r)
         if rate < 0:
             raise ValueError(f"Negative cost-rate for cps {cps}")
@@ -67,5 +68,5 @@ def estimate_costs_for_probabilities(
         raise ValueError("Could not estimate costs for probability computation")
     inv = 1.0 / df["est_total_cost"].values
     probs = inv / inv.sum()
-    df["probability"] = probs
-    return df[["cps","probability"]]
+    df[COL_PROBABILITY] = probs
+    return df[[COL_CPS, COL_PROBABILITY]]

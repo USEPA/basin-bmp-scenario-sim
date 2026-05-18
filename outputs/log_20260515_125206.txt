@@ -1,4 +1,0 @@
-2026-05-15 12:52:06,809 [DEBUG] Logger initialized
-2026-05-15 12:52:06,809 [INFO] Starting model run
-2026-05-15 12:52:06,809 [INFO] Config: examples\east_fork.yaml
-2026-05-15 12:52:06,809 [INFO] Logging to: outputs\log_20260515_125206.txt

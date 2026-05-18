@@ -1,4 +1,0 @@
-2026-05-18 10:52:55,672 [DEBUG] Logger initialized
-2026-05-18 10:52:55,672 [INFO] Starting model run
-2026-05-18 10:52:55,672 [INFO] Config: C:\Users\GEVENSON\Data\bmp\basin-bmp-sim\examples\east_fork.yaml
-2026-05-18 10:52:55,672 [INFO] Logging to: outputs\log_20260518_105255.txt
