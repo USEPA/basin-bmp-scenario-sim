@@ -4,6 +4,18 @@ from collections import defaultdict
 from pathlib import Path
 from typing import Any, Dict, List, Tuple
 
+from .constants import (
+    CFG_BMP_COST,
+    CFG_OUTLET_MEAN,
+    CFG_OUTLET_TARGET,
+    COL_OID,
+    XAXIS_COUNT,
+    XAXIS_COST,
+    YAXIS_MEAN,
+    YAXIS_TARGET,
+    YAXIS_TOTAL,
+)
+
 def make_summary_plots(
     cfg: Dict[str, Any],
     data: Dict[str, Any],
@@ -17,18 +29,18 @@ def make_summary_plots(
     using cost or BMP count on the x-axis and absolute/target/mean reductions on the y-axis.
     """
     pollutants = data["pollutants"]
-    oids = [str(x) for x in data["outlet_loc"]["oid"].astype(str).tolist()]
+    oids = [str(x) for x in data["outlet_loc"][COL_OID].astype(str).tolist()]
 
     x_axes = []
-    if cfg.get("bmp_cost"):
-        x_axes.append("cost")
-    x_axes.append("count")
+    if cfg.get(CFG_BMP_COST):
+        x_axes.append(XAXIS_COST)
+    x_axes.append(XAXIS_COUNT)
 
-    y_axes = ["total"]
-    if cfg.get("outlet_target"):
-        y_axes.append("target")
-    if cfg.get("outlet_mean"):
-        y_axes.append("mean")
+    y_axes = [YAXIS_TOTAL]
+    if cfg.get(CFG_OUTLET_TARGET):
+        y_axes.append(YAXIS_TARGET)
+    if cfg.get(CFG_OUTLET_MEAN):
+        y_axes.append(YAXIS_MEAN)
 
     for pol in pollutants:
         for oid in oids:
@@ -48,10 +60,10 @@ def make_summary_plots(
                         ys = [y for x,y in pts]
                         lbl = f"scenario {sid}"
                         plt.plot(xs, ys, marker="o", markersize=2, linewidth=1.25, label=lbl, alpha=0.9)
-                    plt.xlabel("total cost (USD)" if xax=="cost" else "total bmp count")
-                    if yax=="total":
+                    plt.xlabel("total cost (USD)" if xax == XAXIS_COST else "total bmp count")
+                    if yax == YAXIS_TOTAL:
                         plt.ylabel(f"total {pol} load reduction (delivered)")
-                    elif yax=="target":
+                    elif yax == YAXIS_TARGET:
                         plt.ylabel(f"{pol} reduction (% of target)")
                     else:
                         plt.ylabel(f"{pol} reduction (% of mean load)")

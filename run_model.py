@@ -3,6 +3,7 @@ import sys
 import yaml
 from pathlib import Path
 
+from src.constants import CFG_OUTPUTS
 from src.logging_utils import make_logger
 from src.io_utils import load_and_validate_all
 from src.scenario import Simulator
@@ -19,7 +20,7 @@ def main() -> None:
         sys.exit(1)
     cfg_path = Path(sys.argv[1])
     if not cfg_path.exists():
-        print(f"Config not found: {cfg_path}")
+        print(f"ERROR: input yaml file not found: {cfg_path}")
         sys.exit(1)
 
     with open(cfg_path, "r", encoding="utf-8") as f:
@@ -28,7 +29,7 @@ def main() -> None:
     # normalize keys to lowercase (do not enforce case sensitivity)
     cfg = {str(k).lower(): v for k, v in cfg.items()}
 
-    outputs_dir = Path(cfg.get("outputs", "./outputs"))
+    outputs_dir = Path(cfg.get(CFG_OUTPUTS, "./outputs"))
     outputs_dir.mkdir(parents=True, exist_ok=True)
     logger, log_path = make_logger(outputs_dir, verbose=bool(cfg.get("verbose", True)))
     logger.info("Starting model run")
