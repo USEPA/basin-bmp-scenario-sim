@@ -107,6 +107,7 @@ class Simulator:
             if self.data[DATA_BMP_COST] is None:
                 probs = np.full(len(self.data[DATA_CPS]), 1.0 / len(self.data[DATA_CPS]))
                 return pd.DataFrame({COL_CPS: self.data[DATA_CPS], COL_PROBABILITY: probs})
+            else:
                 df = estimate_costs_for_probabilities(
                     self.rng,
                     self.data[DATA_BMP_COST],
