@@ -1,4 +1,4 @@
-# BASIN best management practice (BMP) SIMulator 
+# BASIN-BMP-SIMulator 
 
 ## Brief Project Description
 
