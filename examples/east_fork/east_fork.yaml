@@ -34,7 +34,7 @@ outlet_mean: ./examples/east_fork/inputs/outlet_mean.csv
 n_scenarios: 3
 # Choose one of:
 # bmp_limit_n: 10
-bmp_limit_usd: 1000000 # $1 million
+bmp_limit_usd: 1000000
 
 # Optional buffer depth (ft) for grassed waterways
 buffer_depth_ft: 35

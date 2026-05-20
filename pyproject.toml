@@ -1,0 +1,29 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "basin-bmp-sim"
+version = "0.1.0"
+description = "Watershed BMP scenario simulation model"
+readme = "readme.md"
+requires-python = ">=3.10"
+authors = [
+  { name = "USEPA" }
+]
+license = { text = "Apache-2.0" }
+dependencies = [
+  "numpy",
+  "pandas",
+  "geopandas",
+  "shapely",
+  "pyproj",
+  "matplotlib",
+  "pyyaml",
+  "pytest",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+python_files = ["test_*.py"]

@@ -105,3 +105,13 @@ POLLUTANT_ALIAS_MAP = {
     "phosphorus": "TP",
     "sediment": "TSS",
 }
+
+# BMP CPS code name mapping
+BMP_CPS_NAME_MAP = {
+    329: "Residue Management",
+    340: "Cover Crop",
+    412: "Grassed Waterway",
+    590: "Nutrient Management",
+    656: "Constructed Wetland",
+    657: "Vegetated Treatment Area",
+}
