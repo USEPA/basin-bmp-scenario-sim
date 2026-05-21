@@ -1,6 +1,6 @@
 # BASIN-BMP-SIMulator 
 
-`basin-bmp-sim` is a watershed BMP scenario simulator for analyzing parcel-level pollutant yields, BMP efficiencies, and outlet delivery outcomes.
+`basin-bmp-sim` is a probabilistic watershed BMP scenario simulator for analyzing parcel-level pollutant yields, BMP efficiencies, and outlet delivery outcomes.
 
 ## Configuration
 
