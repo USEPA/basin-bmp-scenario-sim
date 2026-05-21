@@ -2,12 +2,6 @@
 
 `basin-bmp-sim` is a watershed BMP scenario simulator for analyzing parcel-level pollutant yields, BMP efficiencies, and outlet delivery outcomes.
 
-This repository contains code for a probabilistic model of best management practice (BMP) (alternatively, 'conservation practices') impacts on basin-scale pollutant loads.
-
-### Contact
-
-evenson.grey@epa.gov
-
 ## Configuration
 
 Required configuration keys:
@@ -47,3 +41,7 @@ The model writes results to the configured `outputs` directory:
 - Pollutant labels are normalized from aliases such as `nitrogen`, `phosphorus`, and `sediment`.
 - `parcel_out` outlet IDs must exist in `outlet_loc`.
 - If both `bmp_limit_n` and `bmp_limit_usd` are specified, the simulation stops when either limit is reached.
+
+### Contact
+
+evenson.grey@epa.gov
