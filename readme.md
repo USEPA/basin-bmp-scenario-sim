@@ -1,6 +1,24 @@
 # BASIN-BMP-SIMulator 
 
-`basin-bmp-sim` is a probabilistic watershed BMP scenario simulator for analyzing parcel-level pollutant yields, BMP efficiencies, and outlet delivery outcomes.
+`basin-bmp-sim` is a probabilistic basin-scale BMP scenario simulator to assess the liklihood of cost-effectively meeting basin-scale pollutant load reduction targets
+
+## Description
+
+`basin-bmp-sim` simulates basin-wide best management practice (BMP) implementation scenarios showing aggregate costs and impacts on basin-outlet pollutant loads as a function of random draws from user-described statistical distributions depicting:
+- Parcel selection
+  - Describe the relative liklihood of BMP implementation across the basin's parcel / agricultural fields
+- BMP / conservation practice type
+  - Describe the relative liklihood that specific types of BMPs or conservation practices will be implemented, including BMP-specific characteristics such as:
+    - Wetland area
+    - Wetland catchment-to-area ratio
+    - Grassed waterway length
+    - Portion of parcel draining to the BMP
+- Cost
+  - Describe the likely costs (e.g., annualized USD) (inluding opportunity, construction, maintenance) of implementing individual types BMPs
+- Parcel pollutant yield
+  - Describe the likely yield rates (e.g., kg/ha/yr) for specific pollutant types across basin parcels  
+- BMP efficiency
+  - Describe the likely effectiveness of specific types of BMPs 
 
 ## Configuration
 
