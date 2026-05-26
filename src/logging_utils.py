@@ -17,6 +17,7 @@ def make_logger(outputs_dir: Path, verbose: bool = True) -> Tuple[logging.Logger
     logger.handlers.clear()
     logger.setLevel(logging.DEBUG)
 
+    # File handler writes all DEBUG and above messages to the timestamped log file.
     fh = logging.FileHandler(log_path, encoding="utf-8")
     fh.setLevel(logging.DEBUG)
     fmt = logging.Formatter("%(asctime)s [%(levelname)s] %(message)s")

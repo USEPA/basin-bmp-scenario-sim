@@ -66,6 +66,7 @@ def _merge_csvs(
     paths = [paths] if isinstance(paths, (str, Path)) else list(paths)
     frames: List[pd.DataFrame] = []
     for p in paths:
+        logger.debug(f"Reading {label} input from {p}")
         df = pd.read_csv(p)
         df = normalize_columns(df)
         _require_cols(df, required_cols, f"{label} ({p})", logger)
@@ -87,6 +88,7 @@ def _ensure_projected(gdf: gpd.GeoDataFrame, logger: Any) -> gpd.GeoDataFrame:
     if gdf.crs is None or not gdf.crs.is_projected:
         est = gdf.estimate_utm_crs()
         logger.info(f"Reprojecting to projected CRS: {est}")
+        logger.debug(f"Original CRS: {gdf.crs}, projected CRS: {est}")
         gdf = gdf.to_crs(est)
     return gdf
 
@@ -101,6 +103,7 @@ def _normalize_pollutant_column(df: pd.DataFrame, label_col: str, label_name: st
 
 def _load_domain(cfg: Dict[str, Any], logger: Any) -> gpd.GeoDataFrame:
     domain_path = Path(ci_get(cfg, CFG_DOMAIN))
+    logger.debug(f"Loading domain file from {domain_path}")
     if not domain_path.exists():
         raise FileNotFoundError(f"Domain not found: {domain_path}")
     domain = gpd.read_file(domain_path)
@@ -109,6 +112,7 @@ def _load_domain(cfg: Dict[str, Any], logger: Any) -> gpd.GeoDataFrame:
 
 def _load_parcels(cfg: Dict[str, Any], domain: gpd.GeoDataFrame, logger: Any) -> gpd.GeoDataFrame:
     parcels_path = Path(ci_get(cfg, CFG_PARCELS))
+    logger.debug(f"Loading parcels file from {parcels_path}")
     if not parcels_path.exists():
         raise FileNotFoundError(f"Parcels not found: {parcels_path}")
     parcels = gpd.read_file(parcels_path)
@@ -127,6 +131,7 @@ def _load_parcels(cfg: Dict[str, Any], domain: gpd.GeoDataFrame, logger: Any) ->
 
 
 def _load_parcel_out(cfg: Dict[str, Any], logger: Any) -> pd.DataFrame:
+    logger.debug(f"Loading parcel outlet mapping from {ci_get(cfg, CFG_PARCEL_OUT)}")
     return _merge_csvs(ci_get(cfg, CFG_PARCEL_OUT), [COL_PID, COL_OIDS], CFG_PARCEL_OUT, logger)
 
 
@@ -183,14 +188,17 @@ def _load_optional_outlet_stats(
     logger: Any,
 ) -> Optional[pd.DataFrame]:
     if ci_get(cfg, key) is None:
+        logger.debug(f"Optional outlet stats key {key} not provided; skipping {label}")
         return None
     df = _merge_csvs(ci_get(cfg, key), required_cols, label, logger)
+    logger.debug(f"Loaded {label} with {len(df)} rows")
     return _normalize_pollutant_column(df, COL_POLLUTANT, label, logger)
 
 
 def _load_delivery_ratios(cfg: Dict[str, Any], logger: Any) -> Optional[pd.DataFrame]:
     dr_cfg = ci_get(cfg, CFG_DELIVERY_RATIOS)
     if dr_cfg is None:
+        logger.debug("No delivery ratios configured; using default delivery coefficients")
         return None
     dr_path = Path(dr_cfg)
     if not dr_path.exists():
@@ -198,6 +206,7 @@ def _load_delivery_ratios(cfg: Dict[str, Any], logger: Any) -> Optional[pd.DataF
             f"{CFG_DELIVERY_RATIOS} specified but file not found: {dr_cfg}; skipping delivery ratios"
         )
         return None
+    logger.debug(f"Loading delivery ratios from {dr_path}")
     return _merge_csvs(
         dr_cfg,
         [COL_PID, COL_OID, "sdr_f_to_s", "sdr_s_to_o", "ndr_f_to_s", "ndr_s_to_o"],

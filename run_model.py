@@ -7,7 +7,7 @@ import yaml
 from src.constants import CFG_OUTPUTS, CFG_RANDOM_SEED, CFG_VERBOSE
 from src.logging_utils import make_logger
 from src.io_utils import load_and_validate_all
-from src.scenario import Simulator
+from src.scenario import Model
 from src.plotting import make_summary_plots
 
 
@@ -54,7 +54,7 @@ def main() -> None:
     logger.info(f"Logging to: {log_path}")
 
     data = load_and_validate_all(cfg, logger)
-    sim = Simulator(cfg, data, logger)
+    sim = Model(cfg, data, logger)
     scenario_records = sim.run_all_scenarios()
 
     # Produce summary plots per spec

@@ -25,7 +25,7 @@ CFG_OUTPUTS = "outputs"
 CFG_VERBOSE = "verbose"
 CFG_BUFFER_DEPTH_FT = "buffer_depth_ft"
 
-# Data payload keys (used in the validated data dict passed to Simulator)
+# Data payload keys (used in the validated data dict passed to Model)
 DATA_PARCELS = "parcels"
 DATA_PARCEL_P = "parcel_p"
 DATA_PARCEL_UP_MAP = "parcel_up_map"
@@ -94,6 +94,8 @@ OUTPUT_IMPACTED_PIDS = "impacted_pids"
 OUTPUT_TREATED = "treated"
 OUTPUT_REMOVED = "removed"
 OUTPUT_COST_USD = "cost_usd"
+OUTPUT_TOTAL_COST_USD = "total_cost_usd"
+OUTPUT_EFFICIENCY = "efficiency"
 
 # Pollutant canonical labels and alias mapping
 POLLUTANT_CANONICAL = ("TN", "TP", "TSS")

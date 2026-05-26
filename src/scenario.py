@@ -1,17 +1,50 @@
 import logging
+import os, sys
 import numpy as np
 import pandas as pd
+import types
 from pathlib import Path
 from collections import defaultdict
 from typing import Any, Dict, List, Optional, Tuple, Union
 
+
 from .bmp import (
-    compute_bmp_cost,
-    simulate_grassed,
-    simulate_infield,
-    simulate_wetland,
+    _select_bmp_type,
+    _get_bmp_name,
+    _sample_efficiency,
+    _simulate_grassed,
+    _simulate_infield,
+    _simulate_wetland,
+    _sample_efficiency,
+    _get_bmp_selection_probs,
 )
-from .sampling import sample_from_stats
+
+
+from .parcel import (
+    _sample_parcel_index,
+    _sample_yield,
+    _get_parcel_metadata,
+    _get_parcel_up_list,
+    _get_parcel_out_oids,
+    _get_delivery_coeffs
+)
+
+
+from .cost import (
+    _compute_bmp_cost,
+    _compute_bmp_cost_usd,
+    _estimate_costs_for_probabilities,
+    _select_cost_rate_median,
+)
+
+
+from .sampling import (
+    _sample_from_stats,
+    _piecewise_quantile_sample,
+    _trunc_normal,
+)
+
+
 from .constants import (
     BMP_CPS_NAME_MAP,
     CFG_BMP_COST,
@@ -69,12 +102,13 @@ from .constants import (
     YAXIS_TARGET,
     YAXIS_TOTAL,
 )
-from .selection import estimate_costs_for_probabilities
 
 
-class Simulator:
+class Model:
     def __init__(self, cfg: Dict[str, Any], data: Dict[str, Any], logger: logging.Logger) -> None:
         """Create a simulation instance with config, validated inputs, and logging."""
+        
+        # define instance variables for config, data, and logger
         self.cfg = cfg
         self.data = data
         self.logger = logger
@@ -99,10 +133,42 @@ class Simulator:
         self.pollutant_yield_stats: list[list[Optional[dict[str, Any]]]]
         self.bmp_cps: list[int]
         self.bmp_selection_probs: np.ndarray
+
+        # bind sampling function
+        self._sample_from_stats = types.MethodType(_sample_from_stats, self)  # bind to instance method for easier mocking in tests
+        self._piecewise_quantile_sample = types.MethodType(_piecewise_quantile_sample, self)
+        self._trunc_normal = types.MethodType(_trunc_normal, self)
+
+        # bind bmp functions
+        self._select_bmp_type = types.MethodType(_select_bmp_type, self)
+        self._get_bmp_name = types.MethodType(_get_bmp_name, self)
+        self._sample_efficiency = types.MethodType(_sample_efficiency, self)
+        self._simulate_wetland = types.MethodType(_simulate_wetland, self)
+        self._simulate_grassed = types.MethodType(_simulate_grassed, self)
+        self._simulate_infield = types.MethodType(_simulate_infield, self)
+        self._get_bmp_selection_probs = types.MethodType(_get_bmp_selection_probs, self)
+        self._compute_bmp_cost = types.MethodType(_compute_bmp_cost, self)
+
+        # bind parcel functions
+        self._sample_parcel_index = types.MethodType(_sample_parcel_index, self)
+        self._sample_yield = types.MethodType(_sample_yield, self)
+        self._get_parcel_metadata = types.MethodType(_get_parcel_metadata, self)
+        self._get_parcel_up_list = types.MethodType(_get_parcel_up_list, self)
+        self._get_parcel_out_oids = types.MethodType(_get_parcel_out_oids, self)
+        self._delivery_coeffs = types.MethodType(_get_delivery_coeffs, self)
+
+        # bind cost functions
+        self._compute_bmp_cost = types.MethodType(_compute_bmp_cost, self)
+        self._compute_bmp_cost_usd = types.MethodType(_compute_bmp_cost_usd, self)
+        self._estimate_costs_for_probabilities = types.MethodType(_estimate_costs_for_probabilities, self)
+        self._select_cost_rate_median = types.MethodType(_select_cost_rate_median, self)
+        
+        # prepare lookup tables
         self._prepare_lookup_tables()
 
     def _prepare_lookup_tables(self) -> None:
         """Build static lookup tables and selection arrays for fast scenario execution."""
+
         parcels = self.data[DATA_PARCELS]
         self.parcel_ids = parcels[COL_PID].astype(str).tolist()
         self.pid_to_index = {pid: idx for idx, pid in enumerate(self.parcel_ids)}
@@ -179,258 +245,111 @@ class Simulator:
                 or (str(k).startswith(PERCENTILE_PREFIX) and str(k)[1:].isdigit())
             }
 
-        bmp_probs = self._get_bmp_selection_probs()
+        self.cfg.get(CFG_BMP_SEL)
+        bmp_probs = self._get_bmp_selection_probs(self.cfg.get(CFG_BMP_SEL))
         self.bmp_cps = bmp_probs[COL_CPS].astype(int).tolist()
         self.bmp_selection_probs = bmp_probs[COL_PROBABILITY].astype(float).to_numpy()
-
-    def _get_bmp_selection_probs(self) -> pd.DataFrame:
-        """Return BMP type selection probabilities for the scenario loop.
-
-        If an explicit probability file is provided via cfg[bmp_sel], use it.
-        Otherwise derive weights from estimated costs so lower-cost BMPs are more likely.
-        """
-        import pandas as pd
-
-        bmp_sel_path = self.cfg.get(CFG_BMP_SEL)
-        if bmp_sel_path:
-            df = pd.read_csv(bmp_sel_path)
-            df.columns = [c.lower() for c in df.columns]
-            df = df[df[COL_CPS].astype(int).isin(self.data[DATA_CPS])].copy()
-            if COL_PROBABILITY not in df.columns and "pr" in df.columns:
-                df[COL_PROBABILITY] = df["pr"]
-            elif COL_PROBABILITY not in df.columns and "p" in df.columns:
-                df[COL_PROBABILITY] = df["p"]
-            s = df[COL_PROBABILITY].sum()
-            if s <= 0:
-                raise ValueError(f"{CFG_BMP_SEL} probabilities sum to zero or negative")
-            df[COL_PROBABILITY] = df[COL_PROBABILITY] / s
-            return df[[COL_CPS, COL_PROBABILITY]]
-        else:
-            if self.data[DATA_BMP_COST] is None:
-                probs = np.full(len(self.data[DATA_CPS]), 1.0 / len(self.data[DATA_CPS]))
-                return pd.DataFrame({COL_CPS: self.data[DATA_CPS], COL_PROBABILITY: probs})
-            else:
-                df = estimate_costs_for_probabilities(
-                    self.rng,
-                    self.data[DATA_BMP_COST],
-                    self.data[DATA_CPS],
-                    self.data[DATA_AVG_AREA_HA],
-                    self.data[DATA_AVG_PERIM_M],
-                    overrides={},
-                )
-                return df
-
-    def _sample_efficiency(self, cps: Union[int, str], pol_idx: int) -> float:
-        """Sample BMP efficiency for a given CPS type and pollutant index."""
-        cps_key = int(cps)
-        stats = self.bmp_efficiency_stats[cps_key][pol_idx]
-        if stats is None:
-            raise KeyError(f"No BMP efficiency stats found for cps={cps_key}, pollutant={self.pollutants[pol_idx]}")
-        return sample_from_stats(
-            self.rng,
-            stats,
-            kind="efficiency",
-            verbose_logger=self.logger,
-            ctx=f"cps={cps_key},pollutant={self.pollutants[pol_idx]}",
-        )
-
-    def _sample_yield(self, parcel_idx: int, pol_idx: int) -> float:
-        """Sample baseline pollutant yield for a parcel and pollutant index."""
-        stats = self.pollutant_yield_stats[parcel_idx][pol_idx]
-        if stats is None:
-            raise KeyError(
-                f"No pollutant yield stats found for pid={self.parcel_ids[parcel_idx]}, pollutant={self.pollutants[pol_idx]}"
-            )
-        return sample_from_stats(
-            self.rng,
-            stats,
-            kind="yield",
-            verbose_logger=self.logger,
-            ctx=f"pid={self.parcel_ids[parcel_idx]},pollutant={self.pollutants[pol_idx]}",
-        )
-
-    def _select_parcel_index(self) -> int:
-        """Choose a parcel index randomly from parcel selection probabilities."""
-        idx = self.rng.choice(len(self.parcel_selection_ids), p=self.parcel_selection_probs)
         self.logger.debug(
-            f"Random parcel selection idx={idx} pid={self.parcel_selection_ids[idx]} probs_sample={self.parcel_selection_probs} ctx=parcel_selection"
-        )
-        return idx
-
-    def _select_bmp_type(self) -> int:
-        """Choose a BMP type code from the probability distribution."""
-        idx = self.rng.choice(len(self.bmp_cps), p=self.bmp_selection_probs)
-        cps = int(self.bmp_cps[idx])
-        self.logger.debug(
-            f"Random BMP type selection idx={idx} cps={cps} probs_sample={self.bmp_selection_probs} ctx=bmp_selection"
-        )
-        return cps
-
-    def _get_bmp_name(self, cps: Union[int, str]) -> str:
-        """Return the human-readable name for the BMP CPS code."""
-        key = int(cps)
-        return BMP_CPS_NAME_MAP.get(key, f"CPS {key}")
-
-    def _parcel_record(self, pid: Union[int, str]) -> pd.Series:
-        """Return parcel metadata for a given parcel ID, raising if missing."""
-        sub = self.data[DATA_PARCELS]
-        match = sub[sub[COL_PID].astype(str) == str(pid)]
-        if match.empty:
-            raise KeyError(
-                f"Selected pid {pid} not found in parcels after clipping. "
-                f"Ensure parcel_p PIDs exist in parcels and are within the domain."
-            )
-        return match.iloc[0]
-
-    def _parcel_up_list(self, pid: Union[int, str]) -> List[str]:
-        """Return the ordered list of up-gradient parcel IDs for the given parcel."""
-        return list(self.data[DATA_PARCEL_UP_MAP].get(str(pid), []))
-
-    def _parcel_out_oids(self, parcel_idx: int) -> List[str]:
-        """Return the outlet IDs associated with a parcel index."""
-        return list(self.parcel_out_oids[parcel_idx])
-
-    def _delivery_coeffs(self, pid: Union[int, str], oid: Union[int, str]) -> Dict[str, float]:
-        """Get delivery coefficients for a parcel-to-outlet pair.
-
-        Defaults to 1.0 when no explicit delivery ratios are supplied.
-        """
-        return self.delivery_coeffs.get(
-            (str(pid), str(oid)),
-            dict(sdr_f_to_s=1.0, sdr_s_to_o=1.0, ndr_f_to_s=1.0, ndr_s_to_o=1.0),
+            f"Prepared lookup tables: parcels={len(self.parcel_ids)}, pollutants={len(self.pollutants)}, "
+            f"bmp_types={len(self.bmp_cps)}"
         )
 
-    def _compute_bmp_cost(self, cps: Union[int, str], quantity: float) -> float:
-        """Compute the cost for a BMP instance using the configured cost table."""
-        return compute_bmp_cost(self.rng, self.data.get("bmp_cost"), cps, quantity, self.logger)
-
-    def _simulate_wetland(
-        self,
-        parcel_idx: int,
-        eff: List[float],
-        yields: np.ndarray,
-        bmp_rec: Dict[str, Any],
-        bmp_outputs: Dict[str, np.ndarray],
-    ) -> None:
-        """Wrap wetland BMP simulation logic into the scenario engine."""
-        simulate_wetland(
-            self.rng,
-            parcel_idx,
-            eff,
-            yields,
-            bmp_rec,
-            bmp_outputs,
-            self.parcel_area_ha,
-            self.parcel_up_idxs,
-            self.parcel_ids,
-            self.pollutants,
-            logger=self.logger,
-        )
-
-    def _simulate_grassed(
-        self,
-        parcel_idx: int,
-        eff: List[float],
-        yields: np.ndarray,
-        bmp_rec: Dict[str, Any],
-        bmp_outputs: Dict[str, np.ndarray],
-    ) -> None:
-        """Wrap grassed/buffer BMP simulation logic into the scenario engine."""
-        simulate_grassed(
-            self.rng,
-            parcel_idx,
-            eff,
-            yields,
-            bmp_rec,
-            bmp_outputs,
-            self.parcel_area_ha,
-            self.parcel_perim_m,
-            self.cfg,
-            self.pollutants,
-            logger=self.logger,
-        )
-
-    def _simulate_infield(
-        self,
-        parcel_idx: int,
-        eff: List[float],
-        yields: np.ndarray,
-        bmp_rec: Dict[str, Any],
-        bmp_outputs: Dict[str, np.ndarray],
-    ) -> None:
-        """Wrap in-field BMP simulation logic into the scenario engine."""
-        simulate_infield(
-            parcel_idx,
-            eff,
-            yields,
-            bmp_rec,
-            bmp_outputs,
-            self.parcel_area_ha,
-            self.pollutants,
-        )
 
     def run_all_scenarios(self) -> Dict[Tuple[str, str, str, str], List[Tuple[int, float, float]]]:
         """Run all configured scenarios, persist outputs, and return plotting records."""
+
+        # set output directory
         outputs_dir = Path(self.cfg.get(CFG_OUTPUTS, "./outputs"))
         outputs_dir.mkdir(parents=True, exist_ok=True)
         self.outputs_dir = outputs_dir
 
-
-
-        parcels_path = outputs_dir / "parcels.csv"
-        bmps_path = outputs_dir / "bmps.csv"
+        # define paths for outputs
+        parcels_path = os.path.join(outputs_dir, "parcels.csv")
+        bmps_path = os.path.join(outputs_dir, "bmps.csv")
         first_write = True
 
+        # init scenario records for plotting
         scenario_records: Dict[Tuple[str, str, str, str], List[Tuple[int, float, float]]] = defaultdict(list)
         x_axes: List[str]
 
+        # define number of parcels and pollutants for array initializations
         n_parcels = len(self.parcel_ids)
         n_pollutants = len(self.pollutants)
 
+        # iterate over scenarios
         for sidx in range(self.data[DATA_N_SCENARIOS]):
-            self.logger.info(f"Scenario {sidx + 1}/{self.data['n_scenarios']}")
+            self.logger.info(f"executing scenario {sidx + 1} of {self.data['n_scenarios']}")
+
+            # initialize yields and baseline arrays for this scenario
             yields = np.empty((n_parcels, n_pollutants), dtype=float)
             baseline = np.empty_like(yields)
+            self.logger.debug(f" setting baseline pollutant yields")
             for parcel_idx in range(n_parcels):
                 for pol_idx, pol in enumerate(self.pollutants):
                     y = self._sample_yield(parcel_idx, pol_idx)
                     yields[parcel_idx, pol_idx] = y
                     baseline[parcel_idx, pol_idx] = y
+            mean_pollutant = baseline.mean(axis=0).tolist()
+            min_pollutant = baseline.min(axis=0).tolist()
+            max_pollutant = baseline.max(axis=0).tolist()
+            std_pollutant = baseline.std(axis=0).tolist()
+            for pol_idx, pol in enumerate(self.pollutants):
+                self.logger.debug(
+                    f" baseline yields for {pol} (across bmp impacted parcels): "
+                    f"min={min_pollutant[pol_idx]:.2f}"
+                    f"mean={mean_pollutant[pol_idx]:.2f}"
+                    f"std={std_pollutant[pol_idx]:.2f}"
+                    f"max={max_pollutant[pol_idx]:.2f}"
+                )
 
+            # init bmp count and cost to 0
             total_cost = 0.0
             total_bmp = 0
+
+            # init scenario limits
             limit_usd = self.data[DATA_BMP_LIMIT_USD]
             limit_n = self.data[DATA_BMP_LIMIT_N]
+            self.logger.debug(f" setting scenario limits: limit_usd={limit_usd} limit_n={limit_n}")
+
+            # cumumulative pollutant reduction by outlet and pollutant for this scenario; used for plotting at end of each scenario
             cumul: Dict[str, Dict[str, float]] = defaultdict(lambda: defaultdict(float))
 
+            # init plotting axes for this scenario
             x_axes: List[str] = []
             if self.cfg.get(CFG_BMP_COST):
                 x_axes.append(XAXIS_COST)
             else:
                 x_axes.append(XAXIS_COUNT)
-
             y_axes: List[str] = [YAXIS_TOTAL]
             if self.outlet_target_map:
                 y_axes.append(YAXIS_TARGET)
             if self.outlet_mean_map:
                 y_axes.append(YAXIS_MEAN)
 
+            # init scenario bmp and parcel records for output
             scenario_bmps: List[Dict[str, Any]] = []
             scenario_parcels: List[Dict[str, Any]] = []
 
+            # while limits are not reached, keep adding bmps to the scenario
             while True:
                 if limit_usd is not None and total_cost >= limit_usd:
+                    self.logger.debug(f" reached USD limit: total_cost={total_cost:.2f}, limit_usd={limit_usd:.2f}")
                     break
                 if limit_n is not None and total_bmp >= limit_n:
+                    self.logger.debug(f" reached BMP count limit: total_bmp={total_bmp}, limit_n={limit_n}")
                     break
 
-                parcel_sel_idx = self._select_parcel_index()
-                pid = self.parcel_selection_ids[parcel_sel_idx]
-                parcel_idx = self.pid_to_index[pid]
+                # select parcel
+                parcel_idx = self._sample_parcel_index()
+                pid = self.parcel_selection_ids[parcel_idx]
+
+                # select bmp type
                 cps = self._select_bmp_type()
 
+                # set effectiveness for each pollutant for this bmp type
                 eff = [self._sample_efficiency(cps, pol_idx) for pol_idx in range(n_pollutants)]
 
+                # init bmp record with metadata and empty outputs
                 bmp_rec: Dict[str, Any] = dict(
                     scenario=sidx + 1,
                     cps=cps,
@@ -450,6 +369,7 @@ class Simulator:
                     OUTPUT_REMOVED: np.zeros(n_pollutants, dtype=float),
                 }
 
+                # apply the bmp to the parcel and get the outputs
                 if cps in (656, 657):
                     self._simulate_wetland(parcel_idx, eff, yields, bmp_rec, bmp_outputs)
                     quantity = float(bmp_rec[OUTPUT_WETLAND_AREA])
@@ -460,25 +380,52 @@ class Simulator:
                     self._simulate_infield(parcel_idx, eff, yields, bmp_rec, bmp_outputs)
                     quantity = float(self.parcel_area_ha[parcel_idx])
 
-                cost_this = self._compute_bmp_cost(cps, quantity)
+                # determine cost
+                cost_this = self._compute_bmp_cost(cps, None, quantity, self.logger)
+                self.logger.debug(f" computed cost for this bmp application: {cost_this:.2f} USD (quantity={quantity:.4f})")
+
+                # advance the cost and bmp count totals
                 total_cost += cost_this
                 total_bmp += 1
+                self.logger.debug(f" updated total_cost={total_cost:.2f} total_bmp={total_bmp}")
 
+                # log final bmp record and outputs for this scenario
+                for k, v in bmp_rec.items():
+                    self.logger.debug(f"  {k}: {v}")
                 bmp_rec[OUTPUT_COST_USD] = cost_this
                 for pol_idx, pol in enumerate(self.pollutants):
                     bmp_rec[f"{OUTPUT_TREATED_PREFIX}{pol}"] = float(bmp_outputs[OUTPUT_TREATED][pol_idx])
                     bmp_rec[f"{OUTPUT_REMOVED_PREFIX}{pol}"] = float(bmp_outputs[OUTPUT_REMOVED][pol_idx])
+                self.logger.debug(f" final bmp record: ")
+                for k, v in bmp_rec.items():
+                    self.logger.debug(f"  {k}: {v}")
+
+                # add bmp record to scenario bmps list
                 scenario_bmps.append(bmp_rec)
 
-                oids = self._parcel_out_oids(parcel_idx)
+                # get outlet ids for parcel (>=1 outlets)
+                oids = self._get_parcel_out_oids(parcel_idx)
+
+                # compute cumulative delivered pollutant reduction for each outlet and pollutant, and record for plotting
                 for pol_idx, pol in enumerate(self.pollutants):
+
+                    # get pollutant removed 
                     removed_load = float(bmp_outputs[OUTPUT_REMOVED][pol_idx])
+                    
+                    # for each outlet
                     for oid in oids:
+
+                        # get delivery ratio for this parcel and outlet
                         dr = self._delivery_coeffs(pid, oid)
+                        # TODO: save and print to output file, print to debug log
+
+                        # apply delivery ratio
                         if pol == "TSS":
                             deliver = removed_load * dr[COL_SDR_F_TO_S] * dr[COL_SDR_S_TO_O]
                         else:
                             deliver = removed_load * dr[COL_NDR_F_TO_S] * dr[COL_NDR_S_TO_O]
+
+                        # add 
                         cumul[pol][oid] += deliver
 
                 for pol in self.pollutants:

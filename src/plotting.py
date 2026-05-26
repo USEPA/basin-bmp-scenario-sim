@@ -32,6 +32,7 @@ def make_summary_plots(
     """
     pollutants = data[DATA_POLLUTANTS]
     oids = [str(x) for x in data[DATA_OUTLET_LOC][COL_OID].astype(str).tolist()]
+    logger.debug(f"Generating summary plots for pollutants={pollutants} outlets={oids}")
 
     x_axes = []
     if cfg.get(CFG_BMP_COST):
@@ -74,6 +75,7 @@ def make_summary_plots(
                     plt.legend(fontsize=6)
                     fname = outputs_dir / f"plot_{pol}_oid{oid}_x{xax}_y{yax}.jpg"
                     plt.tight_layout()
+                    logger.debug(f"Saving plot file={fname} xax={xax} yax={yax} pollutant={pol} oid={oid}")
                     plt.savefig(fname, format="jpg", dpi=300)
                     plt.close()
                     logger.info(f"Saved plot: {fname}")

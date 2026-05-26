@@ -16,7 +16,7 @@ parcel_p: ./examples/east_fork/inputs/parcel_p.csv
 
 # Pollutants and BMPs
 pollutants: ["TN","TP"]
-cps: [340,329,590,412,656]
+cps: [340,329,590,393,656]
 
 # Required distributions
 pollutant_yield: ./examples/east_fork/inputs/pollutant_yield.csv
@@ -33,8 +33,8 @@ outlet_mean: ./examples/east_fork/inputs/outlet_mean.csv
 # Scenario controls
 n_scenarios: 3
 # Choose one of:
-# bmp_limit_n: 10
-bmp_limit_usd: 1000000
+bmp_limit_n: 50
+#bmp_limit_usd: 10000000
 
 # Optional buffer depth (ft) for grassed waterways
 buffer_depth_ft: 35
