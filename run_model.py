@@ -23,11 +23,7 @@ def parse_args() -> argparse.Namespace:
 
 
 def main() -> None:
-    """Entry point for the BMP simulation model.
-
-    Loads the YAML config, sets up output logging, validates input data, runs scenarios,
-    and generates summary plots.
-    """
+    """Entry point for the BMP simulation model."""
     args = parse_args()
     cfg_path = Path(args.config)
     if not cfg_path.exists():
@@ -37,7 +33,7 @@ def main() -> None:
     with open(cfg_path, "r", encoding="utf-8") as f:
         cfg = yaml.safe_load(f) or {}
 
-    # normalize keys to lowercase (do not enforce case sensitivity)
+    # normalize keys to lowercase
     cfg = {str(k).lower(): v for k, v in cfg.items()}
 
     if args.seed is not None:
@@ -53,10 +49,12 @@ def main() -> None:
     logger.info(f"Logging to: {log_path}")
 
     data = load_and_validate_all(cfg, logger)
+
+    # Run simulation (workers will write per-scenario CSV + log files)
     sim = Model(cfg, data, logger)
     scenario_records = sim.run_all_scenarios()
 
-    # Produce summary plots per spec
+    # Plots
     make_summary_plots(cfg, data, scenario_records, outputs_dir, logger)
 
     logger.info("Model run complete")
