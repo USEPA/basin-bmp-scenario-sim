@@ -25,120 +25,129 @@ from .constants import (
 )
 
 
-def compute_bmp_cost(
+def _get_bmp_cost(
     self: Model,
-    bmp_cost_df: Optional[pd.DataFrame],
     cps: Union[int, str],
     quantity: float,
-    logger: logging.Logger,
 ) -> float:
     """Estimate BMP cost in USD from configured cost statistics."""
-    logger.debug(f" calling compute_bmp_cost, cps={cps}, quantity={quantity:.4f}")
-    if bmp_cost_df is None:
-        logger.warning(f"  no BMP cost table provided for cps={cps}; returning cost=0.0")
-        return 0.0
-    sub = bmp_cost_df[bmp_cost_df[COL_CPS].astype(int) == int(cps)]
-    if sub.empty:
-        logger.warning(f"  no cost entry found for cps={cps}; returning cost=0.0")
-        return 0.0
-    unit_row = sub.iloc[0]
-    cost = self._compute_bmp_cost_usd(cps, unit_row, quantity, logger)
-    logger.debug(f"  computed cost for cps={cps}, quantity={quantity:.4f} => cost={cost:.2f}")
-    return cost
-
-def _compute_bmp_cost(
-    self: Model,
-    cps: Union[int, str],
-    unit_row: Optional[pd.Series],
-    quantity: float,
-    logger: logging.Logger,
-) -> float:
-    """Compute total BMP cost in USD from sampled unit cost and quantity.
-
-    The function samples a cost rate based on the provided statistics, validates
-    that the sampled rate and resulting total are non-negative, and returns the
-    USD cost for the given BMP quantity.
-    """
-    logger.debug(f'calling compute_bmp_cost_usd, cps = {cps}, quantity={quantity}')
+    self.logger.debug(f" calling compute_bmp_cost")
     
-    df = self.data[DATA_BMP_COST][self.data[DATA_BMP_COST][COL_CPS].astype(int) == int(cps)]
-    if df is None:
-        logger.debug(f" no cost row available for cps={cps}; returning cost = $0")
+    bmp_cost_df = self.data[DATA_BMP_COST]
+    bmp_cost_df = bmp_cost_df[bmp_cost_df[COL_CPS].astype(int) == int(cps)]
+    if bmp_cost_df.empty:
+        self.logger.debug(f"  no cost entry found for cps={cps}; returning cost=$0.0")
         return 0.0
-    stats = {k: df.iloc[0][k] for k in df.columns if k in ("mean","sd","min","max") or (str(k).startswith("p") and str(k)[1:].isdigit())}
-    logger.debug(f" sampling cost rate for cps={cps} using stats={stats}")
-    rate = self._sample_from_stats(stats, kind=None)
-    logger.debug(f" sampled cost rate = {rate:.4f}")
-    if rate < 0:
-        raise ValueError("Negative cost-rate sampled")
-    total = rate * quantity
-    if total < 0:
-        raise ValueError("Negative total cost computed")
-    logger.debug(f" total cost = {total:.2f}")
-    return float(total)
-
-def _select_cost_rate_median(
-    self: Model,
-    row: pd.Series, 
-    logger: Optional[logging.Logger],
-    cps: Optional[Union[int, str]] = None) -> float:
-    """Select a representative BMP cost rate for probability estimation.
-    If a median percentile exists, use it directly; otherwise sample from stats.
-    """
-    logger.debug(f" calling _select_cost_rate_median cps={cps} row={row.to_dict()}")
+    row = bmp_cost_df.iloc[0] # TODO - handle multiple rows per CPS with different stats? or validate that there's only one row per CPS in the input data
+    unit = str(row[COL_UNIT]).lower().strip()
     stats: Dict[str, float] = {
         k: row[k]
         for k in row.index
         if k in ("mean", "sd", "min", "max") or (str(k).startswith("p") and str(k)[1:].isdigit())
     }
-    if "p50" in {k.lower():v for k,v in stats.items()}:
-        selected = float(stats.get("p50") or stats.get("P50"))
-        return selected
+    rate_value = self._sample_from_stats(stats, kind=None)
+    self.logger.debug(f"  sampled cost rate {rate_value:.4f}")
+    if unit in ("usd/ha","usd per ha","usd_per_ha","usd per unit area"):
+        if cps in (656,657):
+            area_ha = float(min(0.8, self.data[DATA_AVG_AREA_HA]))
+            cost_total = rate_value * area_ha
+        else:
+            area_ha = float(self.data[DATA_AVG_AREA_HA])
+            cost_total = rate_value * area_ha
+    elif unit in ("usd/m","usd per m","usd_per_m","usd per unit length"):
+        length_m = float(0.2 * self.data[DATA_AVG_PERIM_M])
+        cost_total = rate_value * length_m
+    elif unit in ("usd/project","usd per project","usd_per_project"):
+        count = 1
+        cost_total = rate_value * count
+    else:
+        cost_total = rate_value
+    self.logger.debug(f"  computed cost using rate{rate_value:.4f}, quantity={quantity:.4f} => cost={cost_total:.2f}")
+    return cost_total
 
-    import logging
-    logging.getLogger(__name__).debug(f"Sampling cost rate for probability estimate cps={cps} stats={stats}")
-    return self._sample_from_stats(stats, kind=None)
+
+def _select_cost_rate_median(
+    self: Model,
+    row: pd.Series, 
+    cps: Optional[Union[int, str]] = None) -> float:
+    """Select a representative BMP cost rate for probability estimation.
+    If a median percentile exists, use it directly; otherwise sample from stats.
+    """
+    self.logger.debug(f" calling _select_cost_rate_median")
+    stats: Dict[str, float] = {
+        k: row[k]
+        for k in row.index
+        if k in ("mean", "sd", "min", "max") or (str(k).startswith("p") and str(k)[1:].isdigit())
+    }
+    rate_value = None
+    if "p50" in {k.lower():v for k,v in stats.items()} or 'median' in {k.lower():v for k,v in stats.items()}:
+        median = float(stats.get("p50") or stats.get("P50") or stats.get("median"))
+        rate_value = median
+    elif "mean" in stats in stats:
+        mean = float(stats.get("mean") or stats.get("average") or stats.get("avg"))
+        rate_value = mean
+    else:
+        rate_min = float(stats.get("min") or stats.get("minimum") or stats.get("p0"))
+        rate_max = float(stats.get("max") or stats.get("maximum") or stats.get("p100"))
+        rate_value = (rate_min + rate_max) / 2.0
+    self.logger.debug(f"  selected cost rate {rate_value:.4f}")
+    if rate_value is None:
+        raise ValueError(f"Could not determine cost rate for cps={cps} from stats={stats}")
+    return rate_value
+
 
 def _estimate_costs_for_probabilities(
     self: Model,
-    bmp_cost_df: pd.DataFrame,
-    cps_list: Sequence[Union[int, str]],
-    avg_area_ha: float,
-    avg_perim_m: float,
-    overrides: Optional[Dict[str, float]] = None,
     ) -> pd.DataFrame:
     """Estimate BMP selection probabilities using inverse expected cost.
 
     This heuristic transforms cost estimates into selection probability weights,
     favoring lower-cost BMP types when explicit probabilities are not provided.
     """
-    
-    overrides = overrides or {}
+    self.logger.debug(f" calling _estimate_costs_for_probabilities")
     rows: list[Dict[str, float]] = []
-    for cps in cps_list:
-        sub = bmp_cost_df[bmp_cost_df[COL_CPS].astype(int) == int(cps)]
-        if sub.empty:
+    for cps in list(set(self.data[DATA_CPS])):
+        bmp_cost_df = self.data[DATA_BMP_COST]
+        bmp_cost_df = bmp_cost_df[bmp_cost_df[COL_CPS].astype(int) == int(cps)]
+        if bmp_cost_df.empty:
+            print(f"  no cost entry found for cps={cps}; skipping probability estimation for this CPS")
+            rows.append({"cps": int(cps), "est_total_cost": float(0.0)})
             continue
-        r = sub.iloc[0]
-        unit = str(r[COL_UNIT]).lower().strip()
-        rate = self._select_cost_rate_median(r, logging.getLogger(__name__), cps)
-        if rate < 0:
-            raise ValueError(f"Negative cost-rate for cps {cps}")
-
+        row = bmp_cost_df.iloc[0] # TODO - handle multiple rows per CPS with different stats? or validate that there's only one row per CPS in the input data
+        unit = str(row[COL_UNIT]).lower().strip()
+        stats: Dict[str, float] = {
+            k: row[k]
+            for k in row.index
+            if k in ("mean", "sd", "min", "max") or (str(k).startswith("p") and str(k)[1:].isdigit())
+        }
+        rate_value = None
+        if "p50" in {k.lower():v for k,v in stats.items()} or 'median' in {k.lower():v for k,v in stats.items()}:
+            median = float(stats.get("p50") or stats.get("P50") or stats.get("median"))
+            rate_value = median
+        elif "mean" in stats in stats:
+            mean = float(stats.get("mean") or stats.get("average") or stats.get("avg"))
+            rate_value = mean
+        else:
+            rate_min = float(stats.get("min") or stats.get("minimum") or stats.get("p0"))
+            rate_max = float(stats.get("max") or stats.get("maximum") or stats.get("p100"))
+            rate_value = (rate_min + rate_max) / 2.0
+        self.logger.debug(f"  selected cost rate {rate_value:.4f}")
+        if rate_value is None:
+            raise ValueError(f"Could not determine cost rate for cps={cps} from stats={stats}")
         if unit in ("usd/ha","usd per ha","usd_per_ha","usd per unit area"):
             if cps in (656,657):
-                area_ha = float(overrides.get("wetland_area_ha_for_prob", min(0.8, avg_area_ha)))
+                area_ha = min(0.8, self.data[DATA_AVG_AREA_HA])
             else:
-                area_ha = float(overrides.get("field_area_ha_for_prob", avg_area_ha))
-            total = rate * area_ha
+                area_ha = float(self.data[DATA_AVG_AREA_HA])
+            total = rate_value * area_ha
         elif unit in ("usd/m","usd per m","usd_per_m","usd per unit length"):
-            length_m = float(overrides.get("buffer_length_m_for_prob", 0.2 * avg_perim_m))
-            total = rate * length_m
+            length_m = float(0.2 * self.data[DATA_AVG_PERIM_M])
+            total = rate_value * length_m
         elif unit in ("usd/project","usd per project","usd_per_project"):
-            count = float(overrides.get("project_count_for_prob", 1.0))
-            total = rate * count
+            count = 1.0
+            total = rate_value * count
         else:
-            total = rate
+            total = rate_value
         if total < 0:
             raise ValueError(f"Estimated total cost < 0 for cps {cps}")
         rows.append({"cps": int(cps), "est_total_cost": float(total)})
@@ -149,17 +158,5 @@ def _estimate_costs_for_probabilities(
     inv = 1.0 / df["est_total_cost"].values
     probs = inv / inv.sum()
     df[COL_PROBABILITY] = probs
-    logging.getLogger(__name__).debug(f"Estimated selection probabilities from cost totals: {df.to_dict(orient='records')}")
+    self.logger.debug(f"  estimated probabilities for cps: {df[[COL_CPS, COL_PROBABILITY]].to_dict(orient='records')}")
     return df[[COL_CPS, COL_PROBABILITY]]
-
-
-def _compute_bmp_cost_usd(
-    self: Model,
-    cps: Union[int, str],
-    unit_row: Optional[pd.Series],
-    quantity: float,
-    logger: logging.Logger,
-) -> float:
-    """Compatibility wrapper: compute USD cost for a BMP using existing helper."""
-    # Delegate to the internal implementation which samples a rate and multiplies
-    return _compute_bmp_cost(self, cps, unit_row, quantity, logger)

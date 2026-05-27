@@ -31,8 +31,7 @@ from .parcel import (
 
 
 from .cost import (
-    _compute_bmp_cost,
-    _compute_bmp_cost_usd,
+    _get_bmp_cost,
     _estimate_costs_for_probabilities,
     _select_cost_rate_median,
 )
@@ -147,7 +146,7 @@ class Model:
         self._simulate_grassed = types.MethodType(_simulate_grassed, self)
         self._simulate_infield = types.MethodType(_simulate_infield, self)
         self._get_bmp_selection_probs = types.MethodType(_get_bmp_selection_probs, self)
-        self._compute_bmp_cost = types.MethodType(_compute_bmp_cost, self)
+        self._get_bmp_cost = types.MethodType(_get_bmp_cost, self)
 
         # bind parcel functions
         self._sample_parcel_index = types.MethodType(_sample_parcel_index, self)
@@ -158,8 +157,7 @@ class Model:
         self._delivery_coeffs = types.MethodType(_get_delivery_coeffs, self)
 
         # bind cost functions
-        self._compute_bmp_cost = types.MethodType(_compute_bmp_cost, self)
-        self._compute_bmp_cost_usd = types.MethodType(_compute_bmp_cost_usd, self)
+        self._compute_bmp_cost = types.MethodType(_get_bmp_cost, self)
         self._estimate_costs_for_probabilities = types.MethodType(_estimate_costs_for_probabilities, self)
         self._select_cost_rate_median = types.MethodType(_select_cost_rate_median, self)
         
@@ -381,7 +379,7 @@ class Model:
                     quantity = float(self.parcel_area_ha[parcel_idx])
 
                 # determine cost
-                cost_this = self._compute_bmp_cost(cps, None, quantity, self.logger)
+                cost_this = self._get_bmp_cost(cps, quantity)
                 self.logger.debug(f" computed cost for this bmp application: {cost_this:.2f} USD (quantity={quantity:.4f})")
 
                 # advance the cost and bmp count totals

@@ -261,11 +261,5 @@ def _get_bmp_selection_probs(
             probs = np.full(len(self.data[DATA_CPS]), 1.0 / len(self.data[DATA_CPS]))
             return pd.DataFrame({COL_CPS: self.data[DATA_CPS], COL_PROBABILITY: probs})
         else:
-            df = self._estimate_costs_for_probabilities(
-                self.data[DATA_BMP_COST],
-                self.data[DATA_CPS],
-                self.data[DATA_AVG_AREA_HA],
-                self.data[DATA_AVG_PERIM_M],
-                overrides={},
-            )
+            df = self._estimate_costs_for_probabilities()
             return df
