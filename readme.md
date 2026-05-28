@@ -5,9 +5,9 @@
 ## Description
 
 `basin-bmp-scenario-sim` facilitates Monte-Carlo-based simulation of basin-wide best management practice (BMP) implementation scenarios depicting aggregate costs and impacts on basin-outlet pollutant loads. The model is composed of a series of user-defined statistical distributions depicting:
-- Parcel selection (i.e., the relative liklihood of BMP implementation across the basin's parcels / agricultural fields)
+- Parcel selection (i.e., the relative liklihood of BMP implementation across the basin's parcels / agricultural fields) 
 - BMP / conservation practice type (i.e., the relative liklihood that specific types of BMPs or conservation practices will be implemented)
-  - BMP-specific characteristics (i.e., the relative likelihood of BMP-specific characteristics where the BMP type is implemented):
+  - BMP-specific characteristics (i.e., the relative likelihood of BMP-specific characteristics where the BMP type is implemented), e.g.:
     - Wetland area
     - Wetland catchment-to-area ratio
     - Grassed waterway length
