@@ -4,7 +4,7 @@
 
 ## Description
 
-`basin-bmp-sim` simulates basin-wide best management practice (BMP) implementation scenarios showing aggregate costs and impacts on basin-outlet pollutant loads as a function of random draws from user-described statistical distributions depicting:
+`basin-bmp-sim` facilitates Monte-Carlo-based simulation of basin-wide best management practice (BMP) implementation scenarios depciting aggregate costs and impacts on basin-outlet pollutant loads. The model is composed of user-defined statistical distributions depicting:
 - Parcel selection
   - Describe the relative liklihood of BMP implementation across the basin's parcel / agricultural fields
 - BMP / conservation practice type
