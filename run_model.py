@@ -46,7 +46,10 @@ def main() -> None:
     logger, log_path = make_logger(outputs_dir, verbose=verbose)
     logger.info("Starting model run")
     logger.info(f"Config: {cfg_path}")
-    logger.info(f"Logging to: {log_path}")
+    if log_path is not None:
+        logger.info(f"Logging to: {log_path}")
+    else:
+        logger.info("Logging only to console; per-scenario log files will be created.")
 
     data = load_and_validate_all(cfg, logger)
 

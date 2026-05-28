@@ -110,10 +110,9 @@ POLLUTANT_ALIAS_MAP = {
 
 # BMP CPS code name mapping
 BMP_CPS_NAME_MAP = {
-    329: "Residue Management",
+    329: "Residue Management (No-Till)",
     340: "Cover Crop",
     412: "Grassed Waterway",
     590: "Nutrient Management",
     656: "Constructed Wetland",
-    657: "Vegetated Treatment Area",
 }

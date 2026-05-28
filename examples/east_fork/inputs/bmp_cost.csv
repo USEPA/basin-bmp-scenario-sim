@@ -1,6 +1,6 @@
-cps,unit,min,max,mean,p50
-340,USD/ha,150,500,300,300
-329,USD/ha,25,125,75,75
-590,USD/ha,30,120,60,60
-412,USD/ha,40,135,75,75
-656,USD/ha,20000,40000,30000,30000
+cps,cps_name,unit,min,max,mean,p50
+340,Cover Crops,USD/ha,150,500,300,300
+329,Residue Management (No-Till),USD/ha,25,125,75,75
+590,Nutrient Management,USD/ha,30,120,60,60
+412,Grassed Waterway,USD/ha,40,135,75,75
+656,Constructed Wetland,USD/ha,20000,40000,30000,30000
