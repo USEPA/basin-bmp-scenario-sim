@@ -442,7 +442,9 @@ def _run_one_scenario(
     logger.debug(f"setting scenario limits: limit_usd={limit_usd} limit_n={limit_n}")
 
     # Plotting axes for this scenario
-    x_axes: List[str] = [XAXIS_COST] if cfg.get(CFG_BMP_COST) else [XAXIS_COUNT]
+    x_axes: List[str] = [XAXIS_COUNT]
+    if cfg.get(CFG_BMP_COST):
+        x_axes.append(XAXIS_COST)
     y_axes: List[str] = [YAXIS_TOTAL]
     if ctx.outlet_target_map:
         y_axes.append(YAXIS_TARGET)

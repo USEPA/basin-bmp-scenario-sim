@@ -35,10 +35,9 @@ def make_summary_plots(
     oids = [str(x) for x in data[DATA_OUTLET_LOC][COL_OID].astype(str).tolist()]
     logger.debug(f"Generating summary plots for pollutants={pollutants} outlets={oids}")
 
-    x_axes = []
+    x_axes = [XAXIS_COUNT]
     if cfg.get(CFG_BMP_COST):
         x_axes.append(XAXIS_COST)
-    x_axes.append(XAXIS_COUNT)
 
     y_axes = [YAXIS_TOTAL]
     if cfg.get(CFG_OUTLET_TARGET):
