@@ -31,7 +31,7 @@ outlet_target: ./examples/east_fork/inputs/outlet_target.csv
 outlet_mean: ./examples/east_fork/inputs/outlet_mean.csv
 
 # Scenario controls
-n_scenarios: 100
+n_scenarios: 5
 # Choose one of:
 bmp_limit_n: 50
 #bmp_limit_usd: 10000000

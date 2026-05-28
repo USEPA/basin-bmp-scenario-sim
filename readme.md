@@ -52,13 +52,52 @@ The model writes results to the configured `outputs` directory:
 - `bmps.csv` (aggregated across all scenarios, includes `scenario` and `cps_name`)
 - `parcels.csv` (aggregated across all scenarios, includes `scenario`)
 - `plot_*` files for summary visualizations
-- `log_*.txt`
+- `log.txt` (driver log for the overall run)
+- `log_s{scenario}.txt` (per-scenario debug logs, one file per scenario)
 
 ## Notes
 
 - Pollutant labels are normalized from aliases such as `nitrogen`, `phosphorus`, and `sediment`.
 - `parcel_out` outlet IDs must exist in `outlet_loc`.
 - If both `bmp_limit_n` and `bmp_limit_usd` are specified, the simulation stops when either limit is reached.
+
+## Parallelization
+
+The model can run scenarios in parallel using `joblib`. Configure parallel execution using the `parallel` config block (key: `parallel`). Supported options:
+
+- `n_jobs` (int): number of worker processes to spawn (pass `-1` to use all CPUs). Default: `-1`.
+- `max_nbytes` (str): memory threshold for memmapping objects to pass between workers (e.g. `"1M"`). Default: `"1M"`.
+- `temp_folder` (str, optional): temporary directory for worker data used by `loky`.
+
+Example `parallel` snippet in your YAML config:
+
+```yaml
+parallel:
+  n_jobs: -1
+  max_nbytes: "1M"
+  temp_folder: "/tmp/bmp-loky"
+```
+
+When running with multiple workers, the driver writes `outputs/log.txt` while each scenario worker writes its own `outputs/log_s{scenario}.txt` file (e.g. `log_s1.txt`).
+
+## Reproducibility (random seed)
+
+To make runs reproducible, set `random_seed` in the config or pass `--seed` on the command line. A base seed is used to spawn per-scenario child seeds so each scenario remains deterministic across runs when the same base seed and config are used.
+
+## CLI usage
+
+Common command-line examples:
+
+```bash
+# Run with defaults from config
+python run_model.py config.yaml
+
+# Override outputs directory and run quietly
+python run_model.py config.yaml --outputs ./outputs --quiet
+
+# Force a deterministic run
+python run_model.py config.yaml --seed 12345
+```
 
 ### Contact
 
