@@ -7874,3 +7874,1973 @@
 2026-05-28 13:35:43,636 [INFO] Wrote per-scenario BMPs: examples\east_fork\outputs\bmps_s5.csv
 2026-05-28 13:35:43,636 [INFO] Wrote per-scenario parcels: examples\east_fork\outputs\parcels_s5.csv
 2026-05-28 13:35:43,636 [INFO] === scenario 5 end (cost=106955.36, bmp=50) ===
+2026-05-28 14:47:25,815 [DEBUG] Worker logger initialized for scenario 5
+2026-05-28 14:47:25,815 [INFO] === scenario 5 start ===
+2026-05-28 14:47:25,815 [DEBUG] setting baseline pollutant yields
+2026-05-28 14:47:25,916 [DEBUG] baseline yields for TN: min=0.05 mean=35.07 std=31.21 max=149.94
+2026-05-28 14:47:25,916 [DEBUG] baseline yields for TP: min=0.00 mean=2.80 std=3.86 max=19.99
+2026-05-28 14:47:25,916 [DEBUG] setting scenario limits: limit_usd=None limit_n=50
+2026-05-28 14:47:25,916 [DEBUG] selected parcel idx=2127 with pid=2128
+2026-05-28 14:47:25,917 [DEBUG] selected bmp 412 (Grassed Waterway)
+2026-05-28 14:47:25,917 [DEBUG] selected efficiency value 0.09 for pollutant=TN
+2026-05-28 14:47:25,917 [DEBUG] selected efficiency value 0.10 for pollutant=TP
+2026-05-28 14:47:25,917 [DEBUG] calling simulate_grassed
+2026-05-28 14:47:25,917 [DEBUG] length of grassed buffer/waterway is 281.67 m based on fraction 0.26 of parcel perimeter 1099.00 m
+2026-05-28 14:47:25,917 [DEBUG] reduced yield for pollutant TN: existing yield=15.94, effectiveness=0.09, treated_area=1.95 ha, removal=2.69, new yield=15.59
+2026-05-28 14:47:25,917 [DEBUG] reduced yield for pollutant TP: existing yield=1.68, effectiveness=0.10, treated_area=1.95 ha, removal=0.34, new yield=1.64
+2026-05-28 14:47:25,917 [DEBUG] calling compute_bmp_cost
+2026-05-28 14:47:25,919 [DEBUG] sampled cost rate 88.8711
+2026-05-28 14:47:25,919 [DEBUG] computed cost using rate88.8711, quantity=0.3005 => cost=1740.85
+2026-05-28 14:47:25,919 [DEBUG] computed cost for this bmp application: 1740.85 USD (quantity=0.3005)
+2026-05-28 14:47:25,919 [DEBUG] updated total_cost=1740.85 total_bmp=1
+2026-05-28 14:47:25,919 [DEBUG] scenario: 5
+2026-05-28 14:47:25,919 [DEBUG] cps: 412
+2026-05-28 14:47:25,919 [DEBUG] cps_name: Grassed Waterway
+2026-05-28 14:47:25,919 [DEBUG] pid: 2128
+2026-05-28 14:47:25,919 [DEBUG] impacted_pids: 
+2026-05-28 14:47:25,919 [DEBUG] linear_length_m: 281.67405250339766
+2026-05-28 14:47:25,919 [DEBUG] buffer_area_ha: 0.30048987921062464
+2026-05-28 14:47:25,919 [DEBUG] portion_treated: 0.2551199005637256
+2026-05-28 14:47:25,920 [DEBUG] wetland_area_ha: None
+2026-05-28 14:47:25,920 [DEBUG] catchment_to_wetland_ratio: None
+2026-05-28 14:47:25,920 [DEBUG] final bmp record:
+2026-05-28 14:47:25,920 [DEBUG] scenario: 5
+2026-05-28 14:47:25,920 [DEBUG] cps: 412
+2026-05-28 14:47:25,920 [DEBUG] cps_name: Grassed Waterway
+2026-05-28 14:47:25,920 [DEBUG] pid: 2128
+2026-05-28 14:47:25,920 [DEBUG] impacted_pids: 
+2026-05-28 14:47:25,920 [DEBUG] linear_length_m: 281.67405250339766
+2026-05-28 14:47:25,920 [DEBUG] buffer_area_ha: 0.30048987921062464
+2026-05-28 14:47:25,920 [DEBUG] portion_treated: 0.2551199005637256
+2026-05-28 14:47:25,920 [DEBUG] wetland_area_ha: None
+2026-05-28 14:47:25,920 [DEBUG] catchment_to_wetland_ratio: None
+2026-05-28 14:47:25,920 [DEBUG] cost_usd: 1740.8546810788578
+2026-05-28 14:47:25,920 [DEBUG] treated_TN: 31.13946565038288
+2026-05-28 14:47:25,920 [DEBUG] removed_TN: 2.6949926599872014
+2026-05-28 14:47:25,920 [DEBUG] treated_TP: 3.2870051217296523
+2026-05-28 14:47:25,920 [DEBUG] removed_TP: 0.34181375041129547
+2026-05-28 14:47:25,921 [DEBUG] selected parcel idx=1647 with pid=1648
+2026-05-28 14:47:25,921 [DEBUG] selected bmp 412 (Grassed Waterway)
+2026-05-28 14:47:25,921 [DEBUG] selected efficiency value 0.08 for pollutant=TN
+2026-05-28 14:47:25,921 [DEBUG] selected efficiency value 0.29 for pollutant=TP
+2026-05-28 14:47:25,921 [DEBUG] calling simulate_grassed
+2026-05-28 14:47:25,921 [DEBUG] length of grassed buffer/waterway is 420.75 m based on fraction 0.23 of parcel perimeter 1797.44 m
+2026-05-28 14:47:25,921 [DEBUG] reduced yield for pollutant TN: existing yield=18.22, effectiveness=0.08, treated_area=4.36 ha, removal=6.23, new yield=17.78
+2026-05-28 14:47:25,921 [DEBUG] reduced yield for pollutant TP: existing yield=1.75, effectiveness=0.29, treated_area=4.36 ha, removal=2.20, new yield=1.59
+2026-05-28 14:47:25,921 [DEBUG] calling compute_bmp_cost
+2026-05-28 14:47:25,922 [DEBUG] sampled cost rate 49.5949
+2026-05-28 14:47:25,922 [DEBUG] computed cost using rate49.5949, quantity=0.4489 => cost=971.49
+2026-05-28 14:47:25,922 [DEBUG] computed cost for this bmp application: 971.49 USD (quantity=0.4489)
+2026-05-28 14:47:25,922 [DEBUG] updated total_cost=2712.35 total_bmp=2
+2026-05-28 14:47:25,923 [DEBUG] scenario: 5
+2026-05-28 14:47:25,923 [DEBUG] cps: 412
+2026-05-28 14:47:25,923 [DEBUG] cps_name: Grassed Waterway
+2026-05-28 14:47:25,923 [DEBUG] pid: 1648
+2026-05-28 14:47:25,923 [DEBUG] impacted_pids: 
+2026-05-28 14:47:25,923 [DEBUG] linear_length_m: 420.75334120678644
+2026-05-28 14:47:25,923 [DEBUG] buffer_area_ha: 0.44885966439939984
+2026-05-28 14:47:25,923 [DEBUG] portion_treated: 0.3054667441565869
+2026-05-28 14:47:25,923 [DEBUG] wetland_area_ha: None
+2026-05-28 14:47:25,923 [DEBUG] catchment_to_wetland_ratio: None
+2026-05-28 14:47:25,923 [DEBUG] final bmp record:
+2026-05-28 14:47:25,923 [DEBUG] scenario: 5
+2026-05-28 14:47:25,923 [DEBUG] cps: 412
+2026-05-28 14:47:25,923 [DEBUG] cps_name: Grassed Waterway
+2026-05-28 14:47:25,923 [DEBUG] pid: 1648
+2026-05-28 14:47:25,923 [DEBUG] impacted_pids: 
+2026-05-28 14:47:25,923 [DEBUG] linear_length_m: 420.75334120678644
+2026-05-28 14:47:25,924 [DEBUG] buffer_area_ha: 0.44885966439939984
+2026-05-28 14:47:25,924 [DEBUG] portion_treated: 0.3054667441565869
+2026-05-28 14:47:25,924 [DEBUG] wetland_area_ha: None
+2026-05-28 14:47:25,924 [DEBUG] catchment_to_wetland_ratio: None
+2026-05-28 14:47:25,924 [DEBUG] cost_usd: 971.4913299244542
+2026-05-28 14:47:25,924 [DEBUG] treated_TN: 79.34445103997625
+2026-05-28 14:47:25,924 [DEBUG] removed_TN: 6.2318198811151815
+2026-05-28 14:47:25,924 [DEBUG] treated_TP: 7.604319630882363
+2026-05-28 14:47:25,924 [DEBUG] removed_TP: 2.202429304739131
+2026-05-28 14:47:25,924 [DEBUG] selected parcel idx=1722 with pid=1723
+2026-05-28 14:47:25,924 [DEBUG] selected bmp 590 (Nutrient Management)
+2026-05-28 14:47:25,924 [DEBUG] selected efficiency value 0.33 for pollutant=TN
+2026-05-28 14:47:25,925 [DEBUG] selected efficiency value 0.39 for pollutant=TP
+2026-05-28 14:47:25,925 [DEBUG] calling _simulate_infield
+2026-05-28 14:47:25,925 [DEBUG] cps=590, parcel_idx=1722, area=47.10 ha
+2026-05-28 14:47:25,925 [DEBUG] reduced yield for pollutant TN: existing yield=13.25, effectiveness=0.33, treated_area=47.10 ha, removal=208.77, new yield=8.81
+2026-05-28 14:47:25,925 [DEBUG] reduced yield for pollutant TP: existing yield=2.21, effectiveness=0.39, treated_area=47.10 ha, removal=40.96, new yield=1.34
+2026-05-28 14:47:25,925 [DEBUG] calling compute_bmp_cost
+2026-05-28 14:47:25,926 [DEBUG] sampled cost rate 114.5531
+2026-05-28 14:47:25,926 [DEBUG] computed cost using rate114.5531, quantity=47.0979 => cost=2243.93
+2026-05-28 14:47:25,926 [DEBUG] computed cost for this bmp application: 2243.93 USD (quantity=47.0979)
+2026-05-28 14:47:25,926 [DEBUG] updated total_cost=4956.27 total_bmp=3
+2026-05-28 14:47:25,926 [DEBUG] scenario: 5
+2026-05-28 14:47:25,926 [DEBUG] cps: 590
+2026-05-28 14:47:25,926 [DEBUG] cps_name: Nutrient Management
+2026-05-28 14:47:25,926 [DEBUG] pid: 1723
+2026-05-28 14:47:25,926 [DEBUG] impacted_pids: 
+2026-05-28 14:47:25,926 [DEBUG] linear_length_m: None
+2026-05-28 14:47:25,926 [DEBUG] buffer_area_ha: None
+2026-05-28 14:47:25,926 [DEBUG] portion_treated: None
+2026-05-28 14:47:25,926 [DEBUG] wetland_area_ha: None
+2026-05-28 14:47:25,926 [DEBUG] catchment_to_wetland_ratio: None
+2026-05-28 14:47:25,926 [DEBUG] final bmp record:
+2026-05-28 14:47:25,926 [DEBUG] scenario: 5
+2026-05-28 14:47:25,927 [DEBUG] cps: 590
+2026-05-28 14:47:25,927 [DEBUG] cps_name: Nutrient Management
+2026-05-28 14:47:25,927 [DEBUG] pid: 1723
+2026-05-28 14:47:25,927 [DEBUG] impacted_pids: 
+2026-05-28 14:47:25,927 [DEBUG] linear_length_m: None
+2026-05-28 14:47:25,927 [DEBUG] buffer_area_ha: None
+2026-05-28 14:47:25,927 [DEBUG] portion_treated: None
+2026-05-28 14:47:25,927 [DEBUG] wetland_area_ha: None
+2026-05-28 14:47:25,927 [DEBUG] catchment_to_wetland_ratio: None
+2026-05-28 14:47:25,927 [DEBUG] cost_usd: 2243.9270180769
+2026-05-28 14:47:25,927 [DEBUG] treated_TN: 623.8640348503928
+2026-05-28 14:47:25,927 [DEBUG] removed_TN: 208.7716855386996
+2026-05-28 14:47:25,927 [DEBUG] treated_TP: 104.12585707912677
+2026-05-28 14:47:25,927 [DEBUG] removed_TP: 40.959443144579076
+2026-05-28 14:47:25,927 [DEBUG] selected parcel idx=1142 with pid=1143
+2026-05-28 14:47:25,928 [DEBUG] selected bmp 590 (Nutrient Management)
+2026-05-28 14:47:25,928 [DEBUG] selected efficiency value 0.13 for pollutant=TN
+2026-05-28 14:47:25,928 [DEBUG] selected efficiency value 0.05 for pollutant=TP
+2026-05-28 14:47:25,928 [DEBUG] calling _simulate_infield
+2026-05-28 14:47:25,928 [DEBUG] cps=590, parcel_idx=1142, area=20.27 ha
+2026-05-28 14:47:25,928 [DEBUG] reduced yield for pollutant TN: existing yield=49.89, effectiveness=0.13, treated_area=20.27 ha, removal=126.97, new yield=43.62
+2026-05-28 14:47:25,928 [DEBUG] reduced yield for pollutant TP: existing yield=0.87, effectiveness=0.05, treated_area=20.27 ha, removal=0.94, new yield=0.82
+2026-05-28 14:47:25,928 [DEBUG] calling compute_bmp_cost
+2026-05-28 14:47:25,929 [DEBUG] sampled cost rate 113.0944
+2026-05-28 14:47:25,929 [DEBUG] computed cost using rate113.0944, quantity=20.2656 => cost=2215.35
+2026-05-28 14:47:25,929 [DEBUG] computed cost for this bmp application: 2215.35 USD (quantity=20.2656)
+2026-05-28 14:47:25,929 [DEBUG] updated total_cost=7171.63 total_bmp=4
+2026-05-28 14:47:25,929 [DEBUG] scenario: 5
+2026-05-28 14:47:25,929 [DEBUG] cps: 590
+2026-05-28 14:47:25,929 [DEBUG] cps_name: Nutrient Management
+2026-05-28 14:47:25,929 [DEBUG] pid: 1143
+2026-05-28 14:47:25,929 [DEBUG] impacted_pids: 
+2026-05-28 14:47:25,929 [DEBUG] linear_length_m: None
+2026-05-28 14:47:25,929 [DEBUG] buffer_area_ha: None
+2026-05-28 14:47:25,929 [DEBUG] portion_treated: None
+2026-05-28 14:47:25,930 [DEBUG] wetland_area_ha: None
+2026-05-28 14:47:25,930 [DEBUG] catchment_to_wetland_ratio: None
+2026-05-28 14:47:25,930 [DEBUG] final bmp record:
+2026-05-28 14:47:25,930 [DEBUG] scenario: 5
+2026-05-28 14:47:25,930 [DEBUG] cps: 590
+2026-05-28 14:47:25,930 [DEBUG] cps_name: Nutrient Management
+2026-05-28 14:47:25,930 [DEBUG] pid: 1143
+2026-05-28 14:47:25,930 [DEBUG] impacted_pids: 
+2026-05-28 14:47:25,930 [DEBUG] linear_length_m: None
+2026-05-28 14:47:25,930 [DEBUG] buffer_area_ha: None
+2026-05-28 14:47:25,930 [DEBUG] portion_treated: None
+2026-05-28 14:47:25,930 [DEBUG] wetland_area_ha: None
+2026-05-28 14:47:25,930 [DEBUG] catchment_to_wetland_ratio: None
+2026-05-28 14:47:25,930 [DEBUG] cost_usd: 2215.3540990566635
+2026-05-28 14:47:25,930 [DEBUG] treated_TN: 1010.9909473540876
+2026-05-28 14:47:25,930 [DEBUG] removed_TN: 126.96800577145557
+2026-05-28 14:47:25,930 [DEBUG] treated_TP: 17.625968924106797
+2026-05-28 14:47:25,930 [DEBUG] removed_TP: 0.9423215891139234
+2026-05-28 14:47:25,931 [DEBUG] selected parcel idx=920 with pid=921
+2026-05-28 14:47:25,931 [DEBUG] selected bmp 590 (Nutrient Management)
+2026-05-28 14:47:25,931 [DEBUG] selected efficiency value 0.20 for pollutant=TN
+2026-05-28 14:47:25,931 [DEBUG] selected efficiency value 0.41 for pollutant=TP
+2026-05-28 14:47:25,931 [DEBUG] calling _simulate_infield
+2026-05-28 14:47:25,931 [DEBUG] cps=590, parcel_idx=920, area=10.40 ha
+2026-05-28 14:47:25,931 [DEBUG] reduced yield for pollutant TN: existing yield=7.04, effectiveness=0.20, treated_area=10.40 ha, removal=14.78, new yield=5.62
+2026-05-28 14:47:25,931 [DEBUG] reduced yield for pollutant TP: existing yield=1.15, effectiveness=0.41, treated_area=10.40 ha, removal=4.95, new yield=0.67
+2026-05-28 14:47:25,931 [DEBUG] calling compute_bmp_cost
+2026-05-28 14:47:25,932 [DEBUG] sampled cost rate 77.0711
+2026-05-28 14:47:25,932 [DEBUG] computed cost using rate77.0711, quantity=10.4031 => cost=1509.71
+2026-05-28 14:47:25,932 [DEBUG] computed cost for this bmp application: 1509.71 USD (quantity=10.4031)
+2026-05-28 14:47:25,932 [DEBUG] updated total_cost=8681.34 total_bmp=5
+2026-05-28 14:47:25,932 [DEBUG] scenario: 5
+2026-05-28 14:47:25,932 [DEBUG] cps: 590
+2026-05-28 14:47:25,932 [DEBUG] cps_name: Nutrient Management
+2026-05-28 14:47:25,932 [DEBUG] pid: 921
+2026-05-28 14:47:25,932 [DEBUG] impacted_pids: 
+2026-05-28 14:47:25,933 [DEBUG] linear_length_m: None
+2026-05-28 14:47:25,933 [DEBUG] buffer_area_ha: None
+2026-05-28 14:47:25,933 [DEBUG] portion_treated: None
+2026-05-28 14:47:25,933 [DEBUG] wetland_area_ha: None
+2026-05-28 14:47:25,933 [DEBUG] catchment_to_wetland_ratio: None
+2026-05-28 14:47:25,933 [DEBUG] final bmp record:
+2026-05-28 14:47:25,933 [DEBUG] scenario: 5
+2026-05-28 14:47:25,933 [DEBUG] cps: 590
+2026-05-28 14:47:25,933 [DEBUG] cps_name: Nutrient Management
+2026-05-28 14:47:25,933 [DEBUG] pid: 921
+2026-05-28 14:47:25,933 [DEBUG] impacted_pids: 
+2026-05-28 14:47:25,933 [DEBUG] linear_length_m: None
+2026-05-28 14:47:25,933 [DEBUG] buffer_area_ha: None
+2026-05-28 14:47:25,933 [DEBUG] portion_treated: None
+2026-05-28 14:47:25,933 [DEBUG] wetland_area_ha: None
+2026-05-28 14:47:25,933 [DEBUG] catchment_to_wetland_ratio: None
+2026-05-28 14:47:25,933 [DEBUG] cost_usd: 1509.708778336762
+2026-05-28 14:47:25,933 [DEBUG] treated_TN: 73.19500397257535
+2026-05-28 14:47:25,934 [DEBUG] removed_TN: 14.77669723389155
+2026-05-28 14:47:25,934 [DEBUG] treated_TP: 11.954370254039514
+2026-05-28 14:47:25,934 [DEBUG] removed_TP: 4.952336820737832
+2026-05-28 14:47:25,934 [DEBUG] selected parcel idx=1003 with pid=1004
+2026-05-28 14:47:25,934 [DEBUG] selected bmp 590 (Nutrient Management)
+2026-05-28 14:47:25,934 [DEBUG] selected efficiency value 0.17 for pollutant=TN
+2026-05-28 14:47:25,934 [DEBUG] selected efficiency value 0.45 for pollutant=TP
+2026-05-28 14:47:25,934 [DEBUG] calling _simulate_infield
+2026-05-28 14:47:25,934 [DEBUG] cps=590, parcel_idx=1003, area=8.47 ha
+2026-05-28 14:47:25,934 [DEBUG] reduced yield for pollutant TN: existing yield=87.25, effectiveness=0.17, treated_area=8.47 ha, removal=129.11, new yield=72.00
+2026-05-28 14:47:25,934 [DEBUG] reduced yield for pollutant TP: existing yield=0.42, effectiveness=0.45, treated_area=8.47 ha, removal=1.57, new yield=0.23
+2026-05-28 14:47:25,935 [DEBUG] calling compute_bmp_cost
+2026-05-28 14:47:25,935 [DEBUG] sampled cost rate 47.8002
+2026-05-28 14:47:25,935 [DEBUG] computed cost using rate47.8002, quantity=8.4667 => cost=936.34
+2026-05-28 14:47:25,935 [DEBUG] computed cost for this bmp application: 936.34 USD (quantity=8.4667)
+2026-05-28 14:47:25,935 [DEBUG] updated total_cost=9617.67 total_bmp=6
+2026-05-28 14:47:25,935 [DEBUG] scenario: 5
+2026-05-28 14:47:25,936 [DEBUG] cps: 590
+2026-05-28 14:47:25,936 [DEBUG] cps_name: Nutrient Management
+2026-05-28 14:47:25,936 [DEBUG] pid: 1004
+2026-05-28 14:47:25,936 [DEBUG] impacted_pids: 
+2026-05-28 14:47:25,936 [DEBUG] linear_length_m: None
+2026-05-28 14:47:25,936 [DEBUG] buffer_area_ha: None
+2026-05-28 14:47:25,936 [DEBUG] portion_treated: None
+2026-05-28 14:47:25,936 [DEBUG] wetland_area_ha: None
+2026-05-28 14:47:25,936 [DEBUG] catchment_to_wetland_ratio: None
+2026-05-28 14:47:25,936 [DEBUG] final bmp record:
+2026-05-28 14:47:25,936 [DEBUG] scenario: 5
+2026-05-28 14:47:25,936 [DEBUG] cps: 590
+2026-05-28 14:47:25,936 [DEBUG] cps_name: Nutrient Management
+2026-05-28 14:47:25,936 [DEBUG] pid: 1004
+2026-05-28 14:47:25,936 [DEBUG] impacted_pids: 
+2026-05-28 14:47:25,936 [DEBUG] linear_length_m: None
+2026-05-28 14:47:25,936 [DEBUG] buffer_area_ha: None
+2026-05-28 14:47:25,936 [DEBUG] portion_treated: None
+2026-05-28 14:47:25,936 [DEBUG] wetland_area_ha: None
+2026-05-28 14:47:25,937 [DEBUG] catchment_to_wetland_ratio: None
+2026-05-28 14:47:25,937 [DEBUG] cost_usd: 936.3354326583842
+2026-05-28 14:47:25,937 [DEBUG] treated_TN: 738.7303774999002
+2026-05-28 14:47:25,937 [DEBUG] removed_TN: 129.11371622660852
+2026-05-28 14:47:25,937 [DEBUG] treated_TP: 3.514725866646078
+2026-05-28 14:47:25,937 [DEBUG] removed_TP: 1.5746720793343292
+2026-05-28 14:47:25,937 [DEBUG] selected parcel idx=468 with pid=469
+2026-05-28 14:47:25,937 [DEBUG] selected bmp 329 (Residue Management (No-Till))
+2026-05-28 14:47:25,937 [DEBUG] selected efficiency value 0.41 for pollutant=TN
+2026-05-28 14:47:25,937 [DEBUG] selected efficiency value 0.50 for pollutant=TP
+2026-05-28 14:47:25,937 [DEBUG] calling _simulate_infield
+2026-05-28 14:47:25,937 [DEBUG] cps=329, parcel_idx=468, area=22.16 ha
+2026-05-28 14:47:25,938 [DEBUG] reduced yield for pollutant TN: existing yield=3.82, effectiveness=0.41, treated_area=22.16 ha, removal=34.66, new yield=2.26
+2026-05-28 14:47:25,938 [DEBUG] reduced yield for pollutant TP: existing yield=0.19, effectiveness=0.50, treated_area=22.16 ha, removal=2.12, new yield=0.10
+2026-05-28 14:47:25,938 [DEBUG] calling compute_bmp_cost
+2026-05-28 14:47:25,938 [DEBUG] sampled cost rate 32.9505
+2026-05-28 14:47:25,938 [DEBUG] computed cost using rate32.9505, quantity=22.1624 => cost=645.45
+2026-05-28 14:47:25,938 [DEBUG] computed cost for this bmp application: 645.45 USD (quantity=22.1624)
+2026-05-28 14:47:25,939 [DEBUG] updated total_cost=10263.12 total_bmp=7
+2026-05-28 14:47:25,939 [DEBUG] scenario: 5
+2026-05-28 14:47:25,939 [DEBUG] cps: 329
+2026-05-28 14:47:25,939 [DEBUG] cps_name: Residue Management (No-Till)
+2026-05-28 14:47:25,939 [DEBUG] pid: 469
+2026-05-28 14:47:25,939 [DEBUG] impacted_pids: 
+2026-05-28 14:47:25,939 [DEBUG] linear_length_m: None
+2026-05-28 14:47:25,939 [DEBUG] buffer_area_ha: None
+2026-05-28 14:47:25,939 [DEBUG] portion_treated: None
+2026-05-28 14:47:25,939 [DEBUG] wetland_area_ha: None
+2026-05-28 14:47:25,939 [DEBUG] catchment_to_wetland_ratio: None
+2026-05-28 14:47:25,939 [DEBUG] final bmp record:
+2026-05-28 14:47:25,939 [DEBUG] scenario: 5
+2026-05-28 14:47:25,939 [DEBUG] cps: 329
+2026-05-28 14:47:25,939 [DEBUG] cps_name: Residue Management (No-Till)
+2026-05-28 14:47:25,939 [DEBUG] pid: 469
+2026-05-28 14:47:25,939 [DEBUG] impacted_pids: 
+2026-05-28 14:47:25,940 [DEBUG] linear_length_m: None
+2026-05-28 14:47:25,940 [DEBUG] buffer_area_ha: None
+2026-05-28 14:47:25,940 [DEBUG] portion_treated: None
+2026-05-28 14:47:25,940 [DEBUG] wetland_area_ha: None
+2026-05-28 14:47:25,940 [DEBUG] catchment_to_wetland_ratio: None
+2026-05-28 14:47:25,940 [DEBUG] cost_usd: 645.4519484484002
+2026-05-28 14:47:25,940 [DEBUG] treated_TN: 84.72981899059317
+2026-05-28 14:47:25,940 [DEBUG] removed_TN: 34.656577847642914
+2026-05-28 14:47:25,940 [DEBUG] treated_TP: 4.27698301638987
+2026-05-28 14:47:25,940 [DEBUG] removed_TP: 2.118367471348839
+2026-05-28 14:47:25,940 [DEBUG] selected parcel idx=1138 with pid=1139
+2026-05-28 14:47:25,940 [DEBUG] selected bmp 590 (Nutrient Management)
+2026-05-28 14:47:25,940 [DEBUG] selected efficiency value 0.21 for pollutant=TN
+2026-05-28 14:47:25,941 [DEBUG] selected efficiency value 0.08 for pollutant=TP
+2026-05-28 14:47:25,941 [DEBUG] calling _simulate_infield
+2026-05-28 14:47:25,941 [DEBUG] cps=590, parcel_idx=1138, area=19.54 ha
+2026-05-28 14:47:25,941 [DEBUG] reduced yield for pollutant TN: existing yield=51.62, effectiveness=0.21, treated_area=19.54 ha, removal=207.98, new yield=40.97
+2026-05-28 14:47:25,941 [DEBUG] reduced yield for pollutant TP: existing yield=13.90, effectiveness=0.08, treated_area=19.54 ha, removal=21.18, new yield=12.81
+2026-05-28 14:47:25,941 [DEBUG] calling compute_bmp_cost
+2026-05-28 14:47:25,942 [DEBUG] sampled cost rate 32.8683
+2026-05-28 14:47:25,942 [DEBUG] computed cost using rate32.8683, quantity=19.5439 => cost=643.84
+2026-05-28 14:47:25,942 [DEBUG] computed cost for this bmp application: 643.84 USD (quantity=19.5439)
+2026-05-28 14:47:25,942 [DEBUG] updated total_cost=10906.97 total_bmp=8
+2026-05-28 14:47:25,942 [DEBUG] scenario: 5
+2026-05-28 14:47:25,942 [DEBUG] cps: 590
+2026-05-28 14:47:25,942 [DEBUG] cps_name: Nutrient Management
+2026-05-28 14:47:25,942 [DEBUG] pid: 1139
+2026-05-28 14:47:25,942 [DEBUG] impacted_pids: 
+2026-05-28 14:47:25,942 [DEBUG] linear_length_m: None
+2026-05-28 14:47:25,942 [DEBUG] buffer_area_ha: None
+2026-05-28 14:47:25,942 [DEBUG] portion_treated: None
+2026-05-28 14:47:25,942 [DEBUG] wetland_area_ha: None
+2026-05-28 14:47:25,942 [DEBUG] catchment_to_wetland_ratio: None
+2026-05-28 14:47:25,942 [DEBUG] final bmp record:
+2026-05-28 14:47:25,942 [DEBUG] scenario: 5
+2026-05-28 14:47:25,943 [DEBUG] cps: 590
+2026-05-28 14:47:25,943 [DEBUG] cps_name: Nutrient Management
+2026-05-28 14:47:25,943 [DEBUG] pid: 1139
+2026-05-28 14:47:25,943 [DEBUG] impacted_pids: 
+2026-05-28 14:47:25,943 [DEBUG] linear_length_m: None
+2026-05-28 14:47:25,943 [DEBUG] buffer_area_ha: None
+2026-05-28 14:47:25,943 [DEBUG] portion_treated: None
+2026-05-28 14:47:25,943 [DEBUG] wetland_area_ha: None
+2026-05-28 14:47:25,943 [DEBUG] catchment_to_wetland_ratio: None
+2026-05-28 14:47:25,943 [DEBUG] cost_usd: 643.8417701558905
+2026-05-28 14:47:25,943 [DEBUG] treated_TN: 1008.7724241847544
+2026-05-28 14:47:25,943 [DEBUG] removed_TN: 207.98237688759468
+2026-05-28 14:47:25,943 [DEBUG] treated_TP: 271.58195795267346
+2026-05-28 14:47:25,943 [DEBUG] removed_TP: 21.183076312373544
+2026-05-28 14:47:25,943 [DEBUG] selected parcel idx=410 with pid=411
+2026-05-28 14:47:25,944 [DEBUG] selected bmp 340 (Cover Crop)
+2026-05-28 14:47:25,944 [DEBUG] selected efficiency value 0.08 for pollutant=TN
+2026-05-28 14:47:25,944 [DEBUG] selected efficiency value 0.29 for pollutant=TP
+2026-05-28 14:47:25,944 [DEBUG] calling _simulate_infield
+2026-05-28 14:47:25,944 [DEBUG] cps=340, parcel_idx=410, area=15.13 ha
+2026-05-28 14:47:25,944 [DEBUG] reduced yield for pollutant TN: existing yield=4.93, effectiveness=0.08, treated_area=15.13 ha, removal=6.32, new yield=4.51
+2026-05-28 14:47:25,944 [DEBUG] reduced yield for pollutant TP: existing yield=9.00, effectiveness=0.29, treated_area=15.13 ha, removal=39.78, new yield=6.37
+2026-05-28 14:47:25,944 [DEBUG] calling compute_bmp_cost
+2026-05-28 14:47:25,945 [DEBUG] sampled cost rate 253.9844
+2026-05-28 14:47:25,945 [DEBUG] computed cost using rate253.9844, quantity=15.1336 => cost=4975.18
+2026-05-28 14:47:25,945 [DEBUG] computed cost for this bmp application: 4975.18 USD (quantity=15.1336)
+2026-05-28 14:47:25,945 [DEBUG] updated total_cost=15882.15 total_bmp=9
+2026-05-28 14:47:25,945 [DEBUG] scenario: 5
+2026-05-28 14:47:25,945 [DEBUG] cps: 340
+2026-05-28 14:47:25,945 [DEBUG] cps_name: Cover Crop
+2026-05-28 14:47:25,945 [DEBUG] pid: 411
+2026-05-28 14:47:25,945 [DEBUG] impacted_pids: 
+2026-05-28 14:47:25,945 [DEBUG] linear_length_m: None
+2026-05-28 14:47:25,945 [DEBUG] buffer_area_ha: None
+2026-05-28 14:47:25,945 [DEBUG] portion_treated: None
+2026-05-28 14:47:25,945 [DEBUG] wetland_area_ha: None
+2026-05-28 14:47:25,946 [DEBUG] catchment_to_wetland_ratio: None
+2026-05-28 14:47:25,946 [DEBUG] final bmp record:
+2026-05-28 14:47:25,946 [DEBUG] scenario: 5
+2026-05-28 14:47:25,946 [DEBUG] cps: 340
+2026-05-28 14:47:25,946 [DEBUG] cps_name: Cover Crop
+2026-05-28 14:47:25,946 [DEBUG] pid: 411
+2026-05-28 14:47:25,946 [DEBUG] impacted_pids: 
+2026-05-28 14:47:25,946 [DEBUG] linear_length_m: None
+2026-05-28 14:47:25,946 [DEBUG] buffer_area_ha: None
+2026-05-28 14:47:25,946 [DEBUG] portion_treated: None
+2026-05-28 14:47:25,946 [DEBUG] wetland_area_ha: None
+2026-05-28 14:47:25,946 [DEBUG] catchment_to_wetland_ratio: None
+2026-05-28 14:47:25,946 [DEBUG] cost_usd: 4975.181605407732
+2026-05-28 14:47:25,946 [DEBUG] treated_TN: 74.53489335952183
+2026-05-28 14:47:25,946 [DEBUG] removed_TN: 6.31565183481593
+2026-05-28 14:47:25,946 [DEBUG] treated_TP: 136.15691135056903
+2026-05-28 14:47:25,946 [DEBUG] removed_TP: 39.78328846924535
+2026-05-28 14:47:25,947 [DEBUG] selected parcel idx=1928 with pid=1929
+2026-05-28 14:47:25,947 [DEBUG] selected bmp 590 (Nutrient Management)
+2026-05-28 14:47:25,947 [DEBUG] selected efficiency value 0.06 for pollutant=TN
+2026-05-28 14:47:25,947 [DEBUG] selected efficiency value 0.18 for pollutant=TP
+2026-05-28 14:47:25,947 [DEBUG] calling _simulate_infield
+2026-05-28 14:47:25,947 [DEBUG] cps=590, parcel_idx=1928, area=25.58 ha
+2026-05-28 14:47:25,947 [DEBUG] reduced yield for pollutant TN: existing yield=15.45, effectiveness=0.06, treated_area=25.58 ha, removal=24.64, new yield=14.49
+2026-05-28 14:47:25,947 [DEBUG] reduced yield for pollutant TP: existing yield=0.72, effectiveness=0.18, treated_area=25.58 ha, removal=3.38, new yield=0.59
+2026-05-28 14:47:25,947 [DEBUG] calling compute_bmp_cost
+2026-05-28 14:47:25,948 [DEBUG] sampled cost rate 100.8958
+2026-05-28 14:47:25,948 [DEBUG] computed cost using rate100.8958, quantity=25.5762 => cost=1976.40
+2026-05-28 14:47:25,948 [DEBUG] computed cost for this bmp application: 1976.40 USD (quantity=25.5762)
+2026-05-28 14:47:25,948 [DEBUG] updated total_cost=17858.55 total_bmp=10
+2026-05-28 14:47:25,948 [DEBUG] scenario: 5
+2026-05-28 14:47:25,948 [DEBUG] cps: 590
+2026-05-28 14:47:25,948 [DEBUG] cps_name: Nutrient Management
+2026-05-28 14:47:25,948 [DEBUG] pid: 1929
+2026-05-28 14:47:25,948 [DEBUG] impacted_pids: 
+2026-05-28 14:47:25,949 [DEBUG] linear_length_m: None
+2026-05-28 14:47:25,949 [DEBUG] buffer_area_ha: None
+2026-05-28 14:47:25,949 [DEBUG] portion_treated: None
+2026-05-28 14:47:25,949 [DEBUG] wetland_area_ha: None
+2026-05-28 14:47:25,949 [DEBUG] catchment_to_wetland_ratio: None
+2026-05-28 14:47:25,949 [DEBUG] final bmp record:
+2026-05-28 14:47:25,949 [DEBUG] scenario: 5
+2026-05-28 14:47:25,949 [DEBUG] cps: 590
+2026-05-28 14:47:25,949 [DEBUG] cps_name: Nutrient Management
+2026-05-28 14:47:25,949 [DEBUG] pid: 1929
+2026-05-28 14:47:25,949 [DEBUG] impacted_pids: 
+2026-05-28 14:47:25,949 [DEBUG] linear_length_m: None
+2026-05-28 14:47:25,949 [DEBUG] buffer_area_ha: None
+2026-05-28 14:47:25,949 [DEBUG] portion_treated: None
+2026-05-28 14:47:25,949 [DEBUG] wetland_area_ha: None
+2026-05-28 14:47:25,949 [DEBUG] catchment_to_wetland_ratio: None
+2026-05-28 14:47:25,949 [DEBUG] cost_usd: 1976.4010053913116
+2026-05-28 14:47:25,949 [DEBUG] treated_TN: 395.227169460499
+2026-05-28 14:47:25,949 [DEBUG] removed_TN: 24.642015468133273
+2026-05-28 14:47:25,950 [DEBUG] treated_TP: 18.391880012470626
+2026-05-28 14:47:25,950 [DEBUG] removed_TP: 3.382489895145362
+2026-05-28 14:47:25,950 [DEBUG] selected parcel idx=503 with pid=504
+2026-05-28 14:47:25,950 [DEBUG] selected bmp 590 (Nutrient Management)
+2026-05-28 14:47:25,950 [DEBUG] selected efficiency value 0.42 for pollutant=TN
+2026-05-28 14:47:25,950 [DEBUG] selected efficiency value 0.40 for pollutant=TP
+2026-05-28 14:47:25,950 [DEBUG] calling _simulate_infield
+2026-05-28 14:47:25,950 [DEBUG] cps=590, parcel_idx=503, area=11.62 ha
+2026-05-28 14:47:25,950 [DEBUG] reduced yield for pollutant TN: existing yield=33.06, effectiveness=0.42, treated_area=11.62 ha, removal=162.88, new yield=19.04
+2026-05-28 14:47:25,950 [DEBUG] reduced yield for pollutant TP: existing yield=0.02, effectiveness=0.40, treated_area=11.62 ha, removal=0.09, new yield=0.01
+2026-05-28 14:47:25,950 [DEBUG] calling compute_bmp_cost
+2026-05-28 14:47:25,951 [DEBUG] sampled cost rate 79.3472
+2026-05-28 14:47:25,951 [DEBUG] computed cost using rate79.3472, quantity=11.6197 => cost=1554.29
+2026-05-28 14:47:25,951 [DEBUG] computed cost for this bmp application: 1554.29 USD (quantity=11.6197)
+2026-05-28 14:47:25,951 [DEBUG] updated total_cost=19412.84 total_bmp=11
+2026-05-28 14:47:25,951 [DEBUG] scenario: 5
+2026-05-28 14:47:25,951 [DEBUG] cps: 590
+2026-05-28 14:47:25,951 [DEBUG] cps_name: Nutrient Management
+2026-05-28 14:47:25,952 [DEBUG] pid: 504
+2026-05-28 14:47:25,952 [DEBUG] impacted_pids: 
+2026-05-28 14:47:25,952 [DEBUG] linear_length_m: None
+2026-05-28 14:47:25,952 [DEBUG] buffer_area_ha: None
+2026-05-28 14:47:25,952 [DEBUG] portion_treated: None
+2026-05-28 14:47:25,952 [DEBUG] wetland_area_ha: None
+2026-05-28 14:47:25,952 [DEBUG] catchment_to_wetland_ratio: None
+2026-05-28 14:47:25,952 [DEBUG] final bmp record:
+2026-05-28 14:47:25,952 [DEBUG] scenario: 5
+2026-05-28 14:47:25,952 [DEBUG] cps: 590
+2026-05-28 14:47:25,952 [DEBUG] cps_name: Nutrient Management
+2026-05-28 14:47:25,952 [DEBUG] pid: 504
+2026-05-28 14:47:25,952 [DEBUG] impacted_pids: 
+2026-05-28 14:47:25,952 [DEBUG] linear_length_m: None
+2026-05-28 14:47:25,952 [DEBUG] buffer_area_ha: None
+2026-05-28 14:47:25,952 [DEBUG] portion_treated: None
+2026-05-28 14:47:25,952 [DEBUG] wetland_area_ha: None
+2026-05-28 14:47:25,952 [DEBUG] catchment_to_wetland_ratio: None
+2026-05-28 14:47:25,953 [DEBUG] cost_usd: 1554.2942774060664
+2026-05-28 14:47:25,953 [DEBUG] treated_TN: 384.16405207993756
+2026-05-28 14:47:25,953 [DEBUG] removed_TN: 162.87845815059936
+2026-05-28 14:47:25,953 [DEBUG] treated_TP: 0.21241564042024744
+2026-05-28 14:47:25,953 [DEBUG] removed_TP: 0.085849103518094
+2026-05-28 14:47:25,953 [DEBUG] selected parcel idx=710 with pid=711
+2026-05-28 14:47:25,953 [DEBUG] selected bmp 590 (Nutrient Management)
+2026-05-28 14:47:25,953 [DEBUG] selected efficiency value 0.35 for pollutant=TN
+2026-05-28 14:47:25,953 [DEBUG] selected efficiency value 0.34 for pollutant=TP
+2026-05-28 14:47:25,953 [DEBUG] calling _simulate_infield
+2026-05-28 14:47:25,953 [DEBUG] cps=590, parcel_idx=710, area=9.50 ha
+2026-05-28 14:47:25,954 [DEBUG] reduced yield for pollutant TN: existing yield=52.38, effectiveness=0.35, treated_area=9.50 ha, removal=172.22, new yield=34.26
+2026-05-28 14:47:25,954 [DEBUG] reduced yield for pollutant TP: existing yield=0.33, effectiveness=0.34, treated_area=9.50 ha, removal=1.07, new yield=0.22
+2026-05-28 14:47:25,954 [DEBUG] calling compute_bmp_cost
+2026-05-28 14:47:25,954 [DEBUG] sampled cost rate 76.5611
+2026-05-28 14:47:25,954 [DEBUG] computed cost using rate76.5611, quantity=9.5034 => cost=1499.72
+2026-05-28 14:47:25,955 [DEBUG] computed cost for this bmp application: 1499.72 USD (quantity=9.5034)
+2026-05-28 14:47:25,955 [DEBUG] updated total_cost=20912.56 total_bmp=12
+2026-05-28 14:47:25,955 [DEBUG] scenario: 5
+2026-05-28 14:47:25,955 [DEBUG] cps: 590
+2026-05-28 14:47:25,955 [DEBUG] cps_name: Nutrient Management
+2026-05-28 14:47:25,955 [DEBUG] pid: 711
+2026-05-28 14:47:25,955 [DEBUG] impacted_pids: 
+2026-05-28 14:47:25,955 [DEBUG] linear_length_m: None
+2026-05-28 14:47:25,955 [DEBUG] buffer_area_ha: None
+2026-05-28 14:47:25,955 [DEBUG] portion_treated: None
+2026-05-28 14:47:25,955 [DEBUG] wetland_area_ha: None
+2026-05-28 14:47:25,955 [DEBUG] catchment_to_wetland_ratio: None
+2026-05-28 14:47:25,955 [DEBUG] final bmp record:
+2026-05-28 14:47:25,955 [DEBUG] scenario: 5
+2026-05-28 14:47:25,955 [DEBUG] cps: 590
+2026-05-28 14:47:25,955 [DEBUG] cps_name: Nutrient Management
+2026-05-28 14:47:25,955 [DEBUG] pid: 711
+2026-05-28 14:47:25,956 [DEBUG] impacted_pids: 
+2026-05-28 14:47:25,956 [DEBUG] linear_length_m: None
+2026-05-28 14:47:25,956 [DEBUG] buffer_area_ha: None
+2026-05-28 14:47:25,956 [DEBUG] portion_treated: None
+2026-05-28 14:47:25,956 [DEBUG] wetland_area_ha: None
+2026-05-28 14:47:25,956 [DEBUG] catchment_to_wetland_ratio: None
+2026-05-28 14:47:25,956 [DEBUG] cost_usd: 1499.7196258959232
+2026-05-28 14:47:25,956 [DEBUG] treated_TN: 497.7728605286721
+2026-05-28 14:47:25,956 [DEBUG] removed_TN: 172.2237568167091
+2026-05-28 14:47:25,956 [DEBUG] treated_TP: 3.153042193549236
+2026-05-28 14:47:25,956 [DEBUG] removed_TP: 1.0671793242501773
+2026-05-28 14:47:25,956 [DEBUG] selected parcel idx=1697 with pid=1698
+2026-05-28 14:47:25,956 [DEBUG] selected bmp 412 (Grassed Waterway)
+2026-05-28 14:47:25,956 [DEBUG] selected efficiency value 0.20 for pollutant=TN
+2026-05-28 14:47:25,957 [DEBUG] selected efficiency value 0.29 for pollutant=TP
+2026-05-28 14:47:25,957 [DEBUG] calling simulate_grassed
+2026-05-28 14:47:25,957 [DEBUG] length of grassed buffer/waterway is 392.65 m based on fraction 0.23 of parcel perimeter 1728.78 m
+2026-05-28 14:47:25,957 [DEBUG] reduced yield for pollutant TN: existing yield=31.28, effectiveness=0.20, treated_area=5.40 ha, removal=33.68, new yield=29.31
+2026-05-28 14:47:25,957 [DEBUG] reduced yield for pollutant TP: existing yield=0.46, effectiveness=0.29, treated_area=5.40 ha, removal=0.73, new yield=0.42
+2026-05-28 14:47:25,957 [DEBUG] calling compute_bmp_cost
+2026-05-28 14:47:25,958 [DEBUG] sampled cost rate 41.2375
+2026-05-28 14:47:25,958 [DEBUG] computed cost using rate41.2375, quantity=0.4189 => cost=807.78
+2026-05-28 14:47:25,958 [DEBUG] computed cost for this bmp application: 807.78 USD (quantity=0.4189)
+2026-05-28 14:47:25,958 [DEBUG] updated total_cost=21720.34 total_bmp=13
+2026-05-28 14:47:25,958 [DEBUG] scenario: 5
+2026-05-28 14:47:25,958 [DEBUG] cps: 412
+2026-05-28 14:47:25,958 [DEBUG] cps_name: Grassed Waterway
+2026-05-28 14:47:25,958 [DEBUG] pid: 1698
+2026-05-28 14:47:25,958 [DEBUG] impacted_pids: 
+2026-05-28 14:47:25,958 [DEBUG] linear_length_m: 392.648619091839
+2026-05-28 14:47:25,958 [DEBUG] buffer_area_ha: 0.41887754684717393
+2026-05-28 14:47:25,958 [DEBUG] portion_treated: 0.3152972810113881
+2026-05-28 14:47:25,958 [DEBUG] wetland_area_ha: None
+2026-05-28 14:47:25,958 [DEBUG] catchment_to_wetland_ratio: None
+2026-05-28 14:47:25,958 [DEBUG] final bmp record:
+2026-05-28 14:47:25,959 [DEBUG] scenario: 5
+2026-05-28 14:47:25,959 [DEBUG] cps: 412
+2026-05-28 14:47:25,959 [DEBUG] cps_name: Grassed Waterway
+2026-05-28 14:47:25,959 [DEBUG] pid: 1698
+2026-05-28 14:47:25,959 [DEBUG] impacted_pids: 
+2026-05-28 14:47:25,959 [DEBUG] linear_length_m: 392.648619091839
+2026-05-28 14:47:25,959 [DEBUG] buffer_area_ha: 0.41887754684717393
+2026-05-28 14:47:25,959 [DEBUG] portion_treated: 0.3152972810113881
+2026-05-28 14:47:25,959 [DEBUG] wetland_area_ha: None
+2026-05-28 14:47:25,959 [DEBUG] catchment_to_wetland_ratio: None
+2026-05-28 14:47:25,959 [DEBUG] cost_usd: 807.7811185774557
+2026-05-28 14:47:25,959 [DEBUG] treated_TN: 168.74897377408266
+2026-05-28 14:47:25,959 [DEBUG] removed_TN: 33.67602423720041
+2026-05-28 14:47:25,959 [DEBUG] treated_TP: 2.5083937176097706
+2026-05-28 14:47:25,959 [DEBUG] removed_TP: 0.7270671236272459
+2026-05-28 14:47:25,959 [DEBUG] selected parcel idx=153 with pid=154
+2026-05-28 14:47:25,960 [DEBUG] selected bmp 412 (Grassed Waterway)
+2026-05-28 14:47:25,960 [DEBUG] selected efficiency value 0.18 for pollutant=TN
+2026-05-28 14:47:25,960 [DEBUG] selected efficiency value 0.15 for pollutant=TP
+2026-05-28 14:47:25,960 [DEBUG] calling simulate_grassed
+2026-05-28 14:47:25,960 [DEBUG] length of grassed buffer/waterway is 719.08 m based on fraction 0.27 of parcel perimeter 2674.09 m
+2026-05-28 14:47:25,960 [DEBUG] reduced yield for pollutant TN: existing yield=43.57, effectiveness=0.18, treated_area=12.05 ha, removal=95.28, new yield=41.13
+2026-05-28 14:47:25,960 [DEBUG] reduced yield for pollutant TP: existing yield=1.22, effectiveness=0.15, treated_area=12.05 ha, removal=2.15, new yield=1.17
+2026-05-28 14:47:25,960 [DEBUG] calling compute_bmp_cost
+2026-05-28 14:47:25,961 [DEBUG] sampled cost rate 71.8927
+2026-05-28 14:47:25,961 [DEBUG] computed cost using rate71.8927, quantity=0.7671 => cost=1408.27
+2026-05-28 14:47:25,961 [DEBUG] computed cost for this bmp application: 1408.27 USD (quantity=0.7671)
+2026-05-28 14:47:25,961 [DEBUG] updated total_cost=23128.61 total_bmp=14
+2026-05-28 14:47:25,961 [DEBUG] scenario: 5
+2026-05-28 14:47:25,961 [DEBUG] cps: 412
+2026-05-28 14:47:25,961 [DEBUG] cps_name: Grassed Waterway
+2026-05-28 14:47:25,961 [DEBUG] pid: 154
+2026-05-28 14:47:25,961 [DEBUG] impacted_pids: 
+2026-05-28 14:47:25,961 [DEBUG] linear_length_m: 719.0784844047882
+2026-05-28 14:47:25,962 [DEBUG] buffer_area_ha: 0.7671129271630281
+2026-05-28 14:47:25,962 [DEBUG] portion_treated: 0.307924715334823
+2026-05-28 14:47:25,962 [DEBUG] wetland_area_ha: None
+2026-05-28 14:47:25,962 [DEBUG] catchment_to_wetland_ratio: None
+2026-05-28 14:47:25,962 [DEBUG] final bmp record:
+2026-05-28 14:47:25,962 [DEBUG] scenario: 5
+2026-05-28 14:47:25,962 [DEBUG] cps: 412
+2026-05-28 14:47:25,962 [DEBUG] cps_name: Grassed Waterway
+2026-05-28 14:47:25,962 [DEBUG] pid: 154
+2026-05-28 14:47:25,962 [DEBUG] impacted_pids: 
+2026-05-28 14:47:25,962 [DEBUG] linear_length_m: 719.0784844047882
+2026-05-28 14:47:25,962 [DEBUG] buffer_area_ha: 0.7671129271630281
+2026-05-28 14:47:25,962 [DEBUG] portion_treated: 0.307924715334823
+2026-05-28 14:47:25,962 [DEBUG] wetland_area_ha: None
+2026-05-28 14:47:25,962 [DEBUG] catchment_to_wetland_ratio: None
+2026-05-28 14:47:25,962 [DEBUG] cost_usd: 1408.272075540445
+2026-05-28 14:47:25,962 [DEBUG] treated_TN: 525.0920426922748
+2026-05-28 14:47:25,962 [DEBUG] removed_TN: 95.28442679627685
+2026-05-28 14:47:25,963 [DEBUG] treated_TP: 14.748857145166511
+2026-05-28 14:47:25,963 [DEBUG] removed_TP: 2.1472981655255086
+2026-05-28 14:47:25,963 [DEBUG] selected parcel idx=1483 with pid=1484
+2026-05-28 14:47:25,963 [DEBUG] selected bmp 412 (Grassed Waterway)
+2026-05-28 14:47:25,963 [DEBUG] selected efficiency value 0.18 for pollutant=TN
+2026-05-28 14:47:25,963 [DEBUG] selected efficiency value 0.18 for pollutant=TP
+2026-05-28 14:47:25,963 [DEBUG] calling simulate_grassed
+2026-05-28 14:47:25,963 [DEBUG] length of grassed buffer/waterway is 501.80 m based on fraction 0.19 of parcel perimeter 2598.58 m
+2026-05-28 14:47:25,963 [DEBUG] reduced yield for pollutant TN: existing yield=16.49, effectiveness=0.18, treated_area=9.90 ha, removal=29.69, new yield=15.54
+2026-05-28 14:47:25,963 [DEBUG] reduced yield for pollutant TP: existing yield=0.48, effectiveness=0.18, treated_area=9.90 ha, removal=0.83, new yield=0.45
+2026-05-28 14:47:25,964 [DEBUG] calling compute_bmp_cost
+2026-05-28 14:47:25,964 [DEBUG] sampled cost rate 126.0537
+2026-05-28 14:47:25,964 [DEBUG] computed cost using rate126.0537, quantity=0.5353 => cost=2469.21
+2026-05-28 14:47:25,964 [DEBUG] computed cost for this bmp application: 2469.21 USD (quantity=0.5353)
+2026-05-28 14:47:25,964 [DEBUG] updated total_cost=25597.82 total_bmp=15
+2026-05-28 14:47:25,964 [DEBUG] scenario: 5
+2026-05-28 14:47:25,965 [DEBUG] cps: 412
+2026-05-28 14:47:25,965 [DEBUG] cps_name: Grassed Waterway
+2026-05-28 14:47:25,965 [DEBUG] pid: 1484
+2026-05-28 14:47:25,965 [DEBUG] impacted_pids: 
+2026-05-28 14:47:25,965 [DEBUG] linear_length_m: 501.79645020975306
+2026-05-28 14:47:25,965 [DEBUG] buffer_area_ha: 0.5353164530837646
+2026-05-28 14:47:25,965 [DEBUG] portion_treated: 0.3173063355959255
+2026-05-28 14:47:25,965 [DEBUG] wetland_area_ha: None
+2026-05-28 14:47:25,965 [DEBUG] catchment_to_wetland_ratio: None
+2026-05-28 14:47:25,965 [DEBUG] final bmp record:
+2026-05-28 14:47:25,965 [DEBUG] scenario: 5
+2026-05-28 14:47:25,965 [DEBUG] cps: 412
+2026-05-28 14:47:25,965 [DEBUG] cps_name: Grassed Waterway
+2026-05-28 14:47:25,965 [DEBUG] pid: 1484
+2026-05-28 14:47:25,965 [DEBUG] impacted_pids: 
+2026-05-28 14:47:25,965 [DEBUG] linear_length_m: 501.79645020975306
+2026-05-28 14:47:25,965 [DEBUG] buffer_area_ha: 0.5353164530837646
+2026-05-28 14:47:25,965 [DEBUG] portion_treated: 0.3173063355959255
+2026-05-28 14:47:25,966 [DEBUG] wetland_area_ha: None
+2026-05-28 14:47:25,966 [DEBUG] catchment_to_wetland_ratio: None
+2026-05-28 14:47:25,966 [DEBUG] cost_usd: 2469.206402039743
+2026-05-28 14:47:25,966 [DEBUG] treated_TN: 163.25351439800826
+2026-05-28 14:47:25,966 [DEBUG] removed_TN: 29.685941103051235
+2026-05-28 14:47:25,966 [DEBUG] treated_TP: 4.735921999682749
+2026-05-28 14:47:25,966 [DEBUG] removed_TP: 0.8307527662596549
+2026-05-28 14:47:25,966 [DEBUG] selected parcel idx=2442 with pid=2443
+2026-05-28 14:47:25,966 [DEBUG] selected bmp 590 (Nutrient Management)
+2026-05-28 14:47:25,966 [DEBUG] selected efficiency value 0.31 for pollutant=TN
+2026-05-28 14:47:25,966 [DEBUG] selected efficiency value 0.37 for pollutant=TP
+2026-05-28 14:47:25,966 [DEBUG] calling _simulate_infield
+2026-05-28 14:47:25,966 [DEBUG] cps=590, parcel_idx=2442, area=66.82 ha
+2026-05-28 14:47:25,967 [DEBUG] reduced yield for pollutant TN: existing yield=61.24, effectiveness=0.31, treated_area=66.82 ha, removal=1253.03, new yield=42.49
+2026-05-28 14:47:25,967 [DEBUG] reduced yield for pollutant TP: existing yield=1.93, effectiveness=0.37, treated_area=66.82 ha, removal=47.44, new yield=1.22
+2026-05-28 14:47:25,967 [DEBUG] calling compute_bmp_cost
+2026-05-28 14:47:25,967 [DEBUG] sampled cost rate 50.4098
+2026-05-28 14:47:25,967 [DEBUG] computed cost using rate50.4098, quantity=66.8165 => cost=987.45
+2026-05-28 14:47:25,968 [DEBUG] computed cost for this bmp application: 987.45 USD (quantity=66.8165)
+2026-05-28 14:47:25,968 [DEBUG] updated total_cost=26585.28 total_bmp=16
+2026-05-28 14:47:25,968 [DEBUG] scenario: 5
+2026-05-28 14:47:25,968 [DEBUG] cps: 590
+2026-05-28 14:47:25,968 [DEBUG] cps_name: Nutrient Management
+2026-05-28 14:47:25,968 [DEBUG] pid: 2443
+2026-05-28 14:47:25,968 [DEBUG] impacted_pids: 
+2026-05-28 14:47:25,968 [DEBUG] linear_length_m: None
+2026-05-28 14:47:25,968 [DEBUG] buffer_area_ha: None
+2026-05-28 14:47:25,968 [DEBUG] portion_treated: None
+2026-05-28 14:47:25,968 [DEBUG] wetland_area_ha: None
+2026-05-28 14:47:25,968 [DEBUG] catchment_to_wetland_ratio: None
+2026-05-28 14:47:25,968 [DEBUG] final bmp record:
+2026-05-28 14:47:25,968 [DEBUG] scenario: 5
+2026-05-28 14:47:25,968 [DEBUG] cps: 590
+2026-05-28 14:47:25,968 [DEBUG] cps_name: Nutrient Management
+2026-05-28 14:47:25,968 [DEBUG] pid: 2443
+2026-05-28 14:47:25,968 [DEBUG] impacted_pids: 
+2026-05-28 14:47:25,968 [DEBUG] linear_length_m: None
+2026-05-28 14:47:25,969 [DEBUG] buffer_area_ha: None
+2026-05-28 14:47:25,969 [DEBUG] portion_treated: None
+2026-05-28 14:47:25,969 [DEBUG] wetland_area_ha: None
+2026-05-28 14:47:25,969 [DEBUG] catchment_to_wetland_ratio: None
+2026-05-28 14:47:25,969 [DEBUG] cost_usd: 987.4543367868897
+2026-05-28 14:47:25,969 [DEBUG] treated_TN: 4091.938186102997
+2026-05-28 14:47:25,969 [DEBUG] removed_TN: 1253.0318598569124
+2026-05-28 14:47:25,969 [DEBUG] treated_TP: 129.16372341206383
+2026-05-28 14:47:25,969 [DEBUG] removed_TP: 47.43830203739641
+2026-05-28 14:47:25,969 [DEBUG] selected parcel idx=752 with pid=753
+2026-05-28 14:47:25,969 [DEBUG] selected bmp 412 (Grassed Waterway)
+2026-05-28 14:47:25,969 [DEBUG] selected efficiency value 0.16 for pollutant=TN
+2026-05-28 14:47:25,970 [DEBUG] selected efficiency value 0.20 for pollutant=TP
+2026-05-28 14:47:25,970 [DEBUG] calling simulate_grassed
+2026-05-28 14:47:25,970 [DEBUG] length of grassed buffer/waterway is 311.13 m based on fraction 0.21 of parcel perimeter 1467.54 m
+2026-05-28 14:47:25,970 [DEBUG] reduced yield for pollutant TN: existing yield=23.31, effectiveness=0.16, treated_area=3.63 ha, removal=13.50, new yield=22.19
+2026-05-28 14:47:25,970 [DEBUG] reduced yield for pollutant TP: existing yield=0.27, effectiveness=0.20, treated_area=3.63 ha, removal=0.20, new yield=0.26
+2026-05-28 14:47:25,970 [DEBUG] calling compute_bmp_cost
+2026-05-28 14:47:25,971 [DEBUG] sampled cost rate 66.1068
+2026-05-28 14:47:25,971 [DEBUG] computed cost using rate66.1068, quantity=0.3319 => cost=1294.93
+2026-05-28 14:47:25,971 [DEBUG] computed cost for this bmp application: 1294.93 USD (quantity=0.3319)
+2026-05-28 14:47:25,971 [DEBUG] updated total_cost=27880.21 total_bmp=17
+2026-05-28 14:47:25,971 [DEBUG] scenario: 5
+2026-05-28 14:47:25,971 [DEBUG] cps: 412
+2026-05-28 14:47:25,971 [DEBUG] cps_name: Grassed Waterway
+2026-05-28 14:47:25,971 [DEBUG] pid: 753
+2026-05-28 14:47:25,971 [DEBUG] impacted_pids: 
+2026-05-28 14:47:25,971 [DEBUG] linear_length_m: 311.13171294555065
+2026-05-28 14:47:25,971 [DEBUG] buffer_area_ha: 0.3319153113703135
+2026-05-28 14:47:25,971 [DEBUG] portion_treated: 0.3016521285120648
+2026-05-28 14:47:25,971 [DEBUG] wetland_area_ha: None
+2026-05-28 14:47:25,971 [DEBUG] catchment_to_wetland_ratio: None
+2026-05-28 14:47:25,971 [DEBUG] final bmp record:
+2026-05-28 14:47:25,972 [DEBUG] scenario: 5
+2026-05-28 14:47:25,972 [DEBUG] cps: 412
+2026-05-28 14:47:25,972 [DEBUG] cps_name: Grassed Waterway
+2026-05-28 14:47:25,972 [DEBUG] pid: 753
+2026-05-28 14:47:25,972 [DEBUG] impacted_pids: 
+2026-05-28 14:47:25,972 [DEBUG] linear_length_m: 311.13171294555065
+2026-05-28 14:47:25,972 [DEBUG] buffer_area_ha: 0.3319153113703135
+2026-05-28 14:47:25,972 [DEBUG] portion_treated: 0.3016521285120648
+2026-05-28 14:47:25,972 [DEBUG] wetland_area_ha: None
+2026-05-28 14:47:25,972 [DEBUG] catchment_to_wetland_ratio: None
+2026-05-28 14:47:25,972 [DEBUG] cost_usd: 1294.934657802971
+2026-05-28 14:47:25,972 [DEBUG] treated_TN: 84.57127722285496
+2026-05-28 14:47:25,972 [DEBUG] removed_TN: 13.500733688862718
+2026-05-28 14:47:25,972 [DEBUG] treated_TP: 0.9923976411953299
+2026-05-28 14:47:25,972 [DEBUG] removed_TP: 0.19538467899686043
+2026-05-28 14:47:25,972 [DEBUG] selected parcel idx=2228 with pid=2229
+2026-05-28 14:47:25,973 [DEBUG] selected bmp 329 (Residue Management (No-Till))
+2026-05-28 14:47:25,973 [DEBUG] selected efficiency value 0.15 for pollutant=TN
+2026-05-28 14:47:25,973 [DEBUG] selected efficiency value 0.50 for pollutant=TP
+2026-05-28 14:47:25,973 [DEBUG] calling _simulate_infield
+2026-05-28 14:47:25,973 [DEBUG] cps=329, parcel_idx=2228, area=13.51 ha
+2026-05-28 14:47:25,973 [DEBUG] reduced yield for pollutant TN: existing yield=83.35, effectiveness=0.15, treated_area=13.51 ha, removal=164.10, new yield=71.21
+2026-05-28 14:47:25,973 [DEBUG] reduced yield for pollutant TP: existing yield=0.83, effectiveness=0.50, treated_area=13.51 ha, removal=5.54, new yield=0.42
+2026-05-28 14:47:25,973 [DEBUG] calling compute_bmp_cost
+2026-05-28 14:47:25,974 [DEBUG] sampled cost rate 116.1815
+2026-05-28 14:47:25,974 [DEBUG] computed cost using rate116.1815, quantity=13.5138 => cost=2275.83
+2026-05-28 14:47:25,974 [DEBUG] computed cost for this bmp application: 2275.83 USD (quantity=13.5138)
+2026-05-28 14:47:25,974 [DEBUG] updated total_cost=30156.04 total_bmp=18
+2026-05-28 14:47:25,974 [DEBUG] scenario: 5
+2026-05-28 14:47:25,974 [DEBUG] cps: 329
+2026-05-28 14:47:25,974 [DEBUG] cps_name: Residue Management (No-Till)
+2026-05-28 14:47:25,974 [DEBUG] pid: 2229
+2026-05-28 14:47:25,974 [DEBUG] impacted_pids: 
+2026-05-28 14:47:25,974 [DEBUG] linear_length_m: None
+2026-05-28 14:47:25,974 [DEBUG] buffer_area_ha: None
+2026-05-28 14:47:25,974 [DEBUG] portion_treated: None
+2026-05-28 14:47:25,975 [DEBUG] wetland_area_ha: None
+2026-05-28 14:47:25,975 [DEBUG] catchment_to_wetland_ratio: None
+2026-05-28 14:47:25,975 [DEBUG] final bmp record:
+2026-05-28 14:47:25,975 [DEBUG] scenario: 5
+2026-05-28 14:47:25,975 [DEBUG] cps: 329
+2026-05-28 14:47:25,975 [DEBUG] cps_name: Residue Management (No-Till)
+2026-05-28 14:47:25,975 [DEBUG] pid: 2229
+2026-05-28 14:47:25,975 [DEBUG] impacted_pids: 
+2026-05-28 14:47:25,975 [DEBUG] linear_length_m: None
+2026-05-28 14:47:25,975 [DEBUG] buffer_area_ha: None
+2026-05-28 14:47:25,975 [DEBUG] portion_treated: None
+2026-05-28 14:47:25,975 [DEBUG] wetland_area_ha: None
+2026-05-28 14:47:25,975 [DEBUG] catchment_to_wetland_ratio: None
+2026-05-28 14:47:25,975 [DEBUG] cost_usd: 2275.8256113264397
+2026-05-28 14:47:25,975 [DEBUG] treated_TN: 1126.365496783601
+2026-05-28 14:47:25,975 [DEBUG] removed_TN: 164.1011834263334
+2026-05-28 14:47:25,975 [DEBUG] treated_TP: 11.178876496169943
+2026-05-28 14:47:25,975 [DEBUG] removed_TP: 5.537294946737845
+2026-05-28 14:47:25,976 [DEBUG] selected parcel idx=2054 with pid=2055
+2026-05-28 14:47:25,976 [DEBUG] selected bmp 412 (Grassed Waterway)
+2026-05-28 14:47:25,976 [DEBUG] selected efficiency value 0.19 for pollutant=TN
+2026-05-28 14:47:25,976 [DEBUG] selected efficiency value 0.19 for pollutant=TP
+2026-05-28 14:47:25,976 [DEBUG] calling simulate_grassed
+2026-05-28 14:47:25,976 [DEBUG] length of grassed buffer/waterway is 261.08 m based on fraction 0.24 of parcel perimeter 1088.25 m
+2026-05-28 14:47:25,976 [DEBUG] reduced yield for pollutant TN: existing yield=1.88, effectiveness=0.19, treated_area=2.58 ha, removal=0.91, new yield=1.77
+2026-05-28 14:47:25,976 [DEBUG] reduced yield for pollutant TP: existing yield=0.65, effectiveness=0.19, treated_area=2.58 ha, removal=0.32, new yield=0.61
+2026-05-28 14:47:25,976 [DEBUG] calling compute_bmp_cost
+2026-05-28 14:47:25,977 [DEBUG] sampled cost rate 130.1143
+2026-05-28 14:47:25,977 [DEBUG] computed cost using rate130.1143, quantity=0.2785 => cost=2548.75
+2026-05-28 14:47:25,977 [DEBUG] computed cost for this bmp application: 2548.75 USD (quantity=0.2785)
+2026-05-28 14:47:25,977 [DEBUG] updated total_cost=32704.78 total_bmp=19
+2026-05-28 14:47:25,977 [DEBUG] scenario: 5
+2026-05-28 14:47:25,977 [DEBUG] cps: 412
+2026-05-28 14:47:25,977 [DEBUG] cps_name: Grassed Waterway
+2026-05-28 14:47:25,978 [DEBUG] pid: 2055
+2026-05-28 14:47:25,978 [DEBUG] impacted_pids: 
+2026-05-28 14:47:25,978 [DEBUG] linear_length_m: 261.0777920649493
+2026-05-28 14:47:25,978 [DEBUG] buffer_area_ha: 0.27851778857488796
+2026-05-28 14:47:25,978 [DEBUG] portion_treated: 0.3239331955778034
+2026-05-28 14:47:25,978 [DEBUG] wetland_area_ha: None
+2026-05-28 14:47:25,978 [DEBUG] catchment_to_wetland_ratio: None
+2026-05-28 14:47:25,978 [DEBUG] final bmp record:
+2026-05-28 14:47:25,978 [DEBUG] scenario: 5
+2026-05-28 14:47:25,978 [DEBUG] cps: 412
+2026-05-28 14:47:25,978 [DEBUG] cps_name: Grassed Waterway
+2026-05-28 14:47:25,978 [DEBUG] pid: 2055
+2026-05-28 14:47:25,978 [DEBUG] impacted_pids: 
+2026-05-28 14:47:25,978 [DEBUG] linear_length_m: 261.0777920649493
+2026-05-28 14:47:25,978 [DEBUG] buffer_area_ha: 0.27851778857488796
+2026-05-28 14:47:25,978 [DEBUG] portion_treated: 0.3239331955778034
+2026-05-28 14:47:25,978 [DEBUG] wetland_area_ha: None
+2026-05-28 14:47:25,978 [DEBUG] catchment_to_wetland_ratio: None
+2026-05-28 14:47:25,978 [DEBUG] cost_usd: 2548.748323492367
+2026-05-28 14:47:25,979 [DEBUG] treated_TN: 4.8627838611422
+2026-05-28 14:47:25,979 [DEBUG] removed_TN: 0.914804814360548
+2026-05-28 14:47:25,979 [DEBUG] treated_TP: 1.681194438751901
+2026-05-28 14:47:25,979 [DEBUG] removed_TP: 0.31591943440297415
+2026-05-28 14:47:25,979 [DEBUG] selected parcel idx=540 with pid=541
+2026-05-28 14:47:25,979 [DEBUG] selected bmp 590 (Nutrient Management)
+2026-05-28 14:47:25,979 [DEBUG] selected efficiency value 0.20 for pollutant=TN
+2026-05-28 14:47:25,979 [DEBUG] selected efficiency value 0.22 for pollutant=TP
+2026-05-28 14:47:25,979 [DEBUG] calling _simulate_infield
+2026-05-28 14:47:25,979 [DEBUG] cps=590, parcel_idx=540, area=21.39 ha
+2026-05-28 14:47:25,979 [DEBUG] reduced yield for pollutant TN: existing yield=22.65, effectiveness=0.20, treated_area=21.39 ha, removal=97.90, new yield=18.07
+2026-05-28 14:47:25,979 [DEBUG] reduced yield for pollutant TP: existing yield=1.70, effectiveness=0.22, treated_area=21.39 ha, removal=7.92, new yield=1.33
+2026-05-28 14:47:25,980 [DEBUG] calling compute_bmp_cost
+2026-05-28 14:47:25,980 [DEBUG] sampled cost rate 32.5460
+2026-05-28 14:47:25,980 [DEBUG] computed cost using rate32.5460, quantity=21.3924 => cost=637.53
+2026-05-28 14:47:25,980 [DEBUG] computed cost for this bmp application: 637.53 USD (quantity=21.3924)
+2026-05-28 14:47:25,980 [DEBUG] updated total_cost=33342.31 total_bmp=20
+2026-05-28 14:47:25,980 [DEBUG] scenario: 5
+2026-05-28 14:47:25,981 [DEBUG] cps: 590
+2026-05-28 14:47:25,981 [DEBUG] cps_name: Nutrient Management
+2026-05-28 14:47:25,981 [DEBUG] pid: 541
+2026-05-28 14:47:25,981 [DEBUG] impacted_pids: 
+2026-05-28 14:47:25,981 [DEBUG] linear_length_m: None
+2026-05-28 14:47:25,981 [DEBUG] buffer_area_ha: None
+2026-05-28 14:47:25,981 [DEBUG] portion_treated: None
+2026-05-28 14:47:25,981 [DEBUG] wetland_area_ha: None
+2026-05-28 14:47:25,981 [DEBUG] catchment_to_wetland_ratio: None
+2026-05-28 14:47:25,981 [DEBUG] final bmp record:
+2026-05-28 14:47:25,981 [DEBUG] scenario: 5
+2026-05-28 14:47:25,981 [DEBUG] cps: 590
+2026-05-28 14:47:25,981 [DEBUG] cps_name: Nutrient Management
+2026-05-28 14:47:25,981 [DEBUG] pid: 541
+2026-05-28 14:47:25,981 [DEBUG] impacted_pids: 
+2026-05-28 14:47:25,981 [DEBUG] linear_length_m: None
+2026-05-28 14:47:25,981 [DEBUG] buffer_area_ha: None
+2026-05-28 14:47:25,981 [DEBUG] portion_treated: None
+2026-05-28 14:47:25,982 [DEBUG] wetland_area_ha: None
+2026-05-28 14:47:25,982 [DEBUG] catchment_to_wetland_ratio: None
+2026-05-28 14:47:25,982 [DEBUG] cost_usd: 637.5275357836398
+2026-05-28 14:47:25,982 [DEBUG] treated_TN: 484.44024796218423
+2026-05-28 14:47:25,982 [DEBUG] removed_TN: 97.90215197502349
+2026-05-28 14:47:25,982 [DEBUG] treated_TP: 36.28405432074254
+2026-05-28 14:47:25,982 [DEBUG] removed_TP: 7.915398162619818
+2026-05-28 14:47:25,982 [DEBUG] selected parcel idx=1260 with pid=1261
+2026-05-28 14:47:25,982 [DEBUG] selected bmp 329 (Residue Management (No-Till))
+2026-05-28 14:47:25,982 [DEBUG] selected efficiency value 0.48 for pollutant=TN
+2026-05-28 14:47:25,982 [DEBUG] selected efficiency value 0.09 for pollutant=TP
+2026-05-28 14:47:25,983 [DEBUG] calling _simulate_infield
+2026-05-28 14:47:25,983 [DEBUG] cps=329, parcel_idx=1260, area=0.87 ha
+2026-05-28 14:47:25,983 [DEBUG] reduced yield for pollutant TN: existing yield=18.36, effectiveness=0.48, treated_area=0.87 ha, removal=7.71, new yield=9.48
+2026-05-28 14:47:25,983 [DEBUG] reduced yield for pollutant TP: existing yield=3.76, effectiveness=0.09, treated_area=0.87 ha, removal=0.31, new yield=3.41
+2026-05-28 14:47:25,983 [DEBUG] calling compute_bmp_cost
+2026-05-28 14:47:25,983 [DEBUG] sampled cost rate 41.7727
+2026-05-28 14:47:25,984 [DEBUG] computed cost using rate41.7727, quantity=0.8672 => cost=818.27
+2026-05-28 14:47:25,984 [DEBUG] computed cost for this bmp application: 818.27 USD (quantity=0.8672)
+2026-05-28 14:47:25,984 [DEBUG] updated total_cost=34160.58 total_bmp=21
+2026-05-28 14:47:25,984 [DEBUG] scenario: 5
+2026-05-28 14:47:25,984 [DEBUG] cps: 329
+2026-05-28 14:47:25,984 [DEBUG] cps_name: Residue Management (No-Till)
+2026-05-28 14:47:25,984 [DEBUG] pid: 1261
+2026-05-28 14:47:25,984 [DEBUG] impacted_pids: 
+2026-05-28 14:47:25,984 [DEBUG] linear_length_m: None
+2026-05-28 14:47:25,984 [DEBUG] buffer_area_ha: None
+2026-05-28 14:47:25,984 [DEBUG] portion_treated: None
+2026-05-28 14:47:25,984 [DEBUG] wetland_area_ha: None
+2026-05-28 14:47:25,984 [DEBUG] catchment_to_wetland_ratio: None
+2026-05-28 14:47:25,984 [DEBUG] final bmp record:
+2026-05-28 14:47:25,984 [DEBUG] scenario: 5
+2026-05-28 14:47:25,984 [DEBUG] cps: 329
+2026-05-28 14:47:25,984 [DEBUG] cps_name: Residue Management (No-Till)
+2026-05-28 14:47:25,985 [DEBUG] pid: 1261
+2026-05-28 14:47:25,985 [DEBUG] impacted_pids: 
+2026-05-28 14:47:25,985 [DEBUG] linear_length_m: None
+2026-05-28 14:47:25,985 [DEBUG] buffer_area_ha: None
+2026-05-28 14:47:25,985 [DEBUG] portion_treated: None
+2026-05-28 14:47:25,985 [DEBUG] wetland_area_ha: None
+2026-05-28 14:47:25,985 [DEBUG] catchment_to_wetland_ratio: None
+2026-05-28 14:47:25,985 [DEBUG] cost_usd: 818.26606463869
+2026-05-28 14:47:25,985 [DEBUG] treated_TN: 15.924457366568797
+2026-05-28 14:47:25,985 [DEBUG] removed_TN: 7.706574287693437
+2026-05-28 14:47:25,985 [DEBUG] treated_TP: 3.260818702856321
+2026-05-28 14:47:25,985 [DEBUG] removed_TP: 0.305409822307592
+2026-05-28 14:47:25,985 [DEBUG] selected parcel idx=241 with pid=242
+2026-05-28 14:47:25,985 [DEBUG] selected bmp 590 (Nutrient Management)
+2026-05-28 14:47:25,985 [DEBUG] selected efficiency value 0.22 for pollutant=TN
+2026-05-28 14:47:25,986 [DEBUG] selected efficiency value 0.12 for pollutant=TP
+2026-05-28 14:47:25,986 [DEBUG] calling _simulate_infield
+2026-05-28 14:47:25,986 [DEBUG] cps=590, parcel_idx=241, area=25.81 ha
+2026-05-28 14:47:25,986 [DEBUG] reduced yield for pollutant TN: existing yield=39.24, effectiveness=0.22, treated_area=25.81 ha, removal=227.66, new yield=30.42
+2026-05-28 14:47:25,986 [DEBUG] reduced yield for pollutant TP: existing yield=0.00, effectiveness=0.12, treated_area=25.81 ha, removal=0.01, new yield=0.00
+2026-05-28 14:47:25,986 [DEBUG] calling compute_bmp_cost
+2026-05-28 14:47:25,987 [DEBUG] sampled cost rate 90.1647
+2026-05-28 14:47:25,987 [DEBUG] computed cost using rate90.1647, quantity=25.8056 => cost=1766.19
+2026-05-28 14:47:25,987 [DEBUG] computed cost for this bmp application: 1766.19 USD (quantity=25.8056)
+2026-05-28 14:47:25,987 [DEBUG] updated total_cost=35926.77 total_bmp=22
+2026-05-28 14:47:25,987 [DEBUG] scenario: 5
+2026-05-28 14:47:25,987 [DEBUG] cps: 590
+2026-05-28 14:47:25,987 [DEBUG] cps_name: Nutrient Management
+2026-05-28 14:47:25,987 [DEBUG] pid: 242
+2026-05-28 14:47:25,987 [DEBUG] impacted_pids: 
+2026-05-28 14:47:25,987 [DEBUG] linear_length_m: None
+2026-05-28 14:47:25,987 [DEBUG] buffer_area_ha: None
+2026-05-28 14:47:25,987 [DEBUG] portion_treated: None
+2026-05-28 14:47:25,987 [DEBUG] wetland_area_ha: None
+2026-05-28 14:47:25,987 [DEBUG] catchment_to_wetland_ratio: None
+2026-05-28 14:47:25,988 [DEBUG] final bmp record:
+2026-05-28 14:47:25,988 [DEBUG] scenario: 5
+2026-05-28 14:47:25,988 [DEBUG] cps: 590
+2026-05-28 14:47:25,988 [DEBUG] cps_name: Nutrient Management
+2026-05-28 14:47:25,988 [DEBUG] pid: 242
+2026-05-28 14:47:25,988 [DEBUG] impacted_pids: 
+2026-05-28 14:47:25,988 [DEBUG] linear_length_m: None
+2026-05-28 14:47:25,988 [DEBUG] buffer_area_ha: None
+2026-05-28 14:47:25,988 [DEBUG] portion_treated: None
+2026-05-28 14:47:25,988 [DEBUG] wetland_area_ha: None
+2026-05-28 14:47:25,988 [DEBUG] catchment_to_wetland_ratio: None
+2026-05-28 14:47:25,988 [DEBUG] cost_usd: 1766.1944408562536
+2026-05-28 14:47:25,988 [DEBUG] treated_TN: 1012.7198837900016
+2026-05-28 14:47:25,988 [DEBUG] removed_TN: 227.65633706068255
+2026-05-28 14:47:25,988 [DEBUG] treated_TP: 0.07964261105861206
+2026-05-28 14:47:25,988 [DEBUG] removed_TP: 0.009386176270885095
+2026-05-28 14:47:25,988 [DEBUG] selected parcel idx=1465 with pid=1466
+2026-05-28 14:47:25,989 [DEBUG] selected bmp 412 (Grassed Waterway)
+2026-05-28 14:47:25,989 [DEBUG] selected efficiency value 0.15 for pollutant=TN
+2026-05-28 14:47:25,989 [DEBUG] selected efficiency value 0.12 for pollutant=TP
+2026-05-28 14:47:25,989 [DEBUG] calling simulate_grassed
+2026-05-28 14:47:25,989 [DEBUG] length of grassed buffer/waterway is 349.76 m based on fraction 0.20 of parcel perimeter 1717.32 m
+2026-05-28 14:47:25,989 [DEBUG] reduced yield for pollutant TN: existing yield=54.52, effectiveness=0.15, treated_area=5.17 ha, removal=42.69, new yield=52.12
+2026-05-28 14:47:25,989 [DEBUG] reduced yield for pollutant TP: existing yield=3.31, effectiveness=0.12, treated_area=5.17 ha, removal=2.02, new yield=3.20
+2026-05-28 14:47:25,989 [DEBUG] calling compute_bmp_cost
+2026-05-28 14:47:25,990 [DEBUG] sampled cost rate 58.0222
+2026-05-28 14:47:25,990 [DEBUG] computed cost using rate58.0222, quantity=0.3731 => cost=1136.57
+2026-05-28 14:47:25,990 [DEBUG] computed cost for this bmp application: 1136.57 USD (quantity=0.3731)
+2026-05-28 14:47:25,990 [DEBUG] updated total_cost=37063.34 total_bmp=23
+2026-05-28 14:47:25,990 [DEBUG] scenario: 5
+2026-05-28 14:47:25,990 [DEBUG] cps: 412
+2026-05-28 14:47:25,990 [DEBUG] cps_name: Grassed Waterway
+2026-05-28 14:47:25,990 [DEBUG] pid: 1466
+2026-05-28 14:47:25,990 [DEBUG] impacted_pids: 
+2026-05-28 14:47:25,990 [DEBUG] linear_length_m: 349.75646668598534
+2026-05-28 14:47:25,991 [DEBUG] buffer_area_ha: 0.3731201986606092
+2026-05-28 14:47:25,991 [DEBUG] portion_treated: 0.29055412702470146
+2026-05-28 14:47:25,991 [DEBUG] wetland_area_ha: None
+2026-05-28 14:47:25,991 [DEBUG] catchment_to_wetland_ratio: None
+2026-05-28 14:47:25,991 [DEBUG] final bmp record:
+2026-05-28 14:47:25,991 [DEBUG] scenario: 5
+2026-05-28 14:47:25,991 [DEBUG] cps: 412
+2026-05-28 14:47:25,991 [DEBUG] cps_name: Grassed Waterway
+2026-05-28 14:47:25,991 [DEBUG] pid: 1466
+2026-05-28 14:47:25,991 [DEBUG] impacted_pids: 
+2026-05-28 14:47:25,991 [DEBUG] linear_length_m: 349.75646668598534
+2026-05-28 14:47:25,991 [DEBUG] buffer_area_ha: 0.3731201986606092
+2026-05-28 14:47:25,991 [DEBUG] portion_treated: 0.29055412702470146
+2026-05-28 14:47:25,991 [DEBUG] wetland_area_ha: None
+2026-05-28 14:47:25,991 [DEBUG] catchment_to_wetland_ratio: None
+2026-05-28 14:47:25,991 [DEBUG] cost_usd: 1136.5703932371086
+2026-05-28 14:47:25,991 [DEBUG] treated_TN: 281.7647523748181
+2026-05-28 14:47:25,991 [DEBUG] removed_TN: 42.692044637860064
+2026-05-28 14:47:25,992 [DEBUG] treated_TP: 17.103350613918067
+2026-05-28 14:47:25,992 [DEBUG] removed_TP: 2.0218387274936576
+2026-05-28 14:47:25,992 [DEBUG] selected parcel idx=847 with pid=848
+2026-05-28 14:47:25,992 [DEBUG] selected bmp 329 (Residue Management (No-Till))
+2026-05-28 14:47:25,992 [DEBUG] selected efficiency value 0.09 for pollutant=TN
+2026-05-28 14:47:25,992 [DEBUG] selected efficiency value 0.19 for pollutant=TP
+2026-05-28 14:47:25,992 [DEBUG] calling _simulate_infield
+2026-05-28 14:47:25,992 [DEBUG] cps=329, parcel_idx=847, area=7.88 ha
+2026-05-28 14:47:25,992 [DEBUG] reduced yield for pollutant TN: existing yield=7.63, effectiveness=0.09, treated_area=7.88 ha, removal=5.26, new yield=6.96
+2026-05-28 14:47:25,992 [DEBUG] reduced yield for pollutant TP: existing yield=0.95, effectiveness=0.19, treated_area=7.88 ha, removal=1.39, new yield=0.77
+2026-05-28 14:47:25,992 [DEBUG] calling compute_bmp_cost
+2026-05-28 14:47:25,993 [DEBUG] sampled cost rate 37.6821
+2026-05-28 14:47:25,993 [DEBUG] computed cost using rate37.6821, quantity=7.8830 => cost=738.14
+2026-05-28 14:47:25,993 [DEBUG] computed cost for this bmp application: 738.14 USD (quantity=7.8830)
+2026-05-28 14:47:25,993 [DEBUG] updated total_cost=37801.48 total_bmp=24
+2026-05-28 14:47:25,993 [DEBUG] scenario: 5
+2026-05-28 14:47:25,993 [DEBUG] cps: 329
+2026-05-28 14:47:25,993 [DEBUG] cps_name: Residue Management (No-Till)
+2026-05-28 14:47:25,994 [DEBUG] pid: 848
+2026-05-28 14:47:25,994 [DEBUG] impacted_pids: 
+2026-05-28 14:47:25,994 [DEBUG] linear_length_m: None
+2026-05-28 14:47:25,994 [DEBUG] buffer_area_ha: None
+2026-05-28 14:47:25,994 [DEBUG] portion_treated: None
+2026-05-28 14:47:25,994 [DEBUG] wetland_area_ha: None
+2026-05-28 14:47:25,994 [DEBUG] catchment_to_wetland_ratio: None
+2026-05-28 14:47:25,994 [DEBUG] final bmp record:
+2026-05-28 14:47:25,994 [DEBUG] scenario: 5
+2026-05-28 14:47:25,994 [DEBUG] cps: 329
+2026-05-28 14:47:25,994 [DEBUG] cps_name: Residue Management (No-Till)
+2026-05-28 14:47:25,994 [DEBUG] pid: 848
+2026-05-28 14:47:25,994 [DEBUG] impacted_pids: 
+2026-05-28 14:47:25,994 [DEBUG] linear_length_m: None
+2026-05-28 14:47:25,994 [DEBUG] buffer_area_ha: None
+2026-05-28 14:47:25,994 [DEBUG] portion_treated: None
+2026-05-28 14:47:25,994 [DEBUG] wetland_area_ha: None
+2026-05-28 14:47:25,995 [DEBUG] catchment_to_wetland_ratio: None
+2026-05-28 14:47:25,995 [DEBUG] cost_usd: 738.1371548444104
+2026-05-28 14:47:25,995 [DEBUG] treated_TN: 60.13509765275307
+2026-05-28 14:47:25,995 [DEBUG] removed_TN: 5.256246510803247
+2026-05-28 14:47:25,995 [DEBUG] treated_TP: 7.456579218171216
+2026-05-28 14:47:25,995 [DEBUG] removed_TP: 1.3856637291021996
+2026-05-28 14:47:25,995 [DEBUG] selected parcel idx=562 with pid=563
+2026-05-28 14:47:25,995 [DEBUG] selected bmp 329 (Residue Management (No-Till))
+2026-05-28 14:47:25,995 [DEBUG] selected efficiency value 0.13 for pollutant=TN
+2026-05-28 14:47:25,995 [DEBUG] selected efficiency value 0.09 for pollutant=TP
+2026-05-28 14:47:25,995 [DEBUG] calling _simulate_infield
+2026-05-28 14:47:25,995 [DEBUG] cps=329, parcel_idx=562, area=27.02 ha
+2026-05-28 14:47:25,996 [DEBUG] reduced yield for pollutant TN: existing yield=9.32, effectiveness=0.13, treated_area=27.02 ha, removal=31.70, new yield=8.15
+2026-05-28 14:47:25,996 [DEBUG] reduced yield for pollutant TP: existing yield=2.59, effectiveness=0.09, treated_area=27.02 ha, removal=6.37, new yield=2.35
+2026-05-28 14:47:25,996 [DEBUG] calling compute_bmp_cost
+2026-05-28 14:47:25,996 [DEBUG] sampled cost rate 25.3019
+2026-05-28 14:47:25,996 [DEBUG] computed cost using rate25.3019, quantity=27.0219 => cost=495.63
+2026-05-28 14:47:25,996 [DEBUG] computed cost for this bmp application: 495.63 USD (quantity=27.0219)
+2026-05-28 14:47:25,997 [DEBUG] updated total_cost=38297.11 total_bmp=25
+2026-05-28 14:47:25,997 [DEBUG] scenario: 5
+2026-05-28 14:47:25,997 [DEBUG] cps: 329
+2026-05-28 14:47:25,997 [DEBUG] cps_name: Residue Management (No-Till)
+2026-05-28 14:47:25,997 [DEBUG] pid: 563
+2026-05-28 14:47:25,997 [DEBUG] impacted_pids: 
+2026-05-28 14:47:25,997 [DEBUG] linear_length_m: None
+2026-05-28 14:47:25,997 [DEBUG] buffer_area_ha: None
+2026-05-28 14:47:25,997 [DEBUG] portion_treated: None
+2026-05-28 14:47:25,997 [DEBUG] wetland_area_ha: None
+2026-05-28 14:47:25,997 [DEBUG] catchment_to_wetland_ratio: None
+2026-05-28 14:47:25,997 [DEBUG] final bmp record:
+2026-05-28 14:47:25,997 [DEBUG] scenario: 5
+2026-05-28 14:47:25,997 [DEBUG] cps: 329
+2026-05-28 14:47:25,997 [DEBUG] cps_name: Residue Management (No-Till)
+2026-05-28 14:47:25,997 [DEBUG] pid: 563
+2026-05-28 14:47:25,997 [DEBUG] impacted_pids: 
+2026-05-28 14:47:25,997 [DEBUG] linear_length_m: None
+2026-05-28 14:47:25,997 [DEBUG] buffer_area_ha: None
+2026-05-28 14:47:25,998 [DEBUG] portion_treated: None
+2026-05-28 14:47:25,998 [DEBUG] wetland_area_ha: None
+2026-05-28 14:47:25,998 [DEBUG] catchment_to_wetland_ratio: None
+2026-05-28 14:47:25,998 [DEBUG] cost_usd: 495.6274935762649
+2026-05-28 14:47:25,998 [DEBUG] treated_TN: 251.83101417266022
+2026-05-28 14:47:25,998 [DEBUG] removed_TN: 31.70374759576219
+2026-05-28 14:47:25,998 [DEBUG] treated_TP: 70.00734173095402
+2026-05-28 14:47:25,998 [DEBUG] removed_TP: 6.372112743632118
+2026-05-28 14:47:25,998 [DEBUG] selected parcel idx=1388 with pid=1389
+2026-05-28 14:47:25,998 [DEBUG] selected bmp 412 (Grassed Waterway)
+2026-05-28 14:47:25,998 [DEBUG] selected efficiency value 0.20 for pollutant=TN
+2026-05-28 14:47:25,998 [DEBUG] selected efficiency value 0.11 for pollutant=TP
+2026-05-28 14:47:25,999 [DEBUG] calling simulate_grassed
+2026-05-28 14:47:25,999 [DEBUG] length of grassed buffer/waterway is 291.49 m based on fraction 0.20 of parcel perimeter 1469.34 m
+2026-05-28 14:47:25,999 [DEBUG] reduced yield for pollutant TN: existing yield=70.95, effectiveness=0.20, treated_area=3.31 ha, removal=46.98, new yield=66.93
+2026-05-28 14:47:25,999 [DEBUG] reduced yield for pollutant TP: existing yield=1.09, effectiveness=0.11, treated_area=3.31 ha, removal=0.41, new yield=1.06
+2026-05-28 14:47:25,999 [DEBUG] calling compute_bmp_cost
+2026-05-28 14:47:26,000 [DEBUG] sampled cost rate 110.6493
+2026-05-28 14:47:26,000 [DEBUG] computed cost using rate110.6493, quantity=0.3110 => cost=2167.46
+2026-05-28 14:47:26,000 [DEBUG] computed cost for this bmp application: 2167.46 USD (quantity=0.3110)
+2026-05-28 14:47:26,000 [DEBUG] updated total_cost=40464.56 total_bmp=26
+2026-05-28 14:47:26,000 [DEBUG] scenario: 5
+2026-05-28 14:47:26,000 [DEBUG] cps: 412
+2026-05-28 14:47:26,000 [DEBUG] cps_name: Grassed Waterway
+2026-05-28 14:47:26,000 [DEBUG] pid: 1389
+2026-05-28 14:47:26,000 [DEBUG] impacted_pids: 
+2026-05-28 14:47:26,000 [DEBUG] linear_length_m: 291.49445450418074
+2026-05-28 14:47:26,000 [DEBUG] buffer_area_ha: 0.31096628406506005
+2026-05-28 14:47:26,000 [DEBUG] portion_treated: 0.28369293842636145
+2026-05-28 14:47:26,000 [DEBUG] wetland_area_ha: None
+2026-05-28 14:47:26,000 [DEBUG] catchment_to_wetland_ratio: None
+2026-05-28 14:47:26,000 [DEBUG] final bmp record:
+2026-05-28 14:47:26,000 [DEBUG] scenario: 5
+2026-05-28 14:47:26,001 [DEBUG] cps: 412
+2026-05-28 14:47:26,001 [DEBUG] cps_name: Grassed Waterway
+2026-05-28 14:47:26,001 [DEBUG] pid: 1389
+2026-05-28 14:47:26,001 [DEBUG] impacted_pids: 
+2026-05-28 14:47:26,001 [DEBUG] linear_length_m: 291.49445450418074
+2026-05-28 14:47:26,001 [DEBUG] buffer_area_ha: 0.31096628406506005
+2026-05-28 14:47:26,001 [DEBUG] portion_treated: 0.28369293842636145
+2026-05-28 14:47:26,001 [DEBUG] wetland_area_ha: None
+2026-05-28 14:47:26,001 [DEBUG] catchment_to_wetland_ratio: None
+2026-05-28 14:47:26,001 [DEBUG] cost_usd: 2167.4576987148293
+2026-05-28 14:47:26,001 [DEBUG] treated_TN: 234.7522877260564
+2026-05-28 14:47:26,001 [DEBUG] removed_TN: 46.97732177079714
+2026-05-28 14:47:26,001 [DEBUG] treated_TP: 3.608053057968439
+2026-05-28 14:47:26,001 [DEBUG] removed_TP: 0.4132208778225125
+2026-05-28 14:47:26,001 [DEBUG] selected parcel idx=1 with pid=2
+2026-05-28 14:47:26,002 [DEBUG] selected bmp 329 (Residue Management (No-Till))
+2026-05-28 14:47:26,002 [DEBUG] selected efficiency value 0.46 for pollutant=TN
+2026-05-28 14:47:26,002 [DEBUG] selected efficiency value 0.45 for pollutant=TP
+2026-05-28 14:47:26,002 [DEBUG] calling _simulate_infield
+2026-05-28 14:47:26,002 [DEBUG] cps=329, parcel_idx=1, area=0.60 ha
+2026-05-28 14:47:26,002 [DEBUG] reduced yield for pollutant TN: existing yield=20.67, effectiveness=0.46, treated_area=0.60 ha, removal=5.75, new yield=11.10
+2026-05-28 14:47:26,002 [DEBUG] reduced yield for pollutant TP: existing yield=0.16, effectiveness=0.45, treated_area=0.60 ha, removal=0.04, new yield=0.09
+2026-05-28 14:47:26,002 [DEBUG] calling compute_bmp_cost
+2026-05-28 14:47:26,003 [DEBUG] sampled cost rate 72.7594
+2026-05-28 14:47:26,003 [DEBUG] computed cost using rate72.7594, quantity=0.6009 => cost=1425.25
+2026-05-28 14:47:26,003 [DEBUG] computed cost for this bmp application: 1425.25 USD (quantity=0.6009)
+2026-05-28 14:47:26,003 [DEBUG] updated total_cost=41889.81 total_bmp=27
+2026-05-28 14:47:26,003 [DEBUG] scenario: 5
+2026-05-28 14:47:26,003 [DEBUG] cps: 329
+2026-05-28 14:47:26,003 [DEBUG] cps_name: Residue Management (No-Till)
+2026-05-28 14:47:26,003 [DEBUG] pid: 2
+2026-05-28 14:47:26,003 [DEBUG] impacted_pids: 
+2026-05-28 14:47:26,003 [DEBUG] linear_length_m: None
+2026-05-28 14:47:26,003 [DEBUG] buffer_area_ha: None
+2026-05-28 14:47:26,003 [DEBUG] portion_treated: None
+2026-05-28 14:47:26,004 [DEBUG] wetland_area_ha: None
+2026-05-28 14:47:26,004 [DEBUG] catchment_to_wetland_ratio: None
+2026-05-28 14:47:26,004 [DEBUG] final bmp record:
+2026-05-28 14:47:26,004 [DEBUG] scenario: 5
+2026-05-28 14:47:26,004 [DEBUG] cps: 329
+2026-05-28 14:47:26,004 [DEBUG] cps_name: Residue Management (No-Till)
+2026-05-28 14:47:26,004 [DEBUG] pid: 2
+2026-05-28 14:47:26,004 [DEBUG] impacted_pids: 
+2026-05-28 14:47:26,004 [DEBUG] linear_length_m: None
+2026-05-28 14:47:26,004 [DEBUG] buffer_area_ha: None
+2026-05-28 14:47:26,004 [DEBUG] portion_treated: None
+2026-05-28 14:47:26,004 [DEBUG] wetland_area_ha: None
+2026-05-28 14:47:26,004 [DEBUG] catchment_to_wetland_ratio: None
+2026-05-28 14:47:26,004 [DEBUG] cost_usd: 1425.2497222245395
+2026-05-28 14:47:26,004 [DEBUG] treated_TN: 12.423485998869738
+2026-05-28 14:47:26,004 [DEBUG] removed_TN: 5.753233209568955
+2026-05-28 14:47:26,004 [DEBUG] treated_TP: 0.09496005782577277
+2026-05-28 14:47:26,004 [DEBUG] removed_TP: 0.04251808162963727
+2026-05-28 14:47:26,005 [DEBUG] selected parcel idx=913 with pid=914
+2026-05-28 14:47:26,005 [DEBUG] selected bmp 412 (Grassed Waterway)
+2026-05-28 14:47:26,005 [DEBUG] selected efficiency value 0.14 for pollutant=TN
+2026-05-28 14:47:26,005 [DEBUG] selected efficiency value 0.15 for pollutant=TP
+2026-05-28 14:47:26,005 [DEBUG] calling simulate_grassed
+2026-05-28 14:47:26,005 [DEBUG] length of grassed buffer/waterway is 560.97 m based on fraction 0.16 of parcel perimeter 3494.86 m
+2026-05-28 14:47:26,005 [DEBUG] reduced yield for pollutant TN: existing yield=23.23, effectiveness=0.14, treated_area=13.06 ha, removal=41.08, new yield=22.19
+2026-05-28 14:47:26,005 [DEBUG] reduced yield for pollutant TP: existing yield=0.34, effectiveness=0.15, treated_area=13.06 ha, removal=0.66, new yield=0.33
+2026-05-28 14:47:26,005 [DEBUG] calling compute_bmp_cost
+2026-05-28 14:47:26,006 [DEBUG] sampled cost rate 65.7699
+2026-05-28 14:47:26,006 [DEBUG] computed cost using rate65.7699, quantity=0.5984 => cost=1288.34
+2026-05-28 14:47:26,006 [DEBUG] computed cost for this bmp application: 1288.34 USD (quantity=0.5984)
+2026-05-28 14:47:26,006 [DEBUG] updated total_cost=43178.15 total_bmp=28
+2026-05-28 14:47:26,006 [DEBUG] scenario: 5
+2026-05-28 14:47:26,006 [DEBUG] cps: 412
+2026-05-28 14:47:26,006 [DEBUG] cps_name: Grassed Waterway
+2026-05-28 14:47:26,006 [DEBUG] pid: 914
+2026-05-28 14:47:26,007 [DEBUG] impacted_pids: 
+2026-05-28 14:47:26,007 [DEBUG] linear_length_m: 560.9680837851223
+2026-05-28 14:47:26,007 [DEBUG] buffer_area_ha: 0.5984407517819685
+2026-05-28 14:47:26,007 [DEBUG] portion_treated: 0.3324851090751945
+2026-05-28 14:47:26,007 [DEBUG] wetland_area_ha: None
+2026-05-28 14:47:26,007 [DEBUG] catchment_to_wetland_ratio: None
+2026-05-28 14:47:26,007 [DEBUG] final bmp record:
+2026-05-28 14:47:26,007 [DEBUG] scenario: 5
+2026-05-28 14:47:26,007 [DEBUG] cps: 412
+2026-05-28 14:47:26,007 [DEBUG] cps_name: Grassed Waterway
+2026-05-28 14:47:26,007 [DEBUG] pid: 914
+2026-05-28 14:47:26,007 [DEBUG] impacted_pids: 
+2026-05-28 14:47:26,007 [DEBUG] linear_length_m: 560.9680837851223
+2026-05-28 14:47:26,007 [DEBUG] buffer_area_ha: 0.5984407517819685
+2026-05-28 14:47:26,007 [DEBUG] portion_treated: 0.3324851090751945
+2026-05-28 14:47:26,007 [DEBUG] wetland_area_ha: None
+2026-05-28 14:47:26,007 [DEBUG] catchment_to_wetland_ratio: None
+2026-05-28 14:47:26,007 [DEBUG] cost_usd: 1288.335043424712
+2026-05-28 14:47:26,008 [DEBUG] treated_TN: 303.38299852519265
+2026-05-28 14:47:26,008 [DEBUG] removed_TN: 41.078890085229894
+2026-05-28 14:47:26,008 [DEBUG] treated_TP: 4.502833606617201
+2026-05-28 14:47:26,008 [DEBUG] removed_TP: 0.6581594791913284
+2026-05-28 14:47:26,008 [DEBUG] selected parcel idx=1368 with pid=1369
+2026-05-28 14:47:26,008 [DEBUG] selected bmp 590 (Nutrient Management)
+2026-05-28 14:47:26,008 [DEBUG] selected efficiency value 0.30 for pollutant=TN
+2026-05-28 14:47:26,008 [DEBUG] selected efficiency value 0.08 for pollutant=TP
+2026-05-28 14:47:26,008 [DEBUG] calling _simulate_infield
+2026-05-28 14:47:26,008 [DEBUG] cps=590, parcel_idx=1368, area=22.87 ha
+2026-05-28 14:47:26,008 [DEBUG] reduced yield for pollutant TN: existing yield=63.77, effectiveness=0.30, treated_area=22.87 ha, removal=436.32, new yield=44.70
+2026-05-28 14:47:26,008 [DEBUG] reduced yield for pollutant TP: existing yield=0.00, effectiveness=0.08, treated_area=22.87 ha, removal=0.00, new yield=0.00
+2026-05-28 14:47:26,009 [DEBUG] calling compute_bmp_cost
+2026-05-28 14:47:26,009 [DEBUG] sampled cost rate 111.7260
+2026-05-28 14:47:26,009 [DEBUG] computed cost using rate111.7260, quantity=22.8741 => cost=2188.55
+2026-05-28 14:47:26,009 [DEBUG] computed cost for this bmp application: 2188.55 USD (quantity=22.8741)
+2026-05-28 14:47:26,009 [DEBUG] updated total_cost=45366.70 total_bmp=29
+2026-05-28 14:47:26,010 [DEBUG] scenario: 5
+2026-05-28 14:47:26,010 [DEBUG] cps: 590
+2026-05-28 14:47:26,010 [DEBUG] cps_name: Nutrient Management
+2026-05-28 14:47:26,010 [DEBUG] pid: 1369
+2026-05-28 14:47:26,010 [DEBUG] impacted_pids: 
+2026-05-28 14:47:26,010 [DEBUG] linear_length_m: None
+2026-05-28 14:47:26,010 [DEBUG] buffer_area_ha: None
+2026-05-28 14:47:26,010 [DEBUG] portion_treated: None
+2026-05-28 14:47:26,010 [DEBUG] wetland_area_ha: None
+2026-05-28 14:47:26,010 [DEBUG] catchment_to_wetland_ratio: None
+2026-05-28 14:47:26,010 [DEBUG] final bmp record:
+2026-05-28 14:47:26,010 [DEBUG] scenario: 5
+2026-05-28 14:47:26,010 [DEBUG] cps: 590
+2026-05-28 14:47:26,010 [DEBUG] cps_name: Nutrient Management
+2026-05-28 14:47:26,010 [DEBUG] pid: 1369
+2026-05-28 14:47:26,010 [DEBUG] impacted_pids: 
+2026-05-28 14:47:26,010 [DEBUG] linear_length_m: None
+2026-05-28 14:47:26,010 [DEBUG] buffer_area_ha: None
+2026-05-28 14:47:26,011 [DEBUG] portion_treated: None
+2026-05-28 14:47:26,011 [DEBUG] wetland_area_ha: None
+2026-05-28 14:47:26,011 [DEBUG] catchment_to_wetland_ratio: None
+2026-05-28 14:47:26,011 [DEBUG] cost_usd: 2188.548574947674
+2026-05-28 14:47:26,011 [DEBUG] treated_TN: 1458.7220376201903
+2026-05-28 14:47:26,011 [DEBUG] removed_TN: 436.32059670615007
+2026-05-28 14:47:26,011 [DEBUG] treated_TP: 0.03271103399335341
+2026-05-28 14:47:26,011 [DEBUG] removed_TP: 0.0026812952415916896
+2026-05-28 14:47:26,011 [DEBUG] selected parcel idx=1052 with pid=1053
+2026-05-28 14:47:26,011 [DEBUG] selected bmp 412 (Grassed Waterway)
+2026-05-28 14:47:26,011 [DEBUG] selected efficiency value 0.21 for pollutant=TN
+2026-05-28 14:47:26,011 [DEBUG] selected efficiency value 0.11 for pollutant=TP
+2026-05-28 14:47:26,011 [DEBUG] calling simulate_grassed
+2026-05-28 14:47:26,012 [DEBUG] length of grassed buffer/waterway is 189.34 m based on fraction 0.18 of parcel perimeter 1053.05 m
+2026-05-28 14:47:26,012 [DEBUG] reduced yield for pollutant TN: existing yield=4.42, effectiveness=0.21, treated_area=2.65 ha, removal=2.50, new yield=4.06
+2026-05-28 14:47:26,012 [DEBUG] reduced yield for pollutant TP: existing yield=0.41, effectiveness=0.11, treated_area=2.65 ha, removal=0.12, new yield=0.40
+2026-05-28 14:47:26,012 [DEBUG] calling compute_bmp_cost
+2026-05-28 14:47:26,012 [DEBUG] sampled cost rate 47.3909
+2026-05-28 14:47:26,013 [DEBUG] computed cost using rate47.3909, quantity=0.2020 => cost=928.32
+2026-05-28 14:47:26,013 [DEBUG] computed cost for this bmp application: 928.32 USD (quantity=0.2020)
+2026-05-28 14:47:26,013 [DEBUG] updated total_cost=46295.02 total_bmp=30
+2026-05-28 14:47:26,013 [DEBUG] scenario: 5
+2026-05-28 14:47:26,013 [DEBUG] cps: 412
+2026-05-28 14:47:26,013 [DEBUG] cps_name: Grassed Waterway
+2026-05-28 14:47:26,013 [DEBUG] pid: 1053
+2026-05-28 14:47:26,013 [DEBUG] impacted_pids: 
+2026-05-28 14:47:26,013 [DEBUG] linear_length_m: 189.3410394470354
+2026-05-28 14:47:26,013 [DEBUG] buffer_area_ha: 0.2019890208820974
+2026-05-28 14:47:26,013 [DEBUG] portion_treated: 0.3749862641184245
+2026-05-28 14:47:26,013 [DEBUG] wetland_area_ha: None
+2026-05-28 14:47:26,013 [DEBUG] catchment_to_wetland_ratio: None
+2026-05-28 14:47:26,013 [DEBUG] final bmp record:
+2026-05-28 14:47:26,013 [DEBUG] scenario: 5
+2026-05-28 14:47:26,013 [DEBUG] cps: 412
+2026-05-28 14:47:26,013 [DEBUG] cps_name: Grassed Waterway
+2026-05-28 14:47:26,014 [DEBUG] pid: 1053
+2026-05-28 14:47:26,014 [DEBUG] impacted_pids: 
+2026-05-28 14:47:26,014 [DEBUG] linear_length_m: 189.3410394470354
+2026-05-28 14:47:26,014 [DEBUG] buffer_area_ha: 0.2019890208820974
+2026-05-28 14:47:26,014 [DEBUG] portion_treated: 0.3749862641184245
+2026-05-28 14:47:26,014 [DEBUG] wetland_area_ha: None
+2026-05-28 14:47:26,014 [DEBUG] catchment_to_wetland_ratio: None
+2026-05-28 14:47:26,014 [DEBUG] cost_usd: 928.3184702826388
+2026-05-28 14:47:26,014 [DEBUG] treated_TN: 11.710807251710255
+2026-05-28 14:47:26,014 [DEBUG] removed_TN: 2.5002618132644514
+2026-05-28 14:47:26,014 [DEBUG] treated_TP: 1.099055792856829
+2026-05-28 14:47:26,014 [DEBUG] removed_TP: 0.11850087621674879
+2026-05-28 14:47:26,014 [DEBUG] selected parcel idx=1913 with pid=1914
+2026-05-28 14:47:26,014 [DEBUG] selected bmp 590 (Nutrient Management)
+2026-05-28 14:47:26,015 [DEBUG] selected efficiency value 0.33 for pollutant=TN
+2026-05-28 14:47:26,015 [DEBUG] selected efficiency value 0.16 for pollutant=TP
+2026-05-28 14:47:26,015 [DEBUG] calling _simulate_infield
+2026-05-28 14:47:26,015 [DEBUG] cps=590, parcel_idx=1913, area=18.78 ha
+2026-05-28 14:47:26,015 [DEBUG] reduced yield for pollutant TN: existing yield=147.97, effectiveness=0.33, treated_area=18.78 ha, removal=923.35, new yield=98.80
+2026-05-28 14:47:26,015 [DEBUG] reduced yield for pollutant TP: existing yield=0.98, effectiveness=0.16, treated_area=18.78 ha, removal=2.85, new yield=0.82
+2026-05-28 14:47:26,015 [DEBUG] calling compute_bmp_cost
+2026-05-28 14:47:26,016 [DEBUG] sampled cost rate 84.5354
+2026-05-28 14:47:26,016 [DEBUG] computed cost using rate84.5354, quantity=18.7777 => cost=1655.93
+2026-05-28 14:47:26,016 [DEBUG] computed cost for this bmp application: 1655.93 USD (quantity=18.7777)
+2026-05-28 14:47:26,016 [DEBUG] updated total_cost=47950.94 total_bmp=31
+2026-05-28 14:47:26,016 [DEBUG] scenario: 5
+2026-05-28 14:47:26,016 [DEBUG] cps: 590
+2026-05-28 14:47:26,016 [DEBUG] cps_name: Nutrient Management
+2026-05-28 14:47:26,016 [DEBUG] pid: 1914
+2026-05-28 14:47:26,016 [DEBUG] impacted_pids: 
+2026-05-28 14:47:26,016 [DEBUG] linear_length_m: None
+2026-05-28 14:47:26,016 [DEBUG] buffer_area_ha: None
+2026-05-28 14:47:26,016 [DEBUG] portion_treated: None
+2026-05-28 14:47:26,016 [DEBUG] wetland_area_ha: None
+2026-05-28 14:47:26,016 [DEBUG] catchment_to_wetland_ratio: None
+2026-05-28 14:47:26,016 [DEBUG] final bmp record:
+2026-05-28 14:47:26,017 [DEBUG] scenario: 5
+2026-05-28 14:47:26,017 [DEBUG] cps: 590
+2026-05-28 14:47:26,017 [DEBUG] cps_name: Nutrient Management
+2026-05-28 14:47:26,017 [DEBUG] pid: 1914
+2026-05-28 14:47:26,017 [DEBUG] impacted_pids: 
+2026-05-28 14:47:26,017 [DEBUG] linear_length_m: None
+2026-05-28 14:47:26,017 [DEBUG] buffer_area_ha: None
+2026-05-28 14:47:26,017 [DEBUG] portion_treated: None
+2026-05-28 14:47:26,017 [DEBUG] wetland_area_ha: None
+2026-05-28 14:47:26,017 [DEBUG] catchment_to_wetland_ratio: None
+2026-05-28 14:47:26,017 [DEBUG] cost_usd: 1655.9252509286653
+2026-05-28 14:47:26,017 [DEBUG] treated_TN: 2778.519671910067
+2026-05-28 14:47:26,017 [DEBUG] removed_TN: 923.3495835604305
+2026-05-28 14:47:26,017 [DEBUG] treated_TP: 18.31879676359777
+2026-05-28 14:47:26,017 [DEBUG] removed_TP: 2.854605189042053
+2026-05-28 14:47:26,017 [DEBUG] selected parcel idx=2549 with pid=2550
+2026-05-28 14:47:26,018 [DEBUG] selected bmp 329 (Residue Management (No-Till))
+2026-05-28 14:47:26,018 [DEBUG] selected efficiency value 0.18 for pollutant=TN
+2026-05-28 14:47:26,018 [DEBUG] selected efficiency value 0.10 for pollutant=TP
+2026-05-28 14:47:26,018 [DEBUG] calling _simulate_infield
+2026-05-28 14:47:26,018 [DEBUG] cps=329, parcel_idx=2549, area=6.12 ha
+2026-05-28 14:47:26,018 [DEBUG] reduced yield for pollutant TN: existing yield=17.32, effectiveness=0.18, treated_area=6.12 ha, removal=19.58, new yield=14.13
+2026-05-28 14:47:26,018 [DEBUG] reduced yield for pollutant TP: existing yield=4.52, effectiveness=0.10, treated_area=6.12 ha, removal=2.86, new yield=4.06
+2026-05-28 14:47:26,018 [DEBUG] calling compute_bmp_cost
+2026-05-28 14:47:26,019 [DEBUG] sampled cost rate 103.0150
+2026-05-28 14:47:26,019 [DEBUG] computed cost using rate103.0150, quantity=6.1242 => cost=2017.91
+2026-05-28 14:47:26,019 [DEBUG] computed cost for this bmp application: 2017.91 USD (quantity=6.1242)
+2026-05-28 14:47:26,019 [DEBUG] updated total_cost=49968.85 total_bmp=32
+2026-05-28 14:47:26,019 [DEBUG] scenario: 5
+2026-05-28 14:47:26,019 [DEBUG] cps: 329
+2026-05-28 14:47:26,019 [DEBUG] cps_name: Residue Management (No-Till)
+2026-05-28 14:47:26,019 [DEBUG] pid: 2550
+2026-05-28 14:47:26,019 [DEBUG] impacted_pids: 
+2026-05-28 14:47:26,019 [DEBUG] linear_length_m: None
+2026-05-28 14:47:26,019 [DEBUG] buffer_area_ha: None
+2026-05-28 14:47:26,020 [DEBUG] portion_treated: None
+2026-05-28 14:47:26,020 [DEBUG] wetland_area_ha: None
+2026-05-28 14:47:26,020 [DEBUG] catchment_to_wetland_ratio: None
+2026-05-28 14:47:26,020 [DEBUG] final bmp record:
+2026-05-28 14:47:26,020 [DEBUG] scenario: 5
+2026-05-28 14:47:26,020 [DEBUG] cps: 329
+2026-05-28 14:47:26,020 [DEBUG] cps_name: Residue Management (No-Till)
+2026-05-28 14:47:26,020 [DEBUG] pid: 2550
+2026-05-28 14:47:26,020 [DEBUG] impacted_pids: 
+2026-05-28 14:47:26,020 [DEBUG] linear_length_m: None
+2026-05-28 14:47:26,020 [DEBUG] buffer_area_ha: None
+2026-05-28 14:47:26,020 [DEBUG] portion_treated: None
+2026-05-28 14:47:26,020 [DEBUG] wetland_area_ha: None
+2026-05-28 14:47:26,020 [DEBUG] catchment_to_wetland_ratio: None
+2026-05-28 14:47:26,020 [DEBUG] cost_usd: 2017.911700132212
+2026-05-28 14:47:26,020 [DEBUG] treated_TN: 106.09775288482788
+2026-05-28 14:47:26,020 [DEBUG] removed_TN: 19.576750371390407
+2026-05-28 14:47:26,020 [DEBUG] treated_TP: 27.697354386444086
+2026-05-28 14:47:26,020 [DEBUG] removed_TP: 2.8616832499972977
+2026-05-28 14:47:26,021 [DEBUG] selected parcel idx=260 with pid=261
+2026-05-28 14:47:26,021 [DEBUG] selected bmp 590 (Nutrient Management)
+2026-05-28 14:47:26,021 [DEBUG] selected efficiency value 0.19 for pollutant=TN
+2026-05-28 14:47:26,021 [DEBUG] selected efficiency value 0.10 for pollutant=TP
+2026-05-28 14:47:26,021 [DEBUG] calling _simulate_infield
+2026-05-28 14:47:26,021 [DEBUG] cps=590, parcel_idx=260, area=8.47 ha
+2026-05-28 14:47:26,021 [DEBUG] reduced yield for pollutant TN: existing yield=27.85, effectiveness=0.19, treated_area=8.47 ha, removal=44.65, new yield=22.58
+2026-05-28 14:47:26,021 [DEBUG] reduced yield for pollutant TP: existing yield=2.81, effectiveness=0.10, treated_area=8.47 ha, removal=2.46, new yield=2.52
+2026-05-28 14:47:26,021 [DEBUG] calling compute_bmp_cost
+2026-05-28 14:47:26,022 [DEBUG] sampled cost rate 113.8076
+2026-05-28 14:47:26,022 [DEBUG] computed cost using rate113.8076, quantity=8.4668 => cost=2229.32
+2026-05-28 14:47:26,022 [DEBUG] computed cost for this bmp application: 2229.32 USD (quantity=8.4668)
+2026-05-28 14:47:26,022 [DEBUG] updated total_cost=52198.18 total_bmp=33
+2026-05-28 14:47:26,022 [DEBUG] scenario: 5
+2026-05-28 14:47:26,022 [DEBUG] cps: 590
+2026-05-28 14:47:26,022 [DEBUG] cps_name: Nutrient Management
+2026-05-28 14:47:26,022 [DEBUG] pid: 261
+2026-05-28 14:47:26,023 [DEBUG] impacted_pids: 
+2026-05-28 14:47:26,023 [DEBUG] linear_length_m: None
+2026-05-28 14:47:26,023 [DEBUG] buffer_area_ha: None
+2026-05-28 14:47:26,023 [DEBUG] portion_treated: None
+2026-05-28 14:47:26,023 [DEBUG] wetland_area_ha: None
+2026-05-28 14:47:26,023 [DEBUG] catchment_to_wetland_ratio: None
+2026-05-28 14:47:26,023 [DEBUG] final bmp record:
+2026-05-28 14:47:26,023 [DEBUG] scenario: 5
+2026-05-28 14:47:26,023 [DEBUG] cps: 590
+2026-05-28 14:47:26,023 [DEBUG] cps_name: Nutrient Management
+2026-05-28 14:47:26,023 [DEBUG] pid: 261
+2026-05-28 14:47:26,023 [DEBUG] impacted_pids: 
+2026-05-28 14:47:26,023 [DEBUG] linear_length_m: None
+2026-05-28 14:47:26,023 [DEBUG] buffer_area_ha: None
+2026-05-28 14:47:26,023 [DEBUG] portion_treated: None
+2026-05-28 14:47:26,023 [DEBUG] wetland_area_ha: None
+2026-05-28 14:47:26,023 [DEBUG] catchment_to_wetland_ratio: None
+2026-05-28 14:47:26,023 [DEBUG] cost_usd: 2229.3228291933547
+2026-05-28 14:47:26,023 [DEBUG] treated_TN: 235.83967256586237
+2026-05-28 14:47:26,024 [DEBUG] removed_TN: 44.65305930591677
+2026-05-28 14:47:26,024 [DEBUG] treated_TP: 23.76177206530696
+2026-05-28 14:47:26,024 [DEBUG] removed_TP: 2.4634336257914344
+2026-05-28 14:47:26,024 [DEBUG] selected parcel idx=803 with pid=804
+2026-05-28 14:47:26,024 [DEBUG] selected bmp 340 (Cover Crop)
+2026-05-28 14:47:26,024 [DEBUG] selected efficiency value 0.19 for pollutant=TN
+2026-05-28 14:47:26,024 [DEBUG] selected efficiency value 0.29 for pollutant=TP
+2026-05-28 14:47:26,024 [DEBUG] calling _simulate_infield
+2026-05-28 14:47:26,024 [DEBUG] cps=340, parcel_idx=803, area=12.21 ha
+2026-05-28 14:47:26,024 [DEBUG] reduced yield for pollutant TN: existing yield=28.84, effectiveness=0.19, treated_area=12.21 ha, removal=65.96, new yield=23.43
+2026-05-28 14:47:26,024 [DEBUG] reduced yield for pollutant TP: existing yield=0.48, effectiveness=0.29, treated_area=12.21 ha, removal=1.71, new yield=0.34
+2026-05-28 14:47:26,024 [DEBUG] calling compute_bmp_cost
+2026-05-28 14:47:26,025 [DEBUG] sampled cost rate 260.6511
+2026-05-28 14:47:26,025 [DEBUG] computed cost using rate260.6511, quantity=12.2077 => cost=5105.77
+2026-05-28 14:47:26,025 [DEBUG] computed cost for this bmp application: 5105.77 USD (quantity=12.2077)
+2026-05-28 14:47:26,025 [DEBUG] updated total_cost=57303.95 total_bmp=34
+2026-05-28 14:47:26,025 [DEBUG] scenario: 5
+2026-05-28 14:47:26,025 [DEBUG] cps: 340
+2026-05-28 14:47:26,026 [DEBUG] cps_name: Cover Crop
+2026-05-28 14:47:26,026 [DEBUG] pid: 804
+2026-05-28 14:47:26,026 [DEBUG] impacted_pids: 
+2026-05-28 14:47:26,026 [DEBUG] linear_length_m: None
+2026-05-28 14:47:26,026 [DEBUG] buffer_area_ha: None
+2026-05-28 14:47:26,026 [DEBUG] portion_treated: None
+2026-05-28 14:47:26,026 [DEBUG] wetland_area_ha: None
+2026-05-28 14:47:26,026 [DEBUG] catchment_to_wetland_ratio: None
+2026-05-28 14:47:26,026 [DEBUG] final bmp record:
+2026-05-28 14:47:26,026 [DEBUG] scenario: 5
+2026-05-28 14:47:26,026 [DEBUG] cps: 340
+2026-05-28 14:47:26,026 [DEBUG] cps_name: Cover Crop
+2026-05-28 14:47:26,026 [DEBUG] pid: 804
+2026-05-28 14:47:26,026 [DEBUG] impacted_pids: 
+2026-05-28 14:47:26,026 [DEBUG] linear_length_m: None
+2026-05-28 14:47:26,026 [DEBUG] buffer_area_ha: None
+2026-05-28 14:47:26,026 [DEBUG] portion_treated: None
+2026-05-28 14:47:26,026 [DEBUG] wetland_area_ha: None
+2026-05-28 14:47:26,027 [DEBUG] catchment_to_wetland_ratio: None
+2026-05-28 14:47:26,027 [DEBUG] cost_usd: 5105.772313771021
+2026-05-28 14:47:26,027 [DEBUG] treated_TN: 352.01676002847915
+2026-05-28 14:47:26,027 [DEBUG] removed_TN: 65.95530639251388
+2026-05-28 14:47:26,027 [DEBUG] treated_TP: 5.842865730739202
+2026-05-28 14:47:26,027 [DEBUG] removed_TP: 1.7127519402875948
+2026-05-28 14:47:26,027 [DEBUG] selected parcel idx=1202 with pid=1203
+2026-05-28 14:47:26,027 [DEBUG] selected bmp 590 (Nutrient Management)
+2026-05-28 14:47:26,027 [DEBUG] selected efficiency value 0.12 for pollutant=TN
+2026-05-28 14:47:26,027 [DEBUG] selected efficiency value 0.19 for pollutant=TP
+2026-05-28 14:47:26,027 [DEBUG] calling _simulate_infield
+2026-05-28 14:47:26,027 [DEBUG] cps=590, parcel_idx=1202, area=19.23 ha
+2026-05-28 14:47:26,028 [DEBUG] reduced yield for pollutant TN: existing yield=14.10, effectiveness=0.12, treated_area=19.23 ha, removal=32.61, new yield=12.40
+2026-05-28 14:47:26,028 [DEBUG] reduced yield for pollutant TP: existing yield=0.70, effectiveness=0.19, treated_area=19.23 ha, removal=2.60, new yield=0.56
+2026-05-28 14:47:26,028 [DEBUG] calling compute_bmp_cost
+2026-05-28 14:47:26,028 [DEBUG] sampled cost rate 81.4622
+2026-05-28 14:47:26,028 [DEBUG] computed cost using rate81.4622, quantity=19.2254 => cost=1595.72
+2026-05-28 14:47:26,028 [DEBUG] computed cost for this bmp application: 1595.72 USD (quantity=19.2254)
+2026-05-28 14:47:26,029 [DEBUG] updated total_cost=58899.67 total_bmp=35
+2026-05-28 14:47:26,029 [DEBUG] scenario: 5
+2026-05-28 14:47:26,029 [DEBUG] cps: 590
+2026-05-28 14:47:26,029 [DEBUG] cps_name: Nutrient Management
+2026-05-28 14:47:26,029 [DEBUG] pid: 1203
+2026-05-28 14:47:26,029 [DEBUG] impacted_pids: 
+2026-05-28 14:47:26,029 [DEBUG] linear_length_m: None
+2026-05-28 14:47:26,029 [DEBUG] buffer_area_ha: None
+2026-05-28 14:47:26,029 [DEBUG] portion_treated: None
+2026-05-28 14:47:26,029 [DEBUG] wetland_area_ha: None
+2026-05-28 14:47:26,029 [DEBUG] catchment_to_wetland_ratio: None
+2026-05-28 14:47:26,029 [DEBUG] final bmp record:
+2026-05-28 14:47:26,029 [DEBUG] scenario: 5
+2026-05-28 14:47:26,029 [DEBUG] cps: 590
+2026-05-28 14:47:26,029 [DEBUG] cps_name: Nutrient Management
+2026-05-28 14:47:26,029 [DEBUG] pid: 1203
+2026-05-28 14:47:26,029 [DEBUG] impacted_pids: 
+2026-05-28 14:47:26,029 [DEBUG] linear_length_m: None
+2026-05-28 14:47:26,030 [DEBUG] buffer_area_ha: None
+2026-05-28 14:47:26,030 [DEBUG] portion_treated: None
+2026-05-28 14:47:26,030 [DEBUG] wetland_area_ha: None
+2026-05-28 14:47:26,030 [DEBUG] catchment_to_wetland_ratio: None
+2026-05-28 14:47:26,030 [DEBUG] cost_usd: 1595.7249271162416
+2026-05-28 14:47:26,030 [DEBUG] treated_TN: 271.0621364868656
+2026-05-28 14:47:26,030 [DEBUG] removed_TN: 32.61188903544128
+2026-05-28 14:47:26,030 [DEBUG] treated_TP: 13.43343847656911
+2026-05-28 14:47:26,030 [DEBUG] removed_TP: 2.6010104863440384
+2026-05-28 14:47:26,030 [DEBUG] selected parcel idx=1166 with pid=1167
+2026-05-28 14:47:26,030 [DEBUG] selected bmp 590 (Nutrient Management)
+2026-05-28 14:47:26,030 [DEBUG] selected efficiency value 0.12 for pollutant=TN
+2026-05-28 14:47:26,030 [DEBUG] selected efficiency value 0.08 for pollutant=TP
+2026-05-28 14:47:26,031 [DEBUG] calling _simulate_infield
+2026-05-28 14:47:26,031 [DEBUG] cps=590, parcel_idx=1166, area=13.78 ha
+2026-05-28 14:47:26,031 [DEBUG] reduced yield for pollutant TN: existing yield=4.11, effectiveness=0.12, treated_area=13.78 ha, removal=6.56, new yield=3.63
+2026-05-28 14:47:26,031 [DEBUG] reduced yield for pollutant TP: existing yield=9.23, effectiveness=0.08, treated_area=13.78 ha, removal=10.43, new yield=8.47
+2026-05-28 14:47:26,031 [DEBUG] calling compute_bmp_cost
+2026-05-28 14:47:26,031 [DEBUG] sampled cost rate 45.3800
+2026-05-28 14:47:26,032 [DEBUG] computed cost using rate45.3800, quantity=13.7798 => cost=888.93
+2026-05-28 14:47:26,032 [DEBUG] computed cost for this bmp application: 888.93 USD (quantity=13.7798)
+2026-05-28 14:47:26,032 [DEBUG] updated total_cost=59788.60 total_bmp=36
+2026-05-28 14:47:26,032 [DEBUG] scenario: 5
+2026-05-28 14:47:26,032 [DEBUG] cps: 590
+2026-05-28 14:47:26,032 [DEBUG] cps_name: Nutrient Management
+2026-05-28 14:47:26,032 [DEBUG] pid: 1167
+2026-05-28 14:47:26,032 [DEBUG] impacted_pids: 
+2026-05-28 14:47:26,032 [DEBUG] linear_length_m: None
+2026-05-28 14:47:26,032 [DEBUG] buffer_area_ha: None
+2026-05-28 14:47:26,032 [DEBUG] portion_treated: None
+2026-05-28 14:47:26,032 [DEBUG] wetland_area_ha: None
+2026-05-28 14:47:26,032 [DEBUG] catchment_to_wetland_ratio: None
+2026-05-28 14:47:26,032 [DEBUG] final bmp record:
+2026-05-28 14:47:26,032 [DEBUG] scenario: 5
+2026-05-28 14:47:26,032 [DEBUG] cps: 590
+2026-05-28 14:47:26,032 [DEBUG] cps_name: Nutrient Management
+2026-05-28 14:47:26,033 [DEBUG] pid: 1167
+2026-05-28 14:47:26,033 [DEBUG] impacted_pids: 
+2026-05-28 14:47:26,033 [DEBUG] linear_length_m: None
+2026-05-28 14:47:26,033 [DEBUG] buffer_area_ha: None
+2026-05-28 14:47:26,033 [DEBUG] portion_treated: None
+2026-05-28 14:47:26,033 [DEBUG] wetland_area_ha: None
+2026-05-28 14:47:26,033 [DEBUG] catchment_to_wetland_ratio: None
+2026-05-28 14:47:26,033 [DEBUG] cost_usd: 888.928401530832
+2026-05-28 14:47:26,033 [DEBUG] treated_TN: 56.59122038788959
+2026-05-28 14:47:26,033 [DEBUG] removed_TN: 6.558222163584517
+2026-05-28 14:47:26,033 [DEBUG] treated_TP: 127.20710516469892
+2026-05-28 14:47:26,033 [DEBUG] removed_TP: 10.43058484665174
+2026-05-28 14:47:26,033 [DEBUG] selected parcel idx=213 with pid=214
+2026-05-28 14:47:26,033 [DEBUG] selected bmp 412 (Grassed Waterway)
+2026-05-28 14:47:26,034 [DEBUG] selected efficiency value 0.16 for pollutant=TN
+2026-05-28 14:47:26,034 [DEBUG] selected efficiency value 0.15 for pollutant=TP
+2026-05-28 14:47:26,034 [DEBUG] calling simulate_grassed
+2026-05-28 14:47:26,034 [DEBUG] length of grassed buffer/waterway is 285.71 m based on fraction 0.17 of parcel perimeter 1684.85 m
+2026-05-28 14:47:26,034 [DEBUG] reduced yield for pollutant TN: existing yield=3.91, effectiveness=0.16, treated_area=5.18 ha, removal=3.16, new yield=3.71
+2026-05-28 14:47:26,034 [DEBUG] reduced yield for pollutant TP: existing yield=4.19, effectiveness=0.15, treated_area=5.18 ha, removal=3.16, new yield=3.99
+2026-05-28 14:47:26,034 [DEBUG] calling compute_bmp_cost
+2026-05-28 14:47:26,035 [DEBUG] sampled cost rate 59.9372
+2026-05-28 14:47:26,035 [DEBUG] computed cost using rate59.9372, quantity=0.3048 => cost=1174.08
+2026-05-28 14:47:26,035 [DEBUG] computed cost for this bmp application: 1174.08 USD (quantity=0.3048)
+2026-05-28 14:47:26,035 [DEBUG] updated total_cost=60962.68 total_bmp=37
+2026-05-28 14:47:26,035 [DEBUG] scenario: 5
+2026-05-28 14:47:26,035 [DEBUG] cps: 412
+2026-05-28 14:47:26,035 [DEBUG] cps_name: Grassed Waterway
+2026-05-28 14:47:26,035 [DEBUG] pid: 214
+2026-05-28 14:47:26,035 [DEBUG] impacted_pids: 
+2026-05-28 14:47:26,035 [DEBUG] linear_length_m: 285.71156188033876
+2026-05-28 14:47:26,035 [DEBUG] buffer_area_ha: 0.3047970942139454
+2026-05-28 14:47:26,035 [DEBUG] portion_treated: 0.32033959944050916
+2026-05-28 14:47:26,036 [DEBUG] wetland_area_ha: None
+2026-05-28 14:47:26,036 [DEBUG] catchment_to_wetland_ratio: None
+2026-05-28 14:47:26,036 [DEBUG] final bmp record:
+2026-05-28 14:47:26,036 [DEBUG] scenario: 5
+2026-05-28 14:47:26,036 [DEBUG] cps: 412
+2026-05-28 14:47:26,036 [DEBUG] cps_name: Grassed Waterway
+2026-05-28 14:47:26,036 [DEBUG] pid: 214
+2026-05-28 14:47:26,036 [DEBUG] impacted_pids: 
+2026-05-28 14:47:26,036 [DEBUG] linear_length_m: 285.71156188033876
+2026-05-28 14:47:26,036 [DEBUG] buffer_area_ha: 0.3047970942139454
+2026-05-28 14:47:26,036 [DEBUG] portion_treated: 0.32033959944050916
+2026-05-28 14:47:26,036 [DEBUG] wetland_area_ha: None
+2026-05-28 14:47:26,036 [DEBUG] catchment_to_wetland_ratio: None
+2026-05-28 14:47:26,036 [DEBUG] cost_usd: 1174.081512891847
+2026-05-28 14:47:26,036 [DEBUG] treated_TN: 20.25200268148976
+2026-05-28 14:47:26,036 [DEBUG] removed_TN: 3.1603566343592044
+2026-05-28 14:47:26,036 [DEBUG] treated_TP: 21.690558687620417
+2026-05-28 14:47:26,036 [DEBUG] removed_TP: 3.15588765225942
+2026-05-28 14:47:26,037 [DEBUG] selected parcel idx=175 with pid=176
+2026-05-28 14:47:26,037 [DEBUG] selected bmp 656 (Constructed Wetland)
+2026-05-28 14:47:26,037 [DEBUG] selected efficiency value 0.14 for pollutant=TN
+2026-05-28 14:47:26,037 [DEBUG] selected efficiency value 0.17 for pollutant=TP
+2026-05-28 14:47:26,037 [DEBUG] calling simulate_wetland
+2026-05-28 14:47:26,037 [DEBUG] selected wetland area of 1.52 ha in parcel idx = 175 of area = 14.46 ha
+2026-05-28 14:47:26,037 [DEBUG] selected catchment:wetland area ratio = 1.26
+2026-05-28 14:47:26,037 [DEBUG] computed catchment area = 1.92 ha, total wetland-impacted area (wetland + catchment) = 3.44 ha
+2026-05-28 14:47:26,037 [DEBUG] processing wetland-impacted parcel (pid = 1798, area = 14.46 ha, fraction of parcel draining to wetland = 0.24)
+2026-05-28 14:47:26,038 [DEBUG] processing pollutant TN
+2026-05-28 14:47:26,038 [DEBUG] current yield for parcel 1798 pollutant TN is 67.09 units/ha
+2026-05-28 14:47:26,038 [DEBUG] calculated reduction for pollutant TN: 33.42 units of 230.79 treated
+2026-05-28 14:47:26,038 [DEBUG] reduced parcel 1798 yield for pollutant TN is 64.77 units/ha
+2026-05-28 14:47:26,038 [DEBUG] processing pollutant TP
+2026-05-28 14:47:26,038 [DEBUG] current yield for parcel 1798 pollutant TP is 2.63 units/ha
+2026-05-28 14:47:26,038 [DEBUG] calculated reduction for pollutant TP: 1.54 units of 9.05 treated
+2026-05-28 14:47:26,038 [DEBUG] reduced parcel 1798 yield for pollutant TP is 2.52 units/ha
+2026-05-28 14:47:26,038 [DEBUG] calling compute_bmp_cost
+2026-05-28 14:47:26,039 [DEBUG] sampled cost rate 35032.5074
+2026-05-28 14:47:26,039 [DEBUG] computed cost using rate35032.5074, quantity=1.5242 => cost=28026.01
+2026-05-28 14:47:26,039 [DEBUG] computed cost for this bmp application: 28026.01 USD (quantity=1.5242)
+2026-05-28 14:47:26,039 [DEBUG] updated total_cost=88988.69 total_bmp=38
+2026-05-28 14:47:26,039 [DEBUG] scenario: 5
+2026-05-28 14:47:26,039 [DEBUG] cps: 656
+2026-05-28 14:47:26,039 [DEBUG] cps_name: Constructed Wetland
+2026-05-28 14:47:26,039 [DEBUG] pid: 176
+2026-05-28 14:47:26,039 [DEBUG] impacted_pids: 
+2026-05-28 14:47:26,039 [DEBUG] linear_length_m: None
+2026-05-28 14:47:26,039 [DEBUG] buffer_area_ha: None
+2026-05-28 14:47:26,039 [DEBUG] portion_treated: None
+2026-05-28 14:47:26,039 [DEBUG] wetland_area_ha: 1.5242049058495772
+2026-05-28 14:47:26,039 [DEBUG] catchment_to_wetland_ratio: 1.2570664226461505
+2026-05-28 14:47:26,040 [DEBUG] final bmp record:
+2026-05-28 14:47:26,040 [DEBUG] scenario: 5
+2026-05-28 14:47:26,040 [DEBUG] cps: 656
+2026-05-28 14:47:26,040 [DEBUG] cps_name: Constructed Wetland
+2026-05-28 14:47:26,040 [DEBUG] pid: 176
+2026-05-28 14:47:26,040 [DEBUG] impacted_pids: 
+2026-05-28 14:47:26,040 [DEBUG] linear_length_m: None
+2026-05-28 14:47:26,040 [DEBUG] buffer_area_ha: None
+2026-05-28 14:47:26,040 [DEBUG] portion_treated: None
+2026-05-28 14:47:26,040 [DEBUG] wetland_area_ha: 1.5242049058495772
+2026-05-28 14:47:26,040 [DEBUG] catchment_to_wetland_ratio: 1.2570664226461505
+2026-05-28 14:47:26,040 [DEBUG] cost_usd: 28026.005956622314
+2026-05-28 14:47:26,040 [DEBUG] treated_TN: 230.7910340785131
+2026-05-28 14:47:26,040 [DEBUG] removed_TN: 33.42090549689707
+2026-05-28 14:47:26,040 [DEBUG] treated_TP: 9.046326299314476
+2026-05-28 14:47:26,040 [DEBUG] removed_TP: 1.5386400329243377
+2026-05-28 14:47:26,040 [DEBUG] selected parcel idx=674 with pid=675
+2026-05-28 14:47:26,041 [DEBUG] selected bmp 590 (Nutrient Management)
+2026-05-28 14:47:26,041 [DEBUG] selected efficiency value 0.19 for pollutant=TN
+2026-05-28 14:47:26,041 [DEBUG] selected efficiency value 0.07 for pollutant=TP
+2026-05-28 14:47:26,041 [DEBUG] calling _simulate_infield
+2026-05-28 14:47:26,041 [DEBUG] cps=590, parcel_idx=674, area=29.01 ha
+2026-05-28 14:47:26,041 [DEBUG] reduced yield for pollutant TN: existing yield=34.70, effectiveness=0.19, treated_area=29.01 ha, removal=188.38, new yield=28.21
+2026-05-28 14:47:26,041 [DEBUG] reduced yield for pollutant TP: existing yield=0.35, effectiveness=0.07, treated_area=29.01 ha, removal=0.75, new yield=0.33
+2026-05-28 14:47:26,041 [DEBUG] calling compute_bmp_cost
+2026-05-28 14:47:26,042 [DEBUG] sampled cost rate 39.7393
+2026-05-28 14:47:26,042 [DEBUG] computed cost using rate39.7393, quantity=29.0084 => cost=778.43
+2026-05-28 14:47:26,042 [DEBUG] computed cost for this bmp application: 778.43 USD (quantity=29.0084)
+2026-05-28 14:47:26,042 [DEBUG] updated total_cost=89767.12 total_bmp=39
+2026-05-28 14:47:26,042 [DEBUG] scenario: 5
+2026-05-28 14:47:26,042 [DEBUG] cps: 590
+2026-05-28 14:47:26,042 [DEBUG] cps_name: Nutrient Management
+2026-05-28 14:47:26,042 [DEBUG] pid: 675
+2026-05-28 14:47:26,042 [DEBUG] impacted_pids: 
+2026-05-28 14:47:26,042 [DEBUG] linear_length_m: None
+2026-05-28 14:47:26,042 [DEBUG] buffer_area_ha: None
+2026-05-28 14:47:26,043 [DEBUG] portion_treated: None
+2026-05-28 14:47:26,043 [DEBUG] wetland_area_ha: None
+2026-05-28 14:47:26,043 [DEBUG] catchment_to_wetland_ratio: None
+2026-05-28 14:47:26,043 [DEBUG] final bmp record:
+2026-05-28 14:47:26,043 [DEBUG] scenario: 5
+2026-05-28 14:47:26,043 [DEBUG] cps: 590
+2026-05-28 14:47:26,043 [DEBUG] cps_name: Nutrient Management
+2026-05-28 14:47:26,043 [DEBUG] pid: 675
+2026-05-28 14:47:26,043 [DEBUG] impacted_pids: 
+2026-05-28 14:47:26,043 [DEBUG] linear_length_m: None
+2026-05-28 14:47:26,043 [DEBUG] buffer_area_ha: None
+2026-05-28 14:47:26,043 [DEBUG] portion_treated: None
+2026-05-28 14:47:26,043 [DEBUG] wetland_area_ha: None
+2026-05-28 14:47:26,043 [DEBUG] catchment_to_wetland_ratio: None
+2026-05-28 14:47:26,043 [DEBUG] cost_usd: 778.4343332819293
+2026-05-28 14:47:26,043 [DEBUG] treated_TN: 1006.6705248708347
+2026-05-28 14:47:26,043 [DEBUG] removed_TN: 188.37590647765614
+2026-05-28 14:47:26,043 [DEBUG] treated_TP: 10.265203886372444
+2026-05-28 14:47:26,043 [DEBUG] removed_TP: 0.7476482934012008
+2026-05-28 14:47:26,044 [DEBUG] selected parcel idx=1499 with pid=1500
+2026-05-28 14:47:26,044 [DEBUG] selected bmp 590 (Nutrient Management)
+2026-05-28 14:47:26,044 [DEBUG] selected efficiency value 0.45 for pollutant=TN
+2026-05-28 14:47:26,044 [DEBUG] selected efficiency value 0.26 for pollutant=TP
+2026-05-28 14:47:26,044 [DEBUG] calling _simulate_infield
+2026-05-28 14:47:26,044 [DEBUG] cps=590, parcel_idx=1499, area=5.85 ha
+2026-05-28 14:47:26,044 [DEBUG] reduced yield for pollutant TN: existing yield=33.56, effectiveness=0.45, treated_area=5.85 ha, removal=88.61, new yield=18.42
+2026-05-28 14:47:26,044 [DEBUG] reduced yield for pollutant TP: existing yield=0.32, effectiveness=0.26, treated_area=5.85 ha, removal=0.47, new yield=0.24
+2026-05-28 14:47:26,044 [DEBUG] calling compute_bmp_cost
+2026-05-28 14:47:26,045 [DEBUG] sampled cost rate 49.2471
+2026-05-28 14:47:26,045 [DEBUG] computed cost using rate49.2471, quantity=5.8535 => cost=964.68
+2026-05-28 14:47:26,045 [DEBUG] computed cost for this bmp application: 964.68 USD (quantity=5.8535)
+2026-05-28 14:47:26,045 [DEBUG] updated total_cost=90731.80 total_bmp=40
+2026-05-28 14:47:26,045 [DEBUG] scenario: 5
+2026-05-28 14:47:26,045 [DEBUG] cps: 590
+2026-05-28 14:47:26,045 [DEBUG] cps_name: Nutrient Management
+2026-05-28 14:47:26,045 [DEBUG] pid: 1500
+2026-05-28 14:47:26,045 [DEBUG] impacted_pids: 
+2026-05-28 14:47:26,046 [DEBUG] linear_length_m: None
+2026-05-28 14:47:26,046 [DEBUG] buffer_area_ha: None
+2026-05-28 14:47:26,046 [DEBUG] portion_treated: None
+2026-05-28 14:47:26,046 [DEBUG] wetland_area_ha: None
+2026-05-28 14:47:26,046 [DEBUG] catchment_to_wetland_ratio: None
+2026-05-28 14:47:26,046 [DEBUG] final bmp record:
+2026-05-28 14:47:26,046 [DEBUG] scenario: 5
+2026-05-28 14:47:26,046 [DEBUG] cps: 590
+2026-05-28 14:47:26,046 [DEBUG] cps_name: Nutrient Management
+2026-05-28 14:47:26,046 [DEBUG] pid: 1500
+2026-05-28 14:47:26,046 [DEBUG] impacted_pids: 
+2026-05-28 14:47:26,046 [DEBUG] linear_length_m: None
+2026-05-28 14:47:26,046 [DEBUG] buffer_area_ha: None
+2026-05-28 14:47:26,046 [DEBUG] portion_treated: None
+2026-05-28 14:47:26,046 [DEBUG] wetland_area_ha: None
+2026-05-28 14:47:26,046 [DEBUG] catchment_to_wetland_ratio: None
+2026-05-28 14:47:26,046 [DEBUG] cost_usd: 964.6787388696497
+2026-05-28 14:47:26,046 [DEBUG] treated_TN: 196.42150367443642
+2026-05-28 14:47:26,046 [DEBUG] removed_TN: 88.60508509403886
+2026-05-28 14:47:26,047 [DEBUG] treated_TP: 1.85733144068255
+2026-05-28 14:47:26,047 [DEBUG] removed_TP: 0.47488817106048536
+2026-05-28 14:47:26,047 [DEBUG] selected parcel idx=1933 with pid=1934
+2026-05-28 14:47:26,047 [DEBUG] selected bmp 329 (Residue Management (No-Till))
+2026-05-28 14:47:26,047 [DEBUG] selected efficiency value 0.14 for pollutant=TN
+2026-05-28 14:47:26,047 [DEBUG] selected efficiency value 0.25 for pollutant=TP
+2026-05-28 14:47:26,047 [DEBUG] calling _simulate_infield
+2026-05-28 14:47:26,047 [DEBUG] cps=329, parcel_idx=1933, area=16.98 ha
+2026-05-28 14:47:26,047 [DEBUG] reduced yield for pollutant TN: existing yield=43.15, effectiveness=0.14, treated_area=16.98 ha, removal=104.72, new yield=36.98
+2026-05-28 14:47:26,047 [DEBUG] reduced yield for pollutant TP: existing yield=1.29, effectiveness=0.25, treated_area=16.98 ha, removal=5.49, new yield=0.97
+2026-05-28 14:47:26,047 [DEBUG] calling compute_bmp_cost
+2026-05-28 14:47:26,048 [DEBUG] sampled cost rate 41.2000
+2026-05-28 14:47:26,048 [DEBUG] computed cost using rate41.2000, quantity=16.9762 => cost=807.05
+2026-05-28 14:47:26,048 [DEBUG] computed cost for this bmp application: 807.05 USD (quantity=16.9762)
+2026-05-28 14:47:26,048 [DEBUG] updated total_cost=91538.85 total_bmp=41
+2026-05-28 14:47:26,048 [DEBUG] scenario: 5
+2026-05-28 14:47:26,048 [DEBUG] cps: 329
+2026-05-28 14:47:26,048 [DEBUG] cps_name: Residue Management (No-Till)
+2026-05-28 14:47:26,049 [DEBUG] pid: 1934
+2026-05-28 14:47:26,049 [DEBUG] impacted_pids: 
+2026-05-28 14:47:26,049 [DEBUG] linear_length_m: None
+2026-05-28 14:47:26,049 [DEBUG] buffer_area_ha: None
+2026-05-28 14:47:26,049 [DEBUG] portion_treated: None
+2026-05-28 14:47:26,049 [DEBUG] wetland_area_ha: None
+2026-05-28 14:47:26,049 [DEBUG] catchment_to_wetland_ratio: None
+2026-05-28 14:47:26,049 [DEBUG] final bmp record:
+2026-05-28 14:47:26,049 [DEBUG] scenario: 5
+2026-05-28 14:47:26,049 [DEBUG] cps: 329
+2026-05-28 14:47:26,049 [DEBUG] cps_name: Residue Management (No-Till)
+2026-05-28 14:47:26,049 [DEBUG] pid: 1934
+2026-05-28 14:47:26,049 [DEBUG] impacted_pids: 
+2026-05-28 14:47:26,049 [DEBUG] linear_length_m: None
+2026-05-28 14:47:26,049 [DEBUG] buffer_area_ha: None
+2026-05-28 14:47:26,049 [DEBUG] portion_treated: None
+2026-05-28 14:47:26,049 [DEBUG] wetland_area_ha: None
+2026-05-28 14:47:26,049 [DEBUG] catchment_to_wetland_ratio: None
+2026-05-28 14:47:26,050 [DEBUG] cost_usd: 807.0484676025957
+2026-05-28 14:47:26,050 [DEBUG] treated_TN: 732.5393083952115
+2026-05-28 14:47:26,050 [DEBUG] removed_TN: 104.71632339708971
+2026-05-28 14:47:26,050 [DEBUG] treated_TP: 21.96148625779946
+2026-05-28 14:47:26,050 [DEBUG] removed_TP: 5.488736549125831
+2026-05-28 14:47:26,050 [DEBUG] selected parcel idx=133 with pid=134
+2026-05-28 14:47:26,050 [DEBUG] selected bmp 590 (Nutrient Management)
+2026-05-28 14:47:26,050 [DEBUG] selected efficiency value 0.39 for pollutant=TN
+2026-05-28 14:47:26,050 [DEBUG] selected efficiency value 0.47 for pollutant=TP
+2026-05-28 14:47:26,050 [DEBUG] calling _simulate_infield
+2026-05-28 14:47:26,050 [DEBUG] cps=590, parcel_idx=133, area=10.94 ha
+2026-05-28 14:47:26,051 [DEBUG] reduced yield for pollutant TN: existing yield=60.91, effectiveness=0.39, treated_area=10.94 ha, removal=257.78, new yield=37.36
+2026-05-28 14:47:26,051 [DEBUG] reduced yield for pollutant TP: existing yield=4.92, effectiveness=0.47, treated_area=10.94 ha, removal=25.02, new yield=2.63
+2026-05-28 14:47:26,051 [DEBUG] calling compute_bmp_cost
+2026-05-28 14:47:26,051 [DEBUG] sampled cost rate 53.5328
+2026-05-28 14:47:26,051 [DEBUG] computed cost using rate53.5328, quantity=10.9449 => cost=1048.63
+2026-05-28 14:47:26,051 [DEBUG] computed cost for this bmp application: 1048.63 USD (quantity=10.9449)
+2026-05-28 14:47:26,052 [DEBUG] updated total_cost=92587.48 total_bmp=42
+2026-05-28 14:47:26,052 [DEBUG] scenario: 5
+2026-05-28 14:47:26,052 [DEBUG] cps: 590
+2026-05-28 14:47:26,052 [DEBUG] cps_name: Nutrient Management
+2026-05-28 14:47:26,052 [DEBUG] pid: 134
+2026-05-28 14:47:26,052 [DEBUG] impacted_pids: 
+2026-05-28 14:47:26,052 [DEBUG] linear_length_m: None
+2026-05-28 14:47:26,052 [DEBUG] buffer_area_ha: None
+2026-05-28 14:47:26,052 [DEBUG] portion_treated: None
+2026-05-28 14:47:26,052 [DEBUG] wetland_area_ha: None
+2026-05-28 14:47:26,052 [DEBUG] catchment_to_wetland_ratio: None
+2026-05-28 14:47:26,052 [DEBUG] final bmp record:
+2026-05-28 14:47:26,052 [DEBUG] scenario: 5
+2026-05-28 14:47:26,052 [DEBUG] cps: 590
+2026-05-28 14:47:26,052 [DEBUG] cps_name: Nutrient Management
+2026-05-28 14:47:26,052 [DEBUG] pid: 134
+2026-05-28 14:47:26,052 [DEBUG] impacted_pids: 
+2026-05-28 14:47:26,052 [DEBUG] linear_length_m: None
+2026-05-28 14:47:26,053 [DEBUG] buffer_area_ha: None
+2026-05-28 14:47:26,053 [DEBUG] portion_treated: None
+2026-05-28 14:47:26,053 [DEBUG] wetland_area_ha: None
+2026-05-28 14:47:26,053 [DEBUG] catchment_to_wetland_ratio: None
+2026-05-28 14:47:26,053 [DEBUG] cost_usd: 1048.6291716544015
+2026-05-28 14:47:26,053 [DEBUG] treated_TN: 666.6768714550507
+2026-05-28 14:47:26,053 [DEBUG] removed_TN: 257.7844234450231
+2026-05-28 14:47:26,053 [DEBUG] treated_TP: 53.810745689075894
+2026-05-28 14:47:26,053 [DEBUG] removed_TP: 25.022048922997296
+2026-05-28 14:47:26,053 [DEBUG] selected parcel idx=401 with pid=402
+2026-05-28 14:47:26,053 [DEBUG] selected bmp 329 (Residue Management (No-Till))
+2026-05-28 14:47:26,053 [DEBUG] selected efficiency value 0.21 for pollutant=TN
+2026-05-28 14:47:26,054 [DEBUG] selected efficiency value 0.19 for pollutant=TP
+2026-05-28 14:47:26,054 [DEBUG] calling _simulate_infield
+2026-05-28 14:47:26,054 [DEBUG] cps=329, parcel_idx=401, area=13.92 ha
+2026-05-28 14:47:26,054 [DEBUG] reduced yield for pollutant TN: existing yield=9.15, effectiveness=0.21, treated_area=13.92 ha, removal=26.22, new yield=7.26
+2026-05-28 14:47:26,054 [DEBUG] reduced yield for pollutant TP: existing yield=3.37, effectiveness=0.19, treated_area=13.92 ha, removal=8.82, new yield=2.74
+2026-05-28 14:47:26,054 [DEBUG] calling compute_bmp_cost
+2026-05-28 14:47:26,054 [DEBUG] sampled cost rate 87.0651
+2026-05-28 14:47:26,055 [DEBUG] computed cost using rate87.0651, quantity=13.9192 => cost=1705.48
+2026-05-28 14:47:26,055 [DEBUG] computed cost for this bmp application: 1705.48 USD (quantity=13.9192)
+2026-05-28 14:47:26,055 [DEBUG] updated total_cost=94292.96 total_bmp=43
+2026-05-28 14:47:26,055 [DEBUG] scenario: 5
+2026-05-28 14:47:26,055 [DEBUG] cps: 329
+2026-05-28 14:47:26,055 [DEBUG] cps_name: Residue Management (No-Till)
+2026-05-28 14:47:26,055 [DEBUG] pid: 402
+2026-05-28 14:47:26,055 [DEBUG] impacted_pids: 
+2026-05-28 14:47:26,055 [DEBUG] linear_length_m: None
+2026-05-28 14:47:26,055 [DEBUG] buffer_area_ha: None
+2026-05-28 14:47:26,055 [DEBUG] portion_treated: None
+2026-05-28 14:47:26,055 [DEBUG] wetland_area_ha: None
+2026-05-28 14:47:26,055 [DEBUG] catchment_to_wetland_ratio: None
+2026-05-28 14:47:26,055 [DEBUG] final bmp record:
+2026-05-28 14:47:26,055 [DEBUG] scenario: 5
+2026-05-28 14:47:26,055 [DEBUG] cps: 329
+2026-05-28 14:47:26,056 [DEBUG] cps_name: Residue Management (No-Till)
+2026-05-28 14:47:26,056 [DEBUG] pid: 402
+2026-05-28 14:47:26,056 [DEBUG] impacted_pids: 
+2026-05-28 14:47:26,056 [DEBUG] linear_length_m: None
+2026-05-28 14:47:26,056 [DEBUG] buffer_area_ha: None
+2026-05-28 14:47:26,056 [DEBUG] portion_treated: None
+2026-05-28 14:47:26,056 [DEBUG] wetland_area_ha: None
+2026-05-28 14:47:26,056 [DEBUG] catchment_to_wetland_ratio: None
+2026-05-28 14:47:26,056 [DEBUG] cost_usd: 1705.4783350651344
+2026-05-28 14:47:26,056 [DEBUG] treated_TN: 127.30415231728627
+2026-05-28 14:47:26,056 [DEBUG] removed_TN: 26.222441661203522
+2026-05-28 14:47:26,056 [DEBUG] treated_TP: 46.89776015628509
+2026-05-28 14:47:26,056 [DEBUG] removed_TP: 8.81862628452937
+2026-05-28 14:47:26,056 [DEBUG] selected parcel idx=1400 with pid=1401
+2026-05-28 14:47:26,056 [DEBUG] selected bmp 590 (Nutrient Management)
+2026-05-28 14:47:26,057 [DEBUG] selected efficiency value 0.25 for pollutant=TN
+2026-05-28 14:47:26,057 [DEBUG] selected efficiency value 0.37 for pollutant=TP
+2026-05-28 14:47:26,057 [DEBUG] calling _simulate_infield
+2026-05-28 14:47:26,057 [DEBUG] cps=590, parcel_idx=1400, area=29.27 ha
+2026-05-28 14:47:26,057 [DEBUG] reduced yield for pollutant TN: existing yield=0.89, effectiveness=0.25, treated_area=29.27 ha, removal=6.52, new yield=0.67
+2026-05-28 14:47:26,057 [DEBUG] reduced yield for pollutant TP: existing yield=0.41, effectiveness=0.37, treated_area=29.27 ha, removal=4.46, new yield=0.26
+2026-05-28 14:47:26,057 [DEBUG] calling compute_bmp_cost
+2026-05-28 14:47:26,058 [DEBUG] sampled cost rate 81.8493
+2026-05-28 14:47:26,058 [DEBUG] computed cost using rate81.8493, quantity=29.2684 => cost=1603.31
+2026-05-28 14:47:26,058 [DEBUG] computed cost for this bmp application: 1603.31 USD (quantity=29.2684)
+2026-05-28 14:47:26,058 [DEBUG] updated total_cost=95896.27 total_bmp=44
+2026-05-28 14:47:26,058 [DEBUG] scenario: 5
+2026-05-28 14:47:26,058 [DEBUG] cps: 590
+2026-05-28 14:47:26,058 [DEBUG] cps_name: Nutrient Management
+2026-05-28 14:47:26,058 [DEBUG] pid: 1401
+2026-05-28 14:47:26,058 [DEBUG] impacted_pids: 
+2026-05-28 14:47:26,058 [DEBUG] linear_length_m: None
+2026-05-28 14:47:26,058 [DEBUG] buffer_area_ha: None
+2026-05-28 14:47:26,058 [DEBUG] portion_treated: None
+2026-05-28 14:47:26,058 [DEBUG] wetland_area_ha: None
+2026-05-28 14:47:26,058 [DEBUG] catchment_to_wetland_ratio: None
+2026-05-28 14:47:26,058 [DEBUG] final bmp record:
+2026-05-28 14:47:26,059 [DEBUG] scenario: 5
+2026-05-28 14:47:26,059 [DEBUG] cps: 590
+2026-05-28 14:47:26,059 [DEBUG] cps_name: Nutrient Management
+2026-05-28 14:47:26,059 [DEBUG] pid: 1401
+2026-05-28 14:47:26,059 [DEBUG] impacted_pids: 
+2026-05-28 14:47:26,059 [DEBUG] linear_length_m: None
+2026-05-28 14:47:26,059 [DEBUG] buffer_area_ha: None
+2026-05-28 14:47:26,059 [DEBUG] portion_treated: None
+2026-05-28 14:47:26,059 [DEBUG] wetland_area_ha: None
+2026-05-28 14:47:26,059 [DEBUG] catchment_to_wetland_ratio: None
+2026-05-28 14:47:26,059 [DEBUG] cost_usd: 1603.3069936709164
+2026-05-28 14:47:26,059 [DEBUG] treated_TN: 26.150146167612817
+2026-05-28 14:47:26,059 [DEBUG] removed_TN: 6.518465957869061
+2026-05-28 14:47:26,059 [DEBUG] treated_TP: 12.137540095995814
+2026-05-28 14:47:26,059 [DEBUG] removed_TP: 4.459248320933551
+2026-05-28 14:47:26,059 [DEBUG] selected parcel idx=1637 with pid=1638
+2026-05-28 14:47:26,060 [DEBUG] selected bmp 590 (Nutrient Management)
+2026-05-28 14:47:26,060 [DEBUG] selected efficiency value 0.45 for pollutant=TN
+2026-05-28 14:47:26,060 [DEBUG] selected efficiency value 0.13 for pollutant=TP
+2026-05-28 14:47:26,060 [DEBUG] calling _simulate_infield
+2026-05-28 14:47:26,060 [DEBUG] cps=590, parcel_idx=1637, area=38.55 ha
+2026-05-28 14:47:26,060 [DEBUG] reduced yield for pollutant TN: existing yield=16.52, effectiveness=0.45, treated_area=38.55 ha, removal=283.92, new yield=9.16
+2026-05-28 14:47:26,060 [DEBUG] reduced yield for pollutant TP: existing yield=3.86, effectiveness=0.13, treated_area=38.55 ha, removal=18.59, new yield=3.37
+2026-05-28 14:47:26,060 [DEBUG] calling compute_bmp_cost
+2026-05-28 14:47:26,061 [DEBUG] sampled cost rate 96.7681
+2026-05-28 14:47:26,061 [DEBUG] computed cost using rate96.7681, quantity=38.5451 => cost=1895.54
+2026-05-28 14:47:26,061 [DEBUG] computed cost for this bmp application: 1895.54 USD (quantity=38.5451)
+2026-05-28 14:47:26,061 [DEBUG] updated total_cost=97791.81 total_bmp=45
+2026-05-28 14:47:26,061 [DEBUG] scenario: 5
+2026-05-28 14:47:26,061 [DEBUG] cps: 590
+2026-05-28 14:47:26,061 [DEBUG] cps_name: Nutrient Management
+2026-05-28 14:47:26,061 [DEBUG] pid: 1638
+2026-05-28 14:47:26,061 [DEBUG] impacted_pids: 
+2026-05-28 14:47:26,061 [DEBUG] linear_length_m: None
+2026-05-28 14:47:26,061 [DEBUG] buffer_area_ha: None
+2026-05-28 14:47:26,061 [DEBUG] portion_treated: None
+2026-05-28 14:47:26,062 [DEBUG] wetland_area_ha: None
+2026-05-28 14:47:26,062 [DEBUG] catchment_to_wetland_ratio: None
+2026-05-28 14:47:26,062 [DEBUG] final bmp record:
+2026-05-28 14:47:26,062 [DEBUG] scenario: 5
+2026-05-28 14:47:26,062 [DEBUG] cps: 590
+2026-05-28 14:47:26,062 [DEBUG] cps_name: Nutrient Management
+2026-05-28 14:47:26,062 [DEBUG] pid: 1638
+2026-05-28 14:47:26,062 [DEBUG] impacted_pids: 
+2026-05-28 14:47:26,062 [DEBUG] linear_length_m: None
+2026-05-28 14:47:26,062 [DEBUG] buffer_area_ha: None
+2026-05-28 14:47:26,062 [DEBUG] portion_treated: None
+2026-05-28 14:47:26,062 [DEBUG] wetland_area_ha: None
+2026-05-28 14:47:26,062 [DEBUG] catchment_to_wetland_ratio: None
+2026-05-28 14:47:26,062 [DEBUG] cost_usd: 1895.5446423979442
+2026-05-28 14:47:26,062 [DEBUG] treated_TN: 636.953854606636
+2026-05-28 14:47:26,062 [DEBUG] removed_TN: 283.91860233642
+2026-05-28 14:47:26,062 [DEBUG] treated_TP: 148.6605871087317
+2026-05-28 14:47:26,062 [DEBUG] removed_TP: 18.58750979303378
+2026-05-28 14:47:26,063 [DEBUG] selected parcel idx=1412 with pid=1413
+2026-05-28 14:47:26,063 [DEBUG] selected bmp 590 (Nutrient Management)
+2026-05-28 14:47:26,063 [DEBUG] selected efficiency value 0.09 for pollutant=TN
+2026-05-28 14:47:26,063 [DEBUG] selected efficiency value 0.35 for pollutant=TP
+2026-05-28 14:47:26,063 [DEBUG] calling _simulate_infield
+2026-05-28 14:47:26,063 [DEBUG] cps=590, parcel_idx=1412, area=7.86 ha
+2026-05-28 14:47:26,063 [DEBUG] reduced yield for pollutant TN: existing yield=15.22, effectiveness=0.09, treated_area=7.86 ha, removal=10.46, new yield=13.89
+2026-05-28 14:47:26,063 [DEBUG] reduced yield for pollutant TP: existing yield=0.51, effectiveness=0.35, treated_area=7.86 ha, removal=1.40, new yield=0.33
+2026-05-28 14:47:26,063 [DEBUG] calling compute_bmp_cost
+2026-05-28 14:47:26,064 [DEBUG] sampled cost rate 62.0348
+2026-05-28 14:47:26,064 [DEBUG] computed cost using rate62.0348, quantity=7.8561 => cost=1215.17
+2026-05-28 14:47:26,064 [DEBUG] computed cost for this bmp application: 1215.17 USD (quantity=7.8561)
+2026-05-28 14:47:26,064 [DEBUG] updated total_cost=99006.98 total_bmp=46
+2026-05-28 14:47:26,064 [DEBUG] scenario: 5
+2026-05-28 14:47:26,064 [DEBUG] cps: 590
+2026-05-28 14:47:26,064 [DEBUG] cps_name: Nutrient Management
+2026-05-28 14:47:26,064 [DEBUG] pid: 1413
+2026-05-28 14:47:26,064 [DEBUG] impacted_pids: 
+2026-05-28 14:47:26,065 [DEBUG] linear_length_m: None
+2026-05-28 14:47:26,065 [DEBUG] buffer_area_ha: None
+2026-05-28 14:47:26,065 [DEBUG] portion_treated: None
+2026-05-28 14:47:26,065 [DEBUG] wetland_area_ha: None
+2026-05-28 14:47:26,065 [DEBUG] catchment_to_wetland_ratio: None
+2026-05-28 14:47:26,065 [DEBUG] final bmp record:
+2026-05-28 14:47:26,065 [DEBUG] scenario: 5
+2026-05-28 14:47:26,065 [DEBUG] cps: 590
+2026-05-28 14:47:26,065 [DEBUG] cps_name: Nutrient Management
+2026-05-28 14:47:26,065 [DEBUG] pid: 1413
+2026-05-28 14:47:26,065 [DEBUG] impacted_pids: 
+2026-05-28 14:47:26,065 [DEBUG] linear_length_m: None
+2026-05-28 14:47:26,065 [DEBUG] buffer_area_ha: None
+2026-05-28 14:47:26,065 [DEBUG] portion_treated: None
+2026-05-28 14:47:26,065 [DEBUG] wetland_area_ha: None
+2026-05-28 14:47:26,065 [DEBUG] catchment_to_wetland_ratio: None
+2026-05-28 14:47:26,065 [DEBUG] cost_usd: 1215.1710019792588
+2026-05-28 14:47:26,065 [DEBUG] treated_TN: 119.57316933940773
+2026-05-28 14:47:26,066 [DEBUG] removed_TN: 10.461787790516935
+2026-05-28 14:47:26,066 [DEBUG] treated_TP: 3.977743005850528
+2026-05-28 14:47:26,066 [DEBUG] removed_TP: 1.4044911057320841
+2026-05-28 14:47:26,066 [DEBUG] selected parcel idx=654 with pid=655
+2026-05-28 14:47:26,066 [DEBUG] selected bmp 329 (Residue Management (No-Till))
+2026-05-28 14:47:26,066 [DEBUG] selected efficiency value 0.09 for pollutant=TN
+2026-05-28 14:47:26,066 [DEBUG] selected efficiency value 0.42 for pollutant=TP
+2026-05-28 14:47:26,066 [DEBUG] calling _simulate_infield
+2026-05-28 14:47:26,066 [DEBUG] cps=329, parcel_idx=654, area=6.98 ha
+2026-05-28 14:47:26,066 [DEBUG] reduced yield for pollutant TN: existing yield=24.77, effectiveness=0.09, treated_area=6.98 ha, removal=16.15, new yield=22.45
+2026-05-28 14:47:26,066 [DEBUG] reduced yield for pollutant TP: existing yield=0.58, effectiveness=0.42, treated_area=6.98 ha, removal=1.72, new yield=0.33
+2026-05-28 14:47:26,066 [DEBUG] calling compute_bmp_cost
+2026-05-28 14:47:26,067 [DEBUG] sampled cost rate 124.4905
+2026-05-28 14:47:26,067 [DEBUG] computed cost using rate124.4905, quantity=6.9815 => cost=2438.59
+2026-05-28 14:47:26,067 [DEBUG] computed cost for this bmp application: 2438.59 USD (quantity=6.9815)
+2026-05-28 14:47:26,067 [DEBUG] updated total_cost=101445.57 total_bmp=47
+2026-05-28 14:47:26,067 [DEBUG] scenario: 5
+2026-05-28 14:47:26,067 [DEBUG] cps: 329
+2026-05-28 14:47:26,068 [DEBUG] cps_name: Residue Management (No-Till)
+2026-05-28 14:47:26,068 [DEBUG] pid: 655
+2026-05-28 14:47:26,068 [DEBUG] impacted_pids: 
+2026-05-28 14:47:26,068 [DEBUG] linear_length_m: None
+2026-05-28 14:47:26,068 [DEBUG] buffer_area_ha: None
+2026-05-28 14:47:26,068 [DEBUG] portion_treated: None
+2026-05-28 14:47:26,068 [DEBUG] wetland_area_ha: None
+2026-05-28 14:47:26,068 [DEBUG] catchment_to_wetland_ratio: None
+2026-05-28 14:47:26,068 [DEBUG] final bmp record:
+2026-05-28 14:47:26,068 [DEBUG] scenario: 5
+2026-05-28 14:47:26,068 [DEBUG] cps: 329
+2026-05-28 14:47:26,068 [DEBUG] cps_name: Residue Management (No-Till)
+2026-05-28 14:47:26,068 [DEBUG] pid: 655
+2026-05-28 14:47:26,068 [DEBUG] impacted_pids: 
+2026-05-28 14:47:26,068 [DEBUG] linear_length_m: None
+2026-05-28 14:47:26,068 [DEBUG] buffer_area_ha: None
+2026-05-28 14:47:26,068 [DEBUG] portion_treated: None
+2026-05-28 14:47:26,068 [DEBUG] wetland_area_ha: None
+2026-05-28 14:47:26,068 [DEBUG] catchment_to_wetland_ratio: None
+2026-05-28 14:47:26,069 [DEBUG] cost_usd: 2438.586812630968
+2026-05-28 14:47:26,069 [DEBUG] treated_TN: 172.91824608138228
+2026-05-28 14:47:26,069 [DEBUG] removed_TN: 16.149944499258332
+2026-05-28 14:47:26,069 [DEBUG] treated_TP: 4.051076062805606
+2026-05-28 14:47:26,069 [DEBUG] removed_TP: 1.7185735510197229
+2026-05-28 14:47:26,069 [DEBUG] selected parcel idx=1066 with pid=1067
+2026-05-28 14:47:26,069 [DEBUG] selected bmp 412 (Grassed Waterway)
+2026-05-28 14:47:26,069 [DEBUG] selected efficiency value 0.15 for pollutant=TN
+2026-05-28 14:47:26,069 [DEBUG] selected efficiency value 0.13 for pollutant=TP
+2026-05-28 14:47:26,069 [DEBUG] calling simulate_grassed
+2026-05-28 14:47:26,069 [DEBUG] length of grassed buffer/waterway is 235.99 m based on fraction 0.19 of parcel perimeter 1250.52 m
+2026-05-28 14:47:26,070 [DEBUG] reduced yield for pollutant TN: existing yield=21.29, effectiveness=0.15, treated_area=3.20 ha, removal=10.07, new yield=20.25
+2026-05-28 14:47:26,070 [DEBUG] reduced yield for pollutant TP: existing yield=0.79, effectiveness=0.13, treated_area=3.20 ha, removal=0.33, new yield=0.76
+2026-05-28 14:47:26,070 [DEBUG] calling compute_bmp_cost
+2026-05-28 14:47:26,070 [DEBUG] sampled cost rate 111.9625
+2026-05-28 14:47:26,070 [DEBUG] computed cost using rate111.9625, quantity=0.2518 => cost=2193.18
+2026-05-28 14:47:26,070 [DEBUG] computed cost for this bmp application: 2193.18 USD (quantity=0.2518)
+2026-05-28 14:47:26,071 [DEBUG] updated total_cost=103638.75 total_bmp=48
+2026-05-28 14:47:26,071 [DEBUG] scenario: 5
+2026-05-28 14:47:26,071 [DEBUG] cps: 412
+2026-05-28 14:47:26,071 [DEBUG] cps_name: Grassed Waterway
+2026-05-28 14:47:26,071 [DEBUG] pid: 1067
+2026-05-28 14:47:26,071 [DEBUG] impacted_pids: 
+2026-05-28 14:47:26,071 [DEBUG] linear_length_m: 235.99103249800942
+2026-05-28 14:47:26,071 [DEBUG] buffer_area_ha: 0.25175523346887646
+2026-05-28 14:47:26,071 [DEBUG] portion_treated: 0.32769112741613304
+2026-05-28 14:47:26,071 [DEBUG] wetland_area_ha: None
+2026-05-28 14:47:26,071 [DEBUG] catchment_to_wetland_ratio: None
+2026-05-28 14:47:26,071 [DEBUG] final bmp record:
+2026-05-28 14:47:26,071 [DEBUG] scenario: 5
+2026-05-28 14:47:26,071 [DEBUG] cps: 412
+2026-05-28 14:47:26,071 [DEBUG] cps_name: Grassed Waterway
+2026-05-28 14:47:26,071 [DEBUG] pid: 1067
+2026-05-28 14:47:26,071 [DEBUG] impacted_pids: 
+2026-05-28 14:47:26,071 [DEBUG] linear_length_m: 235.99103249800942
+2026-05-28 14:47:26,072 [DEBUG] buffer_area_ha: 0.25175523346887646
+2026-05-28 14:47:26,072 [DEBUG] portion_treated: 0.32769112741613304
+2026-05-28 14:47:26,072 [DEBUG] wetland_area_ha: None
+2026-05-28 14:47:26,072 [DEBUG] catchment_to_wetland_ratio: None
+2026-05-28 14:47:26,072 [DEBUG] cost_usd: 2193.18000932297
+2026-05-28 14:47:26,072 [DEBUG] treated_TN: 68.16433785509896
+2026-05-28 14:47:26,072 [DEBUG] removed_TN: 10.068674203454469
+2026-05-28 14:47:26,072 [DEBUG] treated_TP: 2.5392158541393837
+2026-05-28 14:47:26,072 [DEBUG] removed_TP: 0.32998450543703667
+2026-05-28 14:47:26,072 [DEBUG] selected parcel idx=573 with pid=574
+2026-05-28 14:47:26,072 [DEBUG] selected bmp 590 (Nutrient Management)
+2026-05-28 14:47:26,072 [DEBUG] selected efficiency value 0.18 for pollutant=TN
+2026-05-28 14:47:26,072 [DEBUG] selected efficiency value 0.25 for pollutant=TP
+2026-05-28 14:47:26,073 [DEBUG] calling _simulate_infield
+2026-05-28 14:47:26,073 [DEBUG] cps=590, parcel_idx=573, area=14.82 ha
+2026-05-28 14:47:26,073 [DEBUG] reduced yield for pollutant TN: existing yield=38.43, effectiveness=0.18, treated_area=14.82 ha, removal=102.77, new yield=31.50
+2026-05-28 14:47:26,073 [DEBUG] reduced yield for pollutant TP: existing yield=0.97, effectiveness=0.25, treated_area=14.82 ha, removal=3.58, new yield=0.73
+2026-05-28 14:47:26,073 [DEBUG] calling compute_bmp_cost
+2026-05-28 14:47:26,073 [DEBUG] sampled cost rate 50.0993
+2026-05-28 14:47:26,073 [DEBUG] computed cost using rate50.0993, quantity=14.8174 => cost=981.37
+2026-05-28 14:47:26,074 [DEBUG] computed cost for this bmp application: 981.37 USD (quantity=14.8174)
+2026-05-28 14:47:26,074 [DEBUG] updated total_cost=104620.12 total_bmp=49
+2026-05-28 14:47:26,074 [DEBUG] scenario: 5
+2026-05-28 14:47:26,074 [DEBUG] cps: 590
+2026-05-28 14:47:26,074 [DEBUG] cps_name: Nutrient Management
+2026-05-28 14:47:26,074 [DEBUG] pid: 574
+2026-05-28 14:47:26,074 [DEBUG] impacted_pids: 
+2026-05-28 14:47:26,074 [DEBUG] linear_length_m: None
+2026-05-28 14:47:26,074 [DEBUG] buffer_area_ha: None
+2026-05-28 14:47:26,074 [DEBUG] portion_treated: None
+2026-05-28 14:47:26,074 [DEBUG] wetland_area_ha: None
+2026-05-28 14:47:26,074 [DEBUG] catchment_to_wetland_ratio: None
+2026-05-28 14:47:26,074 [DEBUG] final bmp record:
+2026-05-28 14:47:26,074 [DEBUG] scenario: 5
+2026-05-28 14:47:26,074 [DEBUG] cps: 590
+2026-05-28 14:47:26,074 [DEBUG] cps_name: Nutrient Management
+2026-05-28 14:47:26,074 [DEBUG] pid: 574
+2026-05-28 14:47:26,074 [DEBUG] impacted_pids: 
+2026-05-28 14:47:26,075 [DEBUG] linear_length_m: None
+2026-05-28 14:47:26,075 [DEBUG] buffer_area_ha: None
+2026-05-28 14:47:26,075 [DEBUG] portion_treated: None
+2026-05-28 14:47:26,075 [DEBUG] wetland_area_ha: None
+2026-05-28 14:47:26,075 [DEBUG] catchment_to_wetland_ratio: None
+2026-05-28 14:47:26,075 [DEBUG] cost_usd: 981.3718565591868
+2026-05-28 14:47:26,075 [DEBUG] treated_TN: 569.4478071877501
+2026-05-28 14:47:26,075 [DEBUG] removed_TN: 102.77042217353393
+2026-05-28 14:47:26,075 [DEBUG] treated_TP: 14.330481200905592
+2026-05-28 14:47:26,075 [DEBUG] removed_TP: 3.584798818624182
+2026-05-28 14:47:26,075 [DEBUG] selected parcel idx=881 with pid=882
+2026-05-28 14:47:26,075 [DEBUG] selected bmp 590 (Nutrient Management)
+2026-05-28 14:47:26,075 [DEBUG] selected efficiency value 0.10 for pollutant=TN
+2026-05-28 14:47:26,076 [DEBUG] selected efficiency value 0.06 for pollutant=TP
+2026-05-28 14:47:26,076 [DEBUG] calling _simulate_infield
+2026-05-28 14:47:26,076 [DEBUG] cps=590, parcel_idx=881, area=5.81 ha
+2026-05-28 14:47:26,076 [DEBUG] reduced yield for pollutant TN: existing yield=58.73, effectiveness=0.10, treated_area=5.81 ha, removal=34.57, new yield=52.78
+2026-05-28 14:47:26,076 [DEBUG] reduced yield for pollutant TP: existing yield=1.29, effectiveness=0.06, treated_area=5.81 ha, removal=0.44, new yield=1.21
+2026-05-28 14:47:26,076 [DEBUG] calling compute_bmp_cost
+2026-05-28 14:47:26,076 [DEBUG] sampled cost rate 119.2147
+2026-05-28 14:47:26,077 [DEBUG] computed cost using rate119.2147, quantity=5.8103 => cost=2335.24
+2026-05-28 14:47:26,077 [DEBUG] computed cost for this bmp application: 2335.24 USD (quantity=5.8103)
+2026-05-28 14:47:26,077 [DEBUG] updated total_cost=106955.36 total_bmp=50
+2026-05-28 14:47:26,077 [DEBUG] scenario: 5
+2026-05-28 14:47:26,077 [DEBUG] cps: 590
+2026-05-28 14:47:26,077 [DEBUG] cps_name: Nutrient Management
+2026-05-28 14:47:26,077 [DEBUG] pid: 882
+2026-05-28 14:47:26,077 [DEBUG] impacted_pids: 
+2026-05-28 14:47:26,077 [DEBUG] linear_length_m: None
+2026-05-28 14:47:26,077 [DEBUG] buffer_area_ha: None
+2026-05-28 14:47:26,077 [DEBUG] portion_treated: None
+2026-05-28 14:47:26,077 [DEBUG] wetland_area_ha: None
+2026-05-28 14:47:26,077 [DEBUG] catchment_to_wetland_ratio: None
+2026-05-28 14:47:26,077 [DEBUG] final bmp record:
+2026-05-28 14:47:26,077 [DEBUG] scenario: 5
+2026-05-28 14:47:26,077 [DEBUG] cps: 590
+2026-05-28 14:47:26,077 [DEBUG] cps_name: Nutrient Management
+2026-05-28 14:47:26,078 [DEBUG] pid: 882
+2026-05-28 14:47:26,078 [DEBUG] impacted_pids: 
+2026-05-28 14:47:26,078 [DEBUG] linear_length_m: None
+2026-05-28 14:47:26,078 [DEBUG] buffer_area_ha: None
+2026-05-28 14:47:26,078 [DEBUG] portion_treated: None
+2026-05-28 14:47:26,078 [DEBUG] wetland_area_ha: None
+2026-05-28 14:47:26,078 [DEBUG] catchment_to_wetland_ratio: None
+2026-05-28 14:47:26,078 [DEBUG] cost_usd: 2335.2417795618476
+2026-05-28 14:47:26,078 [DEBUG] treated_TN: 341.2478042378816
+2026-05-28 14:47:26,078 [DEBUG] removed_TN: 34.57253653719974
+2026-05-28 14:47:26,078 [DEBUG] treated_TP: 7.473663230560783
+2026-05-28 14:47:26,078 [DEBUG] removed_TP: 0.4374094543335959
+2026-05-28 14:47:26,078 [DEBUG] reached BMP count limit: total_bmp=50, limit_n=50
+2026-05-28 14:47:26,131 [INFO] Wrote per-scenario BMPs: examples\east_fork\outputs\bmps_s5.csv
+2026-05-28 14:47:26,131 [INFO] Wrote per-scenario parcels: examples\east_fork\outputs\parcels_s5.csv
+2026-05-28 14:47:26,142 [INFO] Wrote BMP summary: examples\east_fork\outputs\bmp_summaries_s5.csv
+2026-05-28 14:47:26,142 [INFO] === scenario 5 end (cost=106955.36, bmp=50) ===

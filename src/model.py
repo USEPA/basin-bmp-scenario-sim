@@ -38,6 +38,7 @@ from src.sampling import (
     _trunc_normal,
 )
 from src.logging_utils import make_worker_logger
+from src.bmp_summary import BMPSummaryCollector
 
 from src.constants import (
     BMP_CPS_NAME_MAP,
@@ -441,6 +442,12 @@ def _run_one_scenario(
     limit_n = shared["limit_n"]
     logger.debug(f"setting scenario limits: limit_usd={limit_usd} limit_n={limit_n}")
 
+    # Initialize summary collector
+    summary_collector = BMPSummaryCollector(ctx.pollutants, sid)
+    
+    # Build PID to parcel index mapping for baseline yields
+    pid_to_parcel_idx = {pid: idx for idx, pid in enumerate(ctx.parcel_selection_ids)}
+
     # Plotting axes for this scenario
     x_axes: List[str] = [XAXIS_COUNT]
     if cfg.get(CFG_BMP_COST):
@@ -520,6 +527,14 @@ def _run_one_scenario(
             logger.debug(f"{k}: {v}")
 
         scenario_bmps.append(bmp_rec)
+        
+        # Add to summary collector
+        parcel_idx_for_baseline = pid_to_parcel_idx.get(str(pid), 0)
+        pid_baseline_yields = {
+            pol: float(baseline[parcel_idx_for_baseline, pol_idx])
+            for pol_idx, pol in enumerate(ctx.pollutants)
+        }
+        summary_collector.add_bmp_record(bmp_rec, pid_baseline_yields)
 
         # Delivery and plotting records
         oids = ctx._get_parcel_out_oids(parcel_idx)
@@ -561,10 +576,16 @@ def _run_one_scenario(
     # Write per-scenario CSVs
     bmps_path = Path(outputs_dir) / f"bmps_s{sid}.csv"
     parcels_path = Path(outputs_dir) / f"parcels_s{sid}.csv"
+    summary_path = Path(outputs_dir) / f"bmp_summaries_s{sid}.csv"
     pd.DataFrame(scenario_bmps).to_csv(bmps_path, index=False)
     pd.DataFrame(scenario_parcels).to_csv(parcels_path, index=False)
     logger.info(f"Wrote per-scenario BMPs: {bmps_path}")
     logger.info(f"Wrote per-scenario parcels: {parcels_path}")
+    
+    # Write BMP summary statistics from collector
+    summary_df = summary_collector.generate_summary_dataframe()
+    summary_df.to_csv(summary_path, index=False)
+    logger.info(f"Wrote BMP summary: {summary_path}")
 
     logger.info(f"=== scenario {sid} end (cost={total_cost:.2f}, bmp={total_bmp}) ===")
     return scenario_records
