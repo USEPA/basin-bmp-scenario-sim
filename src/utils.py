@@ -1,26 +1,70 @@
-import re
-from typing import Any, Dict, Iterable, Mapping, Optional
+"""
+Utility helpers (stateless).
+
+Contains small utilities used across the codebase:
+- Case-insensitive config lookup
+- DataFrame column normalization
+- Pollutant label normalization to canonical names
+- Percentile key parsing
+"""
+
+from __future__ import annotations
+
+from typing import Any, Dict, Iterable, Mapping
+
 
 def ci_get(d: Mapping[str, Any], key: str, default: Any = None) -> Any:
-    """Case-insensitive dictionary lookup for config keys."""
-    key_l = key.lower()
-    # Iterate through the mapping and compare keys in lowercase.
-    # This allows configuration dictionaries to be used with mixed case keys.
+    """Return a value from a mapping using a case-insensitive key lookup.
+
+    Parameters
+    ----------
+    d : Mapping[str, Any]
+        Source dictionary-like object.
+    key : str
+        Key to look up, case-insensitively.
+    default : Any, optional
+        Default value when key is not found.
+
+    Returns
+    -------
+    Any
+        Value if found; otherwise default.
+    """
+    key_l = str(key).lower()
     for k, v in d.items():
         if str(k).lower() == key_l:
             return v
     return default
 
+
 def normalize_columns(df: Any) -> Any:
-    """Normalize DataFrame column labels to lowercase strings."""
-    # Convert column labels to clean, predictable lowercase strings so
-    # downstream joins and lookups are not affected by casing or whitespace.
+    """Normalize DataFrame column labels to lowercase strings (in place)."""
     df.columns = [str(c).strip().lower() for c in df.columns]
     return df
 
 
 def normalize_pollutant_label(label: str) -> str:
-    """Normalize pollutant labels to a canonical form used by the model."""
+    """Normalize a pollutant label to a canonical form.
+
+    Parameters
+    ----------
+    label : str
+        Arbitrary label (e.g., 'tp', 'TP', 'total phosphorus').
+
+    Returns
+    -------
+    str
+        Canonical label recognized by the model.
+
+    Raises
+    ------
+    ValueError
+        If the label cannot be mapped to a known canonical name.
+
+    Notes
+    -----
+    The mapping is defined by constants.POLLUTANT_ALIAS_MAP.
+    """
     from .constants import POLLUTANT_ALIAS_MAP
 
     canonical = POLLUTANT_ALIAS_MAP.get(str(label).strip().lower())
@@ -30,10 +74,20 @@ def normalize_pollutant_label(label: str) -> str:
 
 
 def parse_percent_keys(cols: Iterable[Any]) -> Dict[int, Any]:
-    """Return a mapping from percentile column names to integer keys."""
-    # Return a mapping for 'p5', 'p10', etc.
-    # Percentile keys are normalized to integer values for easier sorting
-    # and lookup by percentile rank.
+    """Parse percentile-style column labels (e.g., 'p5', 'p50', 'p95').
+
+    Parameters
+    ----------
+    cols : Iterable[Any]
+        Column labels to inspect.
+
+    Returns
+    -------
+    Dict[int, Any]
+        Mapping from percentile integer (5, 50, 95, 100, ...) to the original label.
+    """
+    import re
+
     percents: Dict[int, Any] = {}
     for c in cols:
         c_l = str(c).lower().strip()
