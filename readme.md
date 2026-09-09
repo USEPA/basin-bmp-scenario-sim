@@ -1,129 +1,173 @@
-# BASIN-BMP-SCENARIO-SIMulator 
+# BASIN-BMP-SCENARIO-SIMulator
 
-`basin-bmp-scenario-sim` is a probabilistic basin-scale best management practice (BMP) scenario simulator to assess the likelihood  of cost-effectively meeting basin-scale pollutant load reduction targets
+`basin-bmp-scenario-sim` is a probabilistic, basin-scale best management practice (BMP) scenario simulator for evaluating how uncertainty in pollutant generation, BMP placement, BMP effectiveness, BMP cost, and BMP failure affects basin and outlet pollutant-load outcomes.
 
-## Description
+The model is a Monte Carlo scenario framework for annualized parcel and outlet **loads**. In code and some internal data structures, the evolving parcel-scale quantities updated during BMP application are referred to as **`load_rates`**. In this README, **loads** are treated as the primary scientific and output quantities, while **`load_rates`** refers to the current annualized parcel/pathway pollutant quantities tracked through the scenario engine.
 
-`basin-bmp-scenario-sim` facilitates Monte-Carlo-based simulation of basin-wide BMP implementation scenarios depicting aggregate costs and impacts on basin-outlet pollutant loads. The model is composed of a series of user-defined statistical distributions for:
-- Parcel selection (i.e., the likelihood  that specific parcels or agricultural fields will be selected to implement a BMP)
-  - Parcel selection probabilities are passed as explicit inputs to the model. The user may elect to set selection probabilities by considering, as examples:
-    - Agricultural productivity
-    - Land value
-    - Geospatial siting analysis (e.g., as provided by the Agricultural Conservation Productivity Framework [ACPF])   
-- BMP / conservation practice type (i.e., the likelihood  that specific types of BMPs or conservation practices will be implemented)
-  -  BMP-type probabilities are passed as explicit inputs to the model. The user may elect to set BMP-type probabilities by considering, as examples:
-    - Stakeholder preferences
-    - BMP cost (on average)  
-- BMP-specific characteristics (i.e., where a specific type of BMP is implemented, the likelihood of BMP-specific characteristics), e.g.:
-  - Wetland area
-    - Currently limited by selected parcel total area
-    - Default minimum wetland area = 0.1 ha (0.25 ac) - reduced to parcel area if parcel area < 0.1 ha
-  - Wetland catchment-to-area ratio
-    - Currently <= 100:1 (100 areal-units catchment to 1 areal-unit wetland)
-    - Currently limited by parcel upgradient area 
-  - Grassed waterway length
-    - Currently specified as percentages of parcel perimeter length 
-  - Portion of parcel draining to the BMP
-- Cost (i.e., the likely BMP implementation costs)
-  - Annualized USD per unit area or length
-  - May include opportunity, construction, maintenance
-- Parcel pollutant yield (i.e., the likely of yield rates (e.g., kg/ha/yr) for specific pollutant types across basin parcels)
-  - Optionally specify yields per pollutant loss pathway (e.g., surface, shallow surface, tile, deep subsurface)   
-- BMP efficiency (i.e., the likely effectiveness of specific types of BMPs per pollutant type)
-  - Optionally specify effectiveness per pollutant loss pathway (e.g., surface, shallow surface, tile, deep subsurface)
-- BMP failure (i.e., the likelihood  that a BMP will fail and the resulting decline in BMP effectiveness) 
+The simulator is **not** a continuous hydrologic or water-quality model. It represents annual pollutant generation and BMP effects at the parcel scale and routes those loads to configured outlets.
 
-## Configuration
+## Scientific purpose
 
-Required configuration keys:
+The model is intended for watershed planning and uncertainty analysis. It uses Monte Carlo simulation to generate many plausible basin-wide BMP implementation scenarios, propagate uncertain inputs through each scenario, and evaluate the resulting parcel- and outlet-scale pollutant loads, costs, and target attainment.
 
-- `domain`: watershed boundary file (`.gpkg`, `.shp`, etc.)
-- `parcels`: parcel polygons file
-- `outlet_loc`: outlet location file
-- `parcel_out`: CSV mapping parcels to outlet IDs
-- `pollutants`: list of pollutant labels
-- `cps`: list of BMP CPS codes
-- `pollutant_yield`: CSV of pollutant yield statistics per parcel
-- `bmp_efficiency`: CSV of BMP efficiency statistics per BMP type and pollutant
-- `n_scenarios`: number of scenarios to produce
-- one of `bmp_limit_n` or `bmp_limit_usd`
+The model is designed to answer questions such as:
 
-Optional configuration keys:
+- How variable are expected pollutant reductions across plausible BMP portfolios?
+- How often does a given implementation strategy meet an outlet load-reduction target?
+- How do uncertainty in baseline pollutant generation and BMP performance affect predicted outcomes?
+- How do implementation limits such as BMP count or cost change the distribution of outcomes?
 
-- `parcel_up`: CSV of parcel upstream connectivity
-- `parcel_p`: parcel selection probability weights
-- `bmp_cost`: CSV of BMP cost statistics
-- `delivery_ratios`: CSV of parcel-to-outlet delivery ratios
-- `outlet_target`: CSV of outlet pollutant reduction targets
-- `outlet_mean`: CSV of outlet mean load metrics
-- `buffer_depth_ft`: buffer depth in feet for grassed BMPs
+The simulator is annualized rather than continuous. It does not directly simulate sub-daily hydrology, channel hydraulics, in-stream nutrient transformation, groundwater travel times, sediment storage or remobilization within the channel network, or mechanistic BMP performance through time. Those processes must be represented indirectly through input assumptions, routing factors, or complementary models where needed.
+
+## Two load-generation modes
+
+The model provides two alternative ways to establish baseline parcel pollutant loads.
+
+| Feature | Default statistical mode | `plet_rusle` mode |
+|---|---|---|
+| Baseline pollutant generation | User supplies parcel pollutant load-rate values/distributions | Model calculates loads from PLET-style hydrology, concentrations, and optional RUSLE |
+| Statistical parcel input | `pollutant_load_rate` | Not used |
+| Pollutant pathways | User-defined | Fixed to `surface` and `subsurface` |
+| Runoff and infiltration modeled | No | Yes |
+| Curve Number | Not used | Required user input by land-cover × HSG pairing |
+| Infiltration fraction | Not used | Required user input by land-cover × HSG pairing |
+| Sediment/TSS | User-supplied parcel pollutant input | RUSLE when complete RUSLE inputs are supplied, otherwise concentration-based TSS may be used |
+| BMP efficiency coverage | Required for every active pathway | `surface` required; missing correctly labeled `subsurface` defaults to 0 with logging |
+
+The default statistical mode is appropriate when parcel pollutant quantities are already available from monitoring, another model, literature, calibration, or expert judgment. The `plet_rusle` mode is appropriate when baseline loads should be generated internally from PLET-style runoff and infiltration calculations and, optionally, RUSLE sediment generation.
+
+## Core terminology
+
+### Concentration
+
+Concentration is pollutant mass per unit water volume, for example `mg/L`. Concentrations are used explicitly by `plet_rusle` to calculate runoff-derived and infiltration-derived nutrient loads.
+
+### Load
+
+A load is pollutant mass over the modeled annual period. Parcel and outlet outcomes are reported as loads. BMP application updates parcel/pathway quantities over time, and later BMPs operate on the remaining load after earlier BMPs.
+
+### `load_rates`
+
+Some code paths and internal representations use `load_rates` for the current annualized parcel/pathway pollutant quantities being updated during scenario execution. In user-facing scientific terms, these are the evolving parcel/pathway pollutant quantities that drive parcel and outlet load accounting.
+
+### Pathway
+
+A pathway partitions a parcel pollutant quantity into components that may respond differently to BMPs.
+
+In **statistical mode**, pathway labels are user-defined bookkeeping categories and may represent concepts such as surface runoff, shallow subsurface flow, tile drainage, groundwater, or another user-defined transport category.
+
+In **`plet_rusle` mode**, pathway meanings are fixed:
+
+- `surface` — runoff-derived load plus sediment-associated pollutant load where applicable
+- `subsurface` — infiltration/groundwater-derived non-TSS load
+
+Earlier shallow and deep subsurface splits are **not** part of the production `plet_rusle` pathway representation. Compatibility diagnostic fields may still appear in some outputs for older callers or tests and should not be interpreted as additional production pathways.
+
+## Standardized uncertain-input format
+
+Numeric inputs use a common value/distribution convention. Depending on the table, an input may be specified as:
+
+- a fixed `value`
+- `mean` + `sd`, optionally with `min`/`max` bounds
+- the legacy `min` + `mean` + `max` form
+- `min` + `max` for a uniform distribution
+- `min` + percentile columns such as `p05`, `p50`, `p95` + `max`
+- a reusable `distribution_id` defined once in an optional `input_distributions.csv` catalog
+
+Parcel-indexed inputs may use `pid: "*"` as a default and provide only parcel-specific overrides. This can greatly reduce duplication when many parcels share assumptions.
+
+## Quick start
+
+A model run requires common spatial and routing inputs, pollutant and BMP definitions, a BMP-efficiency table, a load-generation configuration, and at least one scenario stopping condition.
+
+Example command:
+
+    python run_model.py config.yaml
+
+Statistical mode is the default:
+
+    pollutants: [TN, TP, TSS]
+    cps: [340, 329, 590]
+
+    input_distributions: ./inputs/input_distributions.csv
+
+    pollutant_load_rate: ./inputs/pollutant_load_rate.csv
+    bmp_efficiency: ./inputs/bmp_efficiency.csv
+
+    n_scenarios: 1000
+    bmp_limit_n: 200
+
+PLET/RUSLE mode is enabled explicitly and requires a hydrology table:
+
+    input_distributions: ./inputs/plet/input_distributions.csv
+
+    load_generation:
+      mode: plet_rusle
+      plet_inputs: ./inputs/plet/plet_inputs.csv
+      hydrology_lookup: ./inputs/plet/plet_hydrology_lookup.csv
+      rusle_inputs: ./inputs/plet/rusle_inputs.csv
+      pollutant_concentrations: ./inputs/plet/pollutant_concentrations.csv
+      groundwater_concentrations: ./inputs/plet/groundwater_concentrations.csv
+
+See the docs below for complete examples and mode-specific requirements.
+
+## Documentation
+
+- [Model concepts and scientific formulation](docs/model_overview.md) — loads, pathways, Monte Carlo structure, and outlet routing
+- [Configuration reference](docs/configuration.md) — common YAML settings and complete examples for both modes
+- [Standardized numeric inputs and distributions](docs/input_distributions.md) — fixed values, distributions, reusable distribution IDs, parcel defaults and overrides, and shared draws
+- [Statistical load-generation mode](docs/statistical_mode.md) — direct parcel load-rate inputs, arbitrary pathways, aggregate pathway splitting, and coverage rules
+- [PLET/RUSLE load-generation mode](docs/plet_rusle_mode.md) — required land-cover/HSG hydrology inputs, runoff, infiltration, groundwater loads, RUSLE, and two-pathway BMP treatment
+- [BMP simulation](docs/bmp_simulation.md) — BMP selection, efficiencies, treatment fractions, failure, signed effects, and serial stacking
+- [Input and output reference](docs/input_output_reference.md) — input file roles, output files, and interpretation
+- [Reproducibility, testing, and limitations](docs/reproducibility_validation.md) — seeds, parallel execution, validation expectations, assumptions, and appropriate interpretation
+
+## Required inputs at a glance
+
+Inputs shared by both modes generally include:
+
+- watershed/domain geometry
+- parcel polygons
+- outlet locations
+- parcel-to-outlet mapping
+- modeled pollutants
+- configured BMP or conservation-practice CPS codes
+- BMP-efficiency statistics
+- number of Monte Carlo scenarios
+- a BMP-count limit, cost limit, or both
+
+Load-generation-specific inputs differ substantially between the two modes. See [Configuration reference](docs/configuration.md).
 
 ## Outputs
 
-The model writes results to the configured `outputs` directory:
+The model writes scenario-level and aggregated results to the configured `outputs` directory. Current canonical outputs include per-BMP records, per-parcel results, scenario metrics, outlet trajectories, logs, plots, and, when `plet_rusle` is used, load-generation diagnostic records.
 
-- `bmps.csv` (aggregated across all scenarios, includes `scenario` and `cps_name`)
-- `parcels.csv` (aggregated across all scenarios, includes `scenario`)
-- `plot_*` files for summary visualizations
-- `log.txt` (driver log for the overall run)
-- `log_s{scenario}.txt` (per-scenario debug logs, one file per scenario)
+See [Input and output reference](docs/input_output_reference.md) for details.
 
-## Example output plots
-Each line depicts a single BMP scenario (n = 1000)
+## Reproducibility
 
-![TN - cost v % mean annual load](examples/east_fork/outputs/plots/plot_TN_oid1_xcost_ymean.jpg)
+Set `random_seed` in the YAML configuration or use the CLI `--seed` option. The base seed is used to spawn scenario-specific child seeds so a run can be reproduced when the same code, inputs, configuration, and seed are used.
 
-![TN - cost v % target load reduction](examples/east_fork/outputs/plots/plot_TN_oid1_xcost_ytarget.jpg)
+For reproducible scientific analyses, archive or record:
 
-![TN - count v % mean annual load](examples/east_fork/outputs/plots/plot_TN_oid1_xcount_ymean.jpg)
+- the repository commit or release
+- the configuration YAML
+- all input data files, including any distribution catalog and PLET hydrology lookup
+- the random seed
+- the Python environment and dependency versions
+- the generated logs
+- the canonical outputs
 
-![TN - count v % target load reduction](examples/east_fork/outputs/plots/plot_TN_oid1_xcount_ytarget.jpg)
+## Scientific scope and limitations
 
-## Notes
+The model is a scenario and uncertainty framework, not a substitute for a calibrated process-based watershed model where detailed temporal hydrology, water-quality transformation, or in-stream processes are required. Results depend on the validity of the supplied probability distributions, pathway definitions, BMP efficiencies, routing assumptions, and, in `plet_rusle` mode, the PLET/RUSLE parameterization, including the user-supplied Curve Number and infiltration-fraction assumptions.
 
-- Pollutant labels are normalized from aliases such as `nitrogen`, `phosphorus`, and `sediment`.
-- `parcel_out` outlet IDs must exist in `outlet_loc`.
-- If both `bmp_limit_n` and `bmp_limit_usd` are specified, the simulation stops when either limit is reached.
-- Optional representation of BMP failure
+BMP efficiencies are applied serially to the current remaining load. Parcel-to-outlet routing may use optional delivery ratios, but the simulator does not independently resolve all physical fate and transport processes between a parcel and an outlet.
 
-## Parallelization
+When both BMP-count and cost limits are configured, the scenario uses an OR stopping rule: no additional BMPs are added once either limit has been reached or exceeded.
 
-The model can run scenarios in parallel using `joblib`. Configure parallel execution using the `parallel` config block (key: `parallel`). Supported options:
+Model outputs should therefore be interpreted as conditional on the selected model structure and input assumptions.
 
-- `n_jobs` (int): number of worker processes to spawn (pass `-1` to use all CPUs). Default: `-1`.
-- `max_nbytes` (str): memory threshold for memmapping objects to pass between workers (e.g. `"1M"`). Default: `"1M"`.
-- `temp_folder` (str, optional): temporary directory for worker data used by `loky`.
+## Citation
 
-Example `parallel` snippet in your YAML config:
-
-```yaml
-parallel:
-  n_jobs: -1
-  max_nbytes: "1M"
-  temp_folder: "/tmp/bmp-loky"
-```
-
-When running with multiple workers, the driver writes `outputs/log.txt` while each scenario worker writes its own `outputs/log_s{scenario}.txt` file (e.g. `log_s1.txt`).
-
-## Reproducibility (random seed)
-
-To make runs reproducible, set `random_seed` in the config or pass `--seed` on the command line. A base seed is used to spawn per-scenario child seeds so each scenario remains deterministic across runs when the same base seed and config are used.
-
-## CLI usage
-
-Common command-line examples:
-
-```bash
-# Run with defaults from config
-python run_model.py config.yaml
-
-# Override outputs directory and run quietly
-python run_model.py config.yaml --outputs ./outputs --quiet
-
-# Force a deterministic run
-python run_model.py config.yaml --seed 12345
-```
-
-### Contact
-
-evenson.grey@epa.gov
+When using the model in scientific or technical work, identify the repository and the exact version, release, or Git commit used for the analysis.

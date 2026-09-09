@@ -1,0 +1,8 @@
+pid,parameter,value,distribution_id,mean,sd,min,p05,p50,p95,max,sample_group,units,notes
+*,annual_precip_in,,annual_precip_east_fork,,,,,,,,,in/year,Defined once in input_distributions.csv
+*,rain_days,120.0,,,,,,,,,,days/year,
+*,rain_correction_fraction,0.9,,,,,,,,,,fraction,
+*,runoff_day_fraction,0.35,,,,,,,,,,fraction,
+*,land_cover,cropland,,,,,,,,,,classification,Fixed classification; distributions are not allowed
+*,hsg,B,,,,,,,,,,classification,Fixed classification; distributions are not allowed
+*,ia_ratio,0.0,,,,,,,,,,fraction,

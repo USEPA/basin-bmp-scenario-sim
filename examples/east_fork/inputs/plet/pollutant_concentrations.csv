@@ -1,0 +1,3 @@
+pid,pollutant,value,distribution_id,mean,sd,min,p05,p50,p95,max,sample_group,units,notes
+*,TN,,runoff_tn_east_fork,,,,,,,,,mg/L,
+*,TP,0.35,,,,,,,,,,mg/L,

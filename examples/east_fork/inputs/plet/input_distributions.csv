@@ -1,0 +1,3 @@
+distribution_id,value,mean,sd,min,p05,p50,p95,max,units,notes
+annual_precip_east_fork,42.0,,,,,,,,in/year,Reusable fixed assumption; replace value with a distribution if desired
+runoff_tn_east_fork,3.0,,,,,,,,mg/L,Reusable fixed assumption

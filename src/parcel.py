@@ -1,11 +1,7 @@
-"""
-Parcel utilities: metadata lookup, upstream/downstream relations, and baseline yield sampling.
+"""Parcel lookup and routing helpers.
 
-Notes
------
-- Units: areas in hectares (ha), perimeters in meters (m).
-- Baseline parcel yields are sampled in units of load/ha and used downstream
-  to compute treated and removed loads for each BMP.
+This module provides small helper functions used to sample parcel-level loads,
+select parcels for BMP placement, and resolve routing and delivery metadata.
 """
 
 from __future__ import annotations
@@ -26,31 +22,75 @@ from .constants import (
 )
 
 
-def _sample_yield(self: "Model", parcel_idx: int, pol_idx: int) -> float:
-    """Sample baseline pollutant yield for a parcel and pollutant index (units: load/ha).
+def _sample_load_rate(self: "Model", parcel_idx: int, pol_idx: int) -> float:
+    """Sample a baseline areal pollutant load rate for one parcel/pollutant.
 
-    Raises
-    ------
-    KeyError
-        If per-parcel, per-pollutant yield statistics are missing.
+        In the current annual model the returned value has units of kg/ha/yr.
+        Dynamic implementations can retain this helper name while changing the
+        rate's time basis explicitly in the timestep state.
+
+        Parameters
+        ----------
+        parcel_idx : int
+            Zero-based index of the parcel.
+        pol_idx : int
+            Zero-based index of the pollutant.
+
+        Returns
+        -------
+        float
+            Sampled baseline areal pollutant load rate.
+
+        Raises
+        ------
+        KeyError
+            If no load-rate statistics are available for the requested parcel and pollutant.
+        
     """
-    stats = self.pollutant_yield_stats[parcel_idx][pol_idx]
+    stats = self.pollutant_load_rate_stats[parcel_idx][pol_idx]
     if stats is None:
         raise KeyError(
-            f"No pollutant yield stats found for pid={self.parcel_ids[parcel_idx]}, pollutant={self.pollutants[pol_idx]}"
+            "No pollutant load-rate stats found for "
+            f"pid={self.parcel_ids[parcel_idx]}, pollutant={self.pollutants[pol_idx]}"
         )
-    return self._sample_from_stats(stats, kind="yield")
+    return self._sample_from_stats(stats, kind="load_rate")
+
+
 
 
 def _sample_parcel_index(self: "Model") -> int:
-    """Choose a parcel index randomly from parcel selection probabilities."""
+    """Sample the next parcel to receive a BMP attempt.
+
+        Returns
+        -------
+        int
+            Index of the selected parcel.
+        
+    """
     idx = self.rng.choice(len(self.parcel_selection_ids), p=self.parcel_selection_probs)
     self.logger.verbose(f"selected parcel idx={idx} with pid={self.parcel_selection_ids[idx]}")
     return idx
 
 
 def _get_parcel_metadata(self: "Model", pid: Union[int, str]) -> pd.Series:
-    """Return parcel metadata for a given parcel ID, raising KeyError if missing."""
+    """Return metadata for one parcel.
+
+        Parameters
+        ----------
+        pid : Union[int, str]
+            Parcel identifier.
+
+        Returns
+        -------
+        pd.Series
+            Metadata row for the requested parcel.
+
+        Raises
+        ------
+        KeyError
+            If the requested parcel is not present after domain clipping.
+        
+    """
     sub = self.data[DATA_PARCELS]
     match = sub[sub[COL_PID].astype(str) == str(pid)]
     if match.empty:
@@ -62,21 +102,53 @@ def _get_parcel_metadata(self: "Model", pid: Union[int, str]) -> pd.Series:
 
 
 def _get_parcel_up_list(self: "Model", pid: Union[int, str]) -> List[str]:
-    """Return the ordered list of up-gradient parcel IDs for the given parcel."""
-    return list(self.data[DATA_PARCEL_UP_MAP].get(str(pid), []))
+    """Return upstream parcel IDs for one parcel.
+
+        Parameters
+        ----------
+        pid : Union[int, str]
+            Parcel identifier.
+
+        Returns
+        -------
+        List[str]
+            Upstream parcel identifiers.
+        
+    """
+    return list(self.data[DATA_PARCEL_UP_MAP][str(pid)])
 
 
 def _get_parcel_out_oids(self: "Model", parcel_idx: int) -> List[str]:
-    """Return the outlet IDs associated with a parcel index."""
+    """Return outlet IDs connected to one parcel.
+
+        Parameters
+        ----------
+        parcel_idx : int
+            Zero-based index of the parcel.
+
+        Returns
+        -------
+        List[str]
+            Outlet identifiers connected to the parcel.
+        
+    """
     return list(self.parcel_out_oids[parcel_idx])
 
 
 def _get_delivery_coeffs(self: "Model", pid: Union[int, str], oid: Union[int, str]) -> Dict[str, float]:
-    """Get delivery coefficients for a parcel-to-outlet pair.
+    """Return delivery coefficients for a parcel-to-outlet path.
 
-    Defaults to 1.0 when no explicit delivery ratios are supplied.
+        Parameters
+        ----------
+        pid : Union[int, str]
+            Parcel identifier.
+        oid : Union[int, str]
+            Outlet identifier.
+
+        Returns
+        -------
+        Dict[str, float]
+            Delivery coefficients keyed by pollutant.
+        
     """
-    return self.delivery_coeffs.get(
-        (str(pid), str(oid)),
-        dict(sdr_f_to_s=1.0, sdr_s_to_o=1.0, ndr_f_to_s=1.0, ndr_s_to_o=1.0),
-    )
+    return self.delivery_coeffs[(str(pid), str(oid))]

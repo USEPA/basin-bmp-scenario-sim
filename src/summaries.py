@@ -1,25 +1,16 @@
-"""
-Summaries (per-scenario, in-memory).
+"""Build per-scenario summary statistics from BMP records.
 
-This module contains BMPSummaryCollector and its helper functions. The collector
-accumulates per-BMP records during a single scenario and computes per-CPS
-statistics, along with a scenario-wide "All CPS" roll-up. It is intentionally
-pure compute (no filesystem I/O).
-
-Outputs
--------
-For each CPS and for 'All CPS', the collector reports:
-- Type-specific stats: wetland_area_ha, catchment_ratio, buffer_area_ha, linear_length_m
-- Per-pollutant treated_*/removed_* statistics
-- Per-BMP efficiency statistics (treated/baseline), per pollutant
-- Cost statistics: cost_usd_{count,mean,std,min,p25,p50,p75,max} and total_cost_usd
-- New: failures_count (number of BMPs that were marked failed)
+This module aggregates BMP placement records into scenario-level summary rows
+and rollups. Pollutant-performance summaries are mass based: masses are summed
+first, then dimensionless ratios are calculated from those totals. This avoids
+averaging efficiencies across BMPs or future timesteps with very different
+pollutant loads.
 """
 
 from __future__ import annotations
 
 from collections import defaultdict
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Sequence
 
 import numpy as np
 import pandas as pd
@@ -29,8 +20,6 @@ from .constants import (
     OUTPUT_BUFFER_AREA,
     OUTPUT_CATCHMENT_RATIO,
     OUTPUT_LINEAR_LENGTH,
-    OUTPUT_REMOVED_PREFIX,
-    OUTPUT_TREATED_PREFIX,
     OUTPUT_WETLAND_AREA,
     OUTPUT_COST_USD,
     OUTPUT_TOTAL_COST_USD,
@@ -38,13 +27,52 @@ from .constants import (
 )
 
 
+BASELINE_MASS_PREFIX = "baseline_mass_"
+TREATED_BASELINE_MASS_PREFIX = "treated_baseline_mass_"
+REMOVED_MASS_PREFIX = "removed_mass_"
+MASS_SUFFIX = "_kg"
+TREATMENT_EXPOSURE_PREFIX = "treatment_exposure_fraction_"
+REALIZED_EFFICIENCY_PREFIX = "realized_efficiency_"
+OVERALL_REDUCTION_PREFIX = "overall_reduction_fraction_"
+
+
 def _compute_statistics(values: np.ndarray) -> Dict[str, float]:
-    """Compute descriptive statistics for a 1-D array of values."""
+    """Compute common descriptive statistics for finite numeric values.
+
+        Parameters
+        ----------
+        values : np.ndarray
+            Numeric values to summarize.
+
+        Returns
+        -------
+        Dict[str, float]
+            Descriptive statistics for finite input values.
+        
+    """
     if values.size == 0:
-        return {"count": 0, "mean": np.nan, "std": np.nan, "min": np.nan, "p25": np.nan, "p50": np.nan, "p75": np.nan, "max": np.nan}
-    valid = values[~np.isnan(values)]
+        return {
+            "count": 0,
+            "mean": np.nan,
+            "std": np.nan,
+            "min": np.nan,
+            "p25": np.nan,
+            "p50": np.nan,
+            "p75": np.nan,
+            "max": np.nan,
+        }
+    valid = values[np.isfinite(values)]
     if valid.size == 0:
-        return {"count": 0, "mean": np.nan, "std": np.nan, "min": np.nan, "p25": np.nan, "p50": np.nan, "p75": np.nan, "max": np.nan}
+        return {
+            "count": 0,
+            "mean": np.nan,
+            "std": np.nan,
+            "min": np.nan,
+            "p25": np.nan,
+            "p50": np.nan,
+            "p75": np.nan,
+            "max": np.nan,
+        }
     return {
         "count": int(valid.size),
         "mean": float(np.mean(valid)),
@@ -57,26 +85,144 @@ def _compute_statistics(values: np.ndarray) -> Dict[str, float]:
     }
 
 
-def _compute_efficiency(treated: float, baseline_yield: float) -> Optional[float]:
-    """Compute a per-BMP efficiency ratio treated/baseline in [0, 1]."""
-    if baseline_yield <= 0:
+def _safe_mass_ratio(numerator: float, denominator: float) -> Optional[float]:
+    """Return a dimensionless mass ratio, or ``None`` if undefined.
+
+        Ratios are intentionally not clipped. Signed BMP effectiveness is supported,
+        so removed mass and the resulting realized/overall reduction ratios may be
+        negative when a BMP increases load.
+
+        Parameters
+        ----------
+        numerator : float
+            Numerator of the dimensionless ratio.
+        denominator : float
+            Denominator of the dimensionless ratio.
+
+        Returns
+        -------
+        Optional[float]
+            Dimensionless ratio, or ``None`` when the denominator is not positive or finite.
+        
+    """
+    numerator = float(numerator)
+    denominator = float(denominator)
+    if not np.isfinite(numerator) or not np.isfinite(denominator) or denominator <= 0.0:
         return None
-    return min(1.0, treated / baseline_yield)
+    return numerator / denominator
+
+
+def _mass_col(prefix: str, pollutant: str) -> str:
+    """Return the mass-summary column name for a pollutant.
+
+        Parameters
+        ----------
+        prefix : str
+            Metric-name prefix.
+        pollutant : str
+            Pollutant name.
+
+        Returns
+        -------
+        str
+            Mass-summary column name.
+        
+    """
+    return f"{prefix}{pollutant}{MASS_SUFFIX}"
+
+
+def _finite_record_values(records: Sequence[Dict[str, Any]], column: str) -> List[float]:
+    """Return finite numeric values for a record field.
+
+        Parameters
+        ----------
+        records : Sequence[Dict[str, Any]]
+            Model records to summarize.
+        column : str
+            Name of the record or table field to process.
+
+        Returns
+        -------
+        List[float]
+            Finite numeric values found in the requested record field.
+        
+    """
+    values: List[float] = []
+    for rec in records:
+        raw = rec.get(column)
+        if raw is None:
+            continue
+        value = float(raw)
+        if np.isfinite(value):
+            values.append(value)
+    return values
+
+
+def _add_pollutant_mass_summary(
+    summary: Dict[str, Any],
+    records: Sequence[Dict[str, Any]],
+    pollutants: Sequence[str],
+) -> None:
+    """Add mass statistics and mass-weighted performance ratios to ``summary``.
+
+        Parameters
+        ----------
+        summary : Dict[str, Any]
+            Mutable summary mapping to update.
+        records : Sequence[Dict[str, Any]]
+            Model records to summarize.
+        pollutants : Sequence[str]
+            Pollutant names in model order.
+        
+    """
+    for pol in pollutants:
+        baseline_col = _mass_col(BASELINE_MASS_PREFIX, pol)
+        treated_col = _mass_col(TREATED_BASELINE_MASS_PREFIX, pol)
+        removed_col = _mass_col(REMOVED_MASS_PREFIX, pol)
+
+        baseline_vals = _finite_record_values(records, baseline_col)
+        treated_vals = _finite_record_values(records, treated_col)
+        removed_vals = _finite_record_values(records, removed_col)
+
+        for column, values in (
+            (baseline_col, baseline_vals),
+            (treated_col, treated_vals),
+            (removed_col, removed_vals),
+        ):
+            if values:
+                stats = _compute_statistics(np.asarray(values, dtype=float))
+                for stat_name, stat_val in stats.items():
+                    summary[f"{column}_{stat_name}"] = stat_val
+                summary[f"{column}_total"] = float(np.sum(values))
+
+
+        baseline_total = float(np.sum(baseline_vals)) if baseline_vals else 0.0
+        treated_total = float(np.sum(treated_vals)) if treated_vals else 0.0
+        removed_total = float(np.sum(removed_vals)) if removed_vals else 0.0
+
+        exposure = _safe_mass_ratio(treated_total, baseline_total)
+        realized = _safe_mass_ratio(removed_total, treated_total)
+        overall = _safe_mass_ratio(removed_total, baseline_total)
+
+        summary[f"{TREATMENT_EXPOSURE_PREFIX}{pol}"] = np.nan if exposure is None else float(exposure)
+        summary[f"{REALIZED_EFFICIENCY_PREFIX}{pol}"] = np.nan if realized is None else float(realized)
+        summary[f"{OVERALL_REDUCTION_PREFIX}{pol}"] = np.nan if overall is None else float(overall)
 
 
 class BMPSummaryCollector:
-    """Collect and compute per-scenario BMP statistics grouped by CPS.
-
-    The collector receives finalized per-BMP records as they are generated by the
-    scenario loop. It stores attributes and computes:
-      - type-specific stats (e.g., wetland_area_ha, catchment_ratio, buffer_area_ha, linear_length_m)
-      - treated/removed loads per pollutant
-      - per-BMP efficiency ratios (treated / parcel baseline), per pollutant
-      - cost statistics (USD): cost_usd_{count,mean,std,min,p25,p50,p75,max} and total_cost_usd
-      - failures_count (number of BMPs with OUTPUT_BMP_FAILED true)
-    """
+    """Collect BMP records and build per-CPS and all-CPS summary tables."""
 
     def __init__(self, pollutants: List[str], scenario_id: int) -> None:
+        """Initialize the BMP summary collector.
+
+                Parameters
+                ----------
+                pollutants : List[str]
+                    Pollutant names in model order.
+                scenario_id : int
+                    Scenario identifier.
+                
+        """
         self.pollutants = pollutants
         self.scenario_id = scenario_id
         self.bmp_by_cps: Dict[int, Dict[str, Any]] = defaultdict(
@@ -86,14 +232,22 @@ class BMPSummaryCollector:
     def add_bmp_record(
         self,
         bmp_record: Dict[str, Any],
-        pid_baseline_yields: Dict[str, float],
     ) -> None:
-        """Add a single per-BMP record to the collector."""
+        """Add one BMP record.
+
+                Mass-based performance metrics are read directly from the BMP record,
+                so an areal-load-rate denominator is never used to calculate efficiency.
+
+                Parameters
+                ----------
+                bmp_record : Dict[str, Any]
+                    BMP record to append to the scenario summary.
+                
+        """
         cps = int(bmp_record["cps"])
         group = self.bmp_by_cps[cps]
         group["records"].append(bmp_record)
 
-        # Type-specific attributes
         if cps == 656:  # Constructed Wetland
             wetland_area = bmp_record.get(OUTPUT_WETLAND_AREA)
             catchment_ratio = bmp_record.get(OUTPUT_CATCHMENT_RATIO)
@@ -109,154 +263,105 @@ class BMPSummaryCollector:
             if linear_length is not None:
                 group["attributes"]["linear_length_m"].append(float(linear_length))
 
-        # Per-BMP failure flag for counting
-        failed_flag = bool(bmp_record.get(OUTPUT_BMP_FAILED, False))
+        failed_flag = bool(bmp_record.get(OUTPUT_BMP_FAILED))
         group["attributes"]["failed"].append(1 if failed_flag else 0)
+        group["attributes"]["pid"].append(str(bmp_record.get("pid")))
 
-        # Parcel ID and baseline yields (for per-BMP efficiency)
-        group["attributes"]["pid"].append(str(bmp_record.get("pid", "")))
-        for pol in self.pollutants:
-            group["attributes"][f"baseline_{pol}"].append(float(pid_baseline_yields.get(pol, 0.0)))
+    @staticmethod
+    def _add_type_attributes(summary: Dict[str, Any], attrs: Dict[str, List[float]]) -> None:
+        """Add BMP-type attributes to a summary mapping.
+
+                Parameters
+                ----------
+                summary : Dict[str, Any]
+                    Mutable summary mapping to update.
+                attrs : Dict[str, List[float]]
+                    BMP attributes to aggregate into the summary.
+                
+        """
+        for attr_name in ("wetland_area_ha", "catchment_ratio", "buffer_area_ha", "linear_length_m"):
+            values = attrs[attr_name] if attr_name in attrs else []
+            if values:
+                stats = _compute_statistics(np.asarray(values, dtype=float))
+                for stat_name, stat_val in stats.items():
+                    summary[f"{attr_name}_{stat_name}"] = stat_val
+
+    @staticmethod
+    def _add_cost_summary(summary: Dict[str, Any], records: Sequence[Dict[str, Any]]) -> None:
+        """Add BMP cost statistics to a summary mapping.
+
+                Parameters
+                ----------
+                summary : Dict[str, Any]
+                    Mutable summary mapping to update.
+                records : Sequence[Dict[str, Any]]
+                    Model records to summarize.
+                
+        """
+        costs = _finite_record_values(records, OUTPUT_COST_USD)
+        if not costs:
+            return
+        stats = _compute_statistics(np.asarray(costs, dtype=float))
+        for stat_name, stat_val in stats.items():
+            summary[f"{OUTPUT_COST_USD}_{stat_name}"] = stat_val
+        summary[OUTPUT_TOTAL_COST_USD] = float(np.sum(costs))
 
     def generate_summary_dataframe(self) -> pd.DataFrame:
-        """Compute per-CPS summary statistics."""
+        """Generate one summary row per BMP type used in the scenario.
+
+                Returns
+                -------
+                pd.DataFrame
+                    One summary row per BMP type used in the scenario.
+                
+        """
         summaries: List[Dict[str, Any]] = []
         for cps in sorted(self.bmp_by_cps.keys()):
             group = self.bmp_by_cps[cps]
-            bmp_records = group["records"]
+            records = group["records"]
             attrs = group["attributes"]
-
             summary: Dict[str, Any] = {
                 "scenario": self.scenario_id,
                 "cps": cps,
-                "cps_name": BMP_CPS_NAME_MAP.get(cps, f"CPS {cps}"),
-                "bmp_count": len(bmp_records),
-                "failures_count": int(np.sum(np.asarray(attrs.get("failed", []), dtype=float))) if "failed" in attrs else 0,
+                "cps_name": BMP_CPS_NAME_MAP[cps] if cps in BMP_CPS_NAME_MAP else f"CPS {cps}",
+                "bmp_count": len(records),
+                "failures_count": int(np.sum(np.asarray(attrs["failed"] if "failed" in attrs else [], dtype=float)))
+                if "failed" in attrs
+                else 0,
             }
-
-            # Type-specific attributes
-            for attr_name in ("wetland_area_ha", "catchment_ratio", "buffer_area_ha", "linear_length_m"):
-                if attr_name in attrs and len(attrs[attr_name]) > 0:
-                    stats = _compute_statistics(np.asarray(attrs[attr_name], dtype=float))
-                    for stat_name, stat_val in stats.items():
-                        summary[f"{attr_name}_{stat_name}"] = stat_val
-
-            # Treated/removed per pollutant
-            for pol in self.pollutants:
-                t_col = f"{OUTPUT_TREATED_PREFIX}{pol}"
-                r_col = f"{OUTPUT_REMOVED_PREFIX}{pol}"
-
-                t_vals = [float(rec.get(t_col)) for rec in bmp_records if rec.get(t_col) is not None]
-                r_vals = [float(rec.get(r_col)) for rec in bmp_records if rec.get(r_col) is not None]
-
-                if t_vals:
-                    stats = _compute_statistics(np.asarray(t_vals, dtype=float))
-                    for stat_name, stat_val in stats.items():
-                        summary[f"treated_{pol}_{stat_name}"] = stat_val
-                if r_vals:
-                    stats = _compute_statistics(np.asarray(r_vals, dtype=float))
-                    for stat_name, stat_val in stats.items():
-                        summary[f"removed_{pol}_{stat_name}"] = stat_val
-
-            # Efficiency per pollutant (treated/baseline), per BMP, then stats
-            for pol in self.pollutants:
-                t_col = f"{OUTPUT_TREATED_PREFIX}{pol}"
-                blist = attrs.get(f"baseline_{pol}", [])
-                efficiencies: List[float] = []
-                for i, rec in enumerate(bmp_records):
-                    treated = rec.get(t_col)
-                    if treated is None:
-                        continue
-                    eff = _compute_efficiency(float(treated), float(blist[i] if i < len(blist) else 0.0))
-                    if eff is not None:
-                        efficiencies.append(eff)
-                if efficiencies:
-                    stats = _compute_statistics(np.asarray(efficiencies, dtype=float))
-                    for stat_name, stat_val in stats.items():
-                        summary[f"efficiency_{pol}_{stat_name}"] = stat_val
-
-            # Cost per BMP (USD)
-            costs = [float(rec.get(OUTPUT_COST_USD)) for rec in bmp_records if rec.get(OUTPUT_COST_USD) is not None]
-            if costs:
-                stats = _compute_statistics(np.asarray(costs, dtype=float))
-                for stat_name, stat_val in stats.items():
-                    summary[f"{OUTPUT_COST_USD}_{stat_name}"] = stat_val
-                summary[OUTPUT_TOTAL_COST_USD] = float(np.sum(costs))
-
+            self._add_type_attributes(summary, attrs)
+            _add_pollutant_mass_summary(summary, records, self.pollutants)
+            self._add_cost_summary(summary, records)
             summaries.append(summary)
-
         return pd.DataFrame(summaries)
 
     def generate_rollup_summary(self) -> Dict[str, Any]:
-        """Compute an "All CPS" roll-up by re-aggregating raw BMP records."""
+        """Generate one combined summary row across all BMP types.
+
+                Returns
+                -------
+                Dict[str, Any]
+                    Combined summary metrics across all BMP types.
+                
+        """
         all_records: List[Dict[str, Any]] = []
         all_attrs: Dict[str, List[float]] = defaultdict(list)
-
         for cps in sorted(self.bmp_by_cps.keys()):
             group = self.bmp_by_cps[cps]
             all_records.extend(group["records"])
-            for k, vals in group["attributes"].items():
-                all_attrs[k].extend(vals)
+            for key, values in group["attributes"].items():
+                all_attrs[key].extend(values)
 
         summary: Dict[str, Any] = {
             "scenario": self.scenario_id,
             "cps": 0,
             "cps_name": "All CPS",
             "bmp_count": len(all_records),
-            "failures_count": int(np.sum(np.asarray(all_attrs.get("failed", []), dtype=float))) if "failed" in all_attrs else 0,
+            "failures_count": int(np.sum(np.asarray(all_attrs["failed"], dtype=float)))
+            if "failed" in all_attrs
+            else 0,
         }
-
-        # Type-specific attributes
-        for attr_name in ("wetland_area_ha", "catchment_ratio", "buffer_area_ha", "linear_length_m"):
-            vals = all_attrs.get(attr_name, [])
-            if vals:
-                stats = _compute_statistics(np.asarray(vals, dtype=float))
-                for stat_name, stat_val in stats.items():
-                    summary[f"{attr_name}_{stat_name}"] = stat_val
-
-        # Treated/Removed across all BMPs
-        for pol in self.pollutants:
-            t_col = f"{OUTPUT_TREATED_PREFIX}{pol}"
-            r_col = f"{OUTPUT_REMOVED_PREFIX}{pol}"
-            t_vals = [float(rec.get(t_col)) for rec in all_records if rec.get(t_col) is not None]
-            r_vals = [float(rec.get(r_col)) for rec in all_records if rec.get(r_col) is not None]
-            if t_vals:
-                stats = _compute_statistics(np.asarray(t_vals, dtype=float))
-                for stat_name, stat_val in stats.items():
-                    summary[f"treated_{pol}_{stat_name}"] = stat_val
-            if r_vals:
-                stats = _compute_statistics(np.asarray(r_vals, dtype=float))
-                for stat_name, stat_val in stats.items():
-                    summary[f"removed_{pol}_{stat_name}"] = stat_val
-
-        # Efficiency across all BMPs
-        for pol in self.pollutants:
-            t_col = f"{OUTPUT_TREATED_PREFIX}{pol}"
-            efficiencies: List[float] = []
-            # iterate per CPS to align with baseline lists
-            for cps in sorted(self.bmp_by_cps.keys()):
-                group = self.bmp_by_cps[cps]
-                recs = group["records"]
-                blist = group["attributes"].get(f"baseline_{pol}", [])
-                for i, rec in enumerate(recs):
-                    treated = rec.get(t_col)
-                    if treated is None:
-                        continue
-                    baseline = blist[i] if i < len(blist) else 0.0
-                    eff = _compute_efficiency(float(treated), float(baseline))
-                    if eff is not None:
-                        efficiencies.append(eff)
-            if efficiencies:
-                stats = _compute_statistics(np.asarray(efficiencies, dtype=float))
-                for stat_name, stat_val in stats.items():
-                    summary[f"efficiency_{pol}_{stat_name}"] = stat_val
-
-        # Cost across all BMPs
-        all_costs = [float(rec.get(OUTPUT_COST_USD)) for rec in all_records if rec.get(OUTPUT_COST_USD) is not None]
-        if all_costs:
-            stats = _compute_statistics(np.asarray(all_costs, dtype=float))
-            for stat_name, stat_val in stats.items():
-                summary[f"{OUTPUT_COST_USD}_{stat_name}"] = stat_val
-            summary[OUTPUT_TOTAL_COST_USD] = float(np.sum(all_costs))
-
+        self._add_type_attributes(summary, all_attrs)
+        _add_pollutant_mass_summary(summary, all_records, self.pollutants)
+        self._add_cost_summary(summary, all_records)
         return summary

@@ -1,0 +1,4 @@
+pid,pollutant,value,distribution_id,mean,sd,min,p10,p25,p50,p75,p90,max,units,notes
+*,TN,,yield_tn,,,,,,,,,,kg/ha/year,Wildcard applies the distribution independently to every parcel
+*,TP,,yield_tp,,,,,,,,,,kg/ha/year,Wildcard applies the distribution independently to every parcel
+*,TSS,,yield_tss,,,,,,,,,,kg/ha/year,Wildcard applies the distribution independently to every parcel

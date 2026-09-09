@@ -1,0 +1,6 @@
+cps,cps_name,unit,value,distribution_id,mean,sd,min,p05,p50,p95,max,notes
+340,Cover Crops,USD/ha,,,,,91,,,,185,
+329,Residue Management (No-Till),USD/ha,,,,,30,,,,54,
+590,Nutrient Management,USD/ha,,,,,30,,,,120,
+412,Grassed Waterway,USD/ha,,,,,40000,,,,200000,
+656,Constructed Wetland,USD/ha,,,,,25000,,,,200000,

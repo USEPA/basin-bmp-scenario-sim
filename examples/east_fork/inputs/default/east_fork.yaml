@@ -1,0 +1,48 @@
+# Example East Fork (OH) watershed configuration (synthetic data)
+verbose: True
+outputs: ./examples/east_fork/outputs/default/run_1
+random_seed: 42
+
+# Required geospatial inputs
+domain: ./examples/east_fork/inputs/default/domain.gpkg
+parcels: ./examples/east_fork/inputs/default/parcels.gpkg
+outlet_loc: ./examples/east_fork/inputs/default/outlet_loc.gpkg
+# Drainage and selection
+parcel_out: ./examples/east_fork/inputs/default/parcel_out.csv
+parcel_up: ./examples/east_fork/inputs/default/parcel_up.csv
+parcel_p: ./examples/east_fork/inputs/default/parcel_p.csv
+
+pollutants: ["TN", "TP", "TSS"]
+cps: [340, 329, 590, 412, 656]
+# Optional reusable distribution catalog
+input_distributions: ./examples/east_fork/inputs/default/input_distributions.csv
+
+pollutant_load_rate: ./examples/east_fork/inputs/default/pollutant_load_rate.csv
+bmp_efficiency: ./examples/east_fork/inputs/default/bmp_efficiency.csv
+bmp_cost: ./examples/east_fork/inputs/default/bmp_cost.csv
+
+# Explicitly document the default load-generation mode.
+load_generation:
+  mode: statistical
+# One aggregate areal load rate is sampled per parcel and pollutant, then
+# partitioned across the pathways defined by bmp_efficiency.
+pollutant_load_rate_pathway_fractions:
+  surface: 0.30
+  shallow subsurface: 0.40
+  deep subsurface: 0.30
+# Optional delivery ratios and targets/means
+# delivery_ratios: ./examples/east_fork/inputs/default/delivery_ratios.csv
+outlet_target: ./examples/east_fork/inputs/default/outlet_target.csv
+outlet_mean: ./examples/east_fork/inputs/default/outlet_mean.csv
+
+n_scenarios: 20
+bmp_limit_n: 200
+# bmp_limit_usd: 5000000
+buffer_depth_ft: 35
+
+parallel:
+  n_jobs: -1
+
+bmp_sel_prob_via_costs: False
+bmp_fail_rate: 0.25
+bmp_fail_reduction: 0.25

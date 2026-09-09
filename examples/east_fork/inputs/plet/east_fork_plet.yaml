@@ -1,0 +1,44 @@
+# East Fork comparison run using PLET/RUSLE load generation
+verbose: True
+outputs: ./examples/east_fork/outputs/plet/run_1
+
+random_seed: 42
+
+domain: ./examples/east_fork/inputs/plet/domain.gpkg
+parcels: ./examples/east_fork/inputs/plet/parcels.gpkg
+outlet_loc: ./examples/east_fork/inputs/plet/outlet_loc.gpkg
+
+parcel_out: ./examples/east_fork/inputs/plet/parcel_out.csv
+parcel_up: ./examples/east_fork/inputs/plet/parcel_up.csv
+parcel_p: ./examples/east_fork/inputs/plet/parcel_p.csv
+pollutants: ["TN", "TP", "TSS"]
+cps: [340, 329, 590, 412, 656]
+
+# Optional catalog for reusable fixed values or distributions. Any numeric
+# input row can reference a distribution_id from this file.
+input_distributions: ./examples/east_fork/inputs/plet/input_distributions.csv
+
+bmp_efficiency: ./examples/east_fork/inputs/plet/bmp_efficiency.csv
+bmp_cost: ./examples/east_fork/inputs/plet/bmp_cost.csv
+
+load_generation:
+  mode: plet_rusle
+  plet_inputs: ./examples/east_fork/inputs/plet/plet_inputs.csv
+  hydrology_lookup: ./examples/east_fork/inputs/plet/plet_hydrology_lookup.csv
+  rusle_inputs: ./examples/east_fork/inputs/plet/rusle_inputs.csv
+  pollutant_concentrations: ./examples/east_fork/inputs/plet/pollutant_concentrations.csv
+  groundwater_concentrations: ./examples/east_fork/inputs/plet/groundwater_concentrations.csv
+
+outlet_target: ./examples/east_fork/inputs/plet/outlet_target.csv
+outlet_mean: ./examples/east_fork/inputs/plet/outlet_mean.csv
+
+n_scenarios: 1
+bmp_limit_n: 500
+buffer_depth_ft: 35
+
+parallel:
+  n_jobs: 1
+
+bmp_sel_prob_via_costs: False
+bmp_fail_rate: 0.25
+bmp_fail_reduction: 0.25

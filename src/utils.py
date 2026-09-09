@@ -13,7 +13,7 @@ from __future__ import annotations
 from typing import Any, Dict, Iterable, Mapping
 
 
-def ci_get(d: Mapping[str, Any], key: str, default: Any = None) -> Any:
+def ci_get(d: Mapping[str, Any], key: str) -> Any:
     """Return a value from a mapping using a case-insensitive key lookup.
 
     Parameters
@@ -34,7 +34,7 @@ def ci_get(d: Mapping[str, Any], key: str, default: Any = None) -> Any:
     for k, v in d.items():
         if str(k).lower() == key_l:
             return v
-    return default
+    return None
 
 
 def normalize_columns(df: Any) -> Any:

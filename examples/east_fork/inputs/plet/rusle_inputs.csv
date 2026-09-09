@@ -1,0 +1,10 @@
+pid,parameter,value,distribution_id,mean,sd,min,p05,p50,p95,max,sample_group,units,notes
+*,r,175.0,,,,,,,,,,index,
+*,k,0.32,,,,,,,,,,ton acre hour/(acre foot ton inch),
+*,ls,1.8,,,,,,,,,,dimensionless,
+*,c,0.22,,,,,,,,,,dimensionless,
+*,p,0.7,,,,,,,,,,dimensionless,
+*,sdr,1.0,,,,,,,,,,fraction,
+*,sediment_n_pct,0.08,,,,,,,,,,percent,
+*,sediment_p_pct,0.045,,,,,,,,,,percent,
+*,enrichment_ratio,2.0,,,,,,,,,,dimensionless,
