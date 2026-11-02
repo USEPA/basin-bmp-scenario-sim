@@ -79,6 +79,23 @@ def test_shared_payload_separates_hydrologic_and_selection_universes() -> None:
     assert shared["parcel_selection_ids"] == ["C"]
     assert shared["selection_source_idxs"].tolist() == [2]
     assert len(shared["pollutant_load_rate_stats"]) == 3
+    # These lightweight test models do not define optional AFO attributes.
+    assert shared["afo_inputs"] is None
+    assert shared["feedlot_bmp_cps"] == set()
+
+
+
+def test_shared_payload_preserves_configured_afo_state() -> None:
+    """The optional defaults must not erase real AFO inputs."""
+    model = _model_with_nonselectable_upstream_parcels()
+    afo_inputs = {"operations": [{"afo_id": "farm-1", "pid": "A"}]}
+    model.afo_inputs = afo_inputs
+    model.feedlot_bmp_cps = {341, 342}
+
+    shared = model._shared_payload()
+
+    assert shared["afo_inputs"] is afo_inputs
+    assert shared["feedlot_bmp_cps"] == {341, 342}
 
 
 def test_wetland_treats_nonselectable_upstream_parcels() -> None:

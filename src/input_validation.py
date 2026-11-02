@@ -842,6 +842,7 @@ def validate_config(cfg: Dict[str, Any]) -> None:
 
     allowed_top_level = {
         "domain", "parcels", "plet_forcing", "huc_parameters", "outlets", "pollutants", "cps",
+        "animal_operations", "feedlot_bmp_cps",
         "bmp_efficiency", "bmp_cost", "bmp_sel", "n_scenarios",
         "bmp_limit_n", "bmp_limit_usd", "parallel", "random_seed",
         "outputs", "verbose", "buffer_depth_ft", "bmp_sel_prob_via_costs",

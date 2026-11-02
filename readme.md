@@ -170,3 +170,12 @@ Model outputs should therefore be interpreted as conditional on the selected mod
 ## Citation
 
 When using the model in scientific or technical work, identify the repository and the exact version, release, or Git commit used for the analysis.
+
+## Animal feeding operations and manure application (optional)
+
+In `plet_rusle` mode, set `animal_operations: path/to/afo.gpkg` to add PLET-style
+feedlot runoff and explicit or sampled manure-receiving parcels. Feedlot-only
+BMP codes are identified with `feedlot_bmp_cps`. Input tables, selection
+semantics, examples, and limitations are described in
+[docs/animal_feeding_operations.md](docs/animal_feeding_operations.md).
+

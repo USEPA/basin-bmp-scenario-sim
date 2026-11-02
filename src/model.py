@@ -34,6 +34,7 @@ from src.cost import _estimate_costs_for_probabilities, _get_bmp_cost, _select_c
 from src.io_utils import _write_parquet_atomic, _flatten_plot_records
 from src.input_distributions import sample_group_key
 from src.logging_utils import make_worker_logger, log_scope
+from src.afo import apply_afo_baseline
 from src.plet_rusle import (
     calculate_load_diagnostics,
     initialize_plet_rusle_state,
@@ -447,6 +448,8 @@ class Model:
             self.pollutant_concentrations = self.data.get(DATA_POLLUTANT_CONCENTRATIONS)
             self.groundwater_concentrations = self.data.get(DATA_GROUNDWATER_CONCENTRATIONS)
             self.groundwater_loads = self.load_generation_mode == LOAD_MODE_PLET_RUSLE
+            self.afo_inputs = self.data.get("afo_inputs")
+            self.feedlot_bmp_cps = set(int(c) for c in (self.data.get("feedlot_bmp_cps") or []))
 
             # Statistical mode supports either explicit pathway-specific load rates
             # distributions or one aggregate_load_rate distribution split by validated
@@ -533,6 +536,12 @@ class Model:
             pollutant_load_rate_pathway_fractions=pollutant_load_rate_pathway_fractions,
             pollutant_load_rate_is_aggregate=pollutant_load_rate_is_aggregate,
             groundwater_loads=self.groundwater_loads,
+            # AFO support is optional.  Some lightweight Model objects (including
+            # hydrologic-universe test fixtures) are constructed with __new__ and
+            # intentionally omit optional attributes.  Match _ScenarioContext's
+            # defaults instead of requiring an AFO input when none is configured.
+            afo_inputs=getattr(self, "afo_inputs", None),
+            feedlot_bmp_cps=set(getattr(self, "feedlot_bmp_cps", None) or ()),
             bmp_cps=self.bmp_cps,
             bmp_selection_probs=self.bmp_selection_probs,
             avg_area_ha=self.data[DATA_AVG_AREA_HA],
@@ -620,6 +629,10 @@ class _ScenarioContext:
         for k, v in shared.items():
             setattr(self, k, v)
 
+        # Direct scenario callers/tests may omit optional AFO keys.
+        self.afo_inputs = getattr(self, "afo_inputs", None)
+        self.feedlot_bmp_cps = set(getattr(self, "feedlot_bmp_cps", set()) or set())
+
         # Keep the full hydrologic PID->parcel-index map normalized for repeated lookups.
         self.pid_to_index = {str(pid): int(idx) for pid, idx in self.pid_to_index.items()}
 
@@ -688,9 +701,13 @@ def _run_one_scenario(
 
         n_pol = len(ctx.pollutants)
         load_state = None
+        afo_assignments = []
 
         if ctx.load_generation_mode == LOAD_MODE_PLET_RUSLE:
             baseline_load_rates, load_state = initialize_plet_rusle_state(ctx)
+            afo_assignments = apply_afo_baseline(ctx, load_state)
+            if afo_assignments:
+                baseline_load_rates = load_state.pathway_load_rates.sum(axis=2)
             load_rates = baseline_load_rates.copy()
             ctx.current_pathway_load_rates = load_state.pathway_load_rates
             ctx.current_untreated_groundwater_load_rates = load_state.untreated_groundwater_load_rates
@@ -786,7 +803,13 @@ def _run_one_scenario(
 
             # Filter CPS by what has already been applied to this parcel
             already = applied_by_pid[str(pid)]
-            allowed_idx = [i for i, c in enumerate(ctx.bmp_cps) if int(c) not in already]
+            host_pids = {str(op["pid"]) for op in (ctx.afo_inputs or {}).get("operations", [])}
+            allowed_idx = [
+                i for i, c in enumerate(ctx.bmp_cps)
+                if int(c) not in already and (
+                    int(c) not in ctx.feedlot_bmp_cps or str(pid) in host_pids
+                )
+            ]
 
             # If no CPS remain for this parcel, try another parcel; if globally exhausted, stop
             if not allowed_idx:
@@ -871,6 +894,14 @@ def _run_one_scenario(
                 # impacted parcels. This is especially important for wetlands.
                 pre_bmp_load_rates = load_rates.copy()
 
+                # Feedlot CPS treat feedlot source only; all other CPS treat
+                # agricultural/background loads, not the direct feedlot source.
+                ctx.current_bmp_targets_feedlot = bool(cps in getattr(ctx, "feedlot_bmp_cps", set()))
+                if ctx.current_bmp_targets_feedlot and not getattr(ctx, "afo_inputs", None):
+                    raise ValueError("feedlot-specific CPS requires configured AFO inputs")
+                if ctx.current_bmp_targets_feedlot and cps in (412, 656, 657):
+                    raise ValueError("Wetland/buffer CPS cannot be classified as feedlot-only")
+
                 # Apply BMP using sampled efficiency by flow pathway.
                 if cps in (656, 657):
                     ctx._simulate_wetland(parcel_idx, eff_maps, load_rates, bmp_rec, bmp_mass_rate_outputs)
@@ -941,6 +972,38 @@ def _run_one_scenario(
                                 else:
                                     yval = 0.0
                                 records[(pol, oid, xax, yax)].append((sid, xval, yval))
+
+        # Realized operation-to-field allocations, independently auditable for
+        # deterministic and stochastic location assumptions.
+        if afo_assignments:
+            allocation_dir = outputs_dir / "afo_manure_assignments"
+            allocation_dir.mkdir(parents=True, exist_ok=True)
+            _write_parquet_atomic(
+                pd.DataFrame([dict(scenario=sid, **rec) for rec in afo_assignments]),
+                allocation_dir / f"s{sid}.parquet", logger=logger,
+            )
+
+        # Direct feedlot and manure-field components retained independently
+        # through BMP application (kg/year) to enable source-specific auditing.
+        if afo_assignments:
+            component_rows = []
+            for idx, pid in enumerate(ctx.parcel_ids):
+                area_ha = float(ctx.parcel_area_ha[idx])
+                for pol_idx, pollutant in enumerate(ctx.pollutants):
+                    row = {"scenario": sid, "pid": str(pid), "pollutant": pollutant}
+                    for label, initial, final in (
+                        ("direct_feedlot", ctx.baseline_afo_feedlot_pathway_rates,
+                         ctx.current_afo_feedlot_pathway_rates),
+                        ("manure_field", ctx.baseline_afo_manure_pathway_rates,
+                         ctx.current_afo_manure_pathway_rates),
+                    ):
+                        for path_idx, path in enumerate(ctx.pathway_names):
+                            row[f"baseline_{label}_{path}_kg_yr"] = float(initial[idx, pol_idx, path_idx]) * area_ha
+                            row[f"final_{label}_{path}_kg_yr"] = float(final[idx, pol_idx, path_idx]) * area_ha
+                    component_rows.append(row)
+            component_dir = outputs_dir / "afo_load_components"
+            component_dir.mkdir(parents=True, exist_ok=True)
+            _write_parquet_atomic(pd.DataFrame(component_rows), component_dir / f"s{sid}.parquet", logger=logger)
 
         # Parcel-level before/after
         for parcel_idx, pid_i in enumerate(ctx.parcel_ids):

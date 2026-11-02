@@ -1104,6 +1104,7 @@ _CONFIG_PATH_KEYS = (
     CFG_PLET_FORCING,
     CFG_HUC_PARAMETERS,
     CFG_OUTLETS,
+    "animal_operations",
     CFG_BMP_EFFICIENCY,
     CFG_BMP_COST,
     CFG_BMP_SEL,
@@ -3068,6 +3069,24 @@ def load_and_validate_all(cfg: Dict[str, Any], logger: Any) -> Dict[str, Any]:
                 bmp_eff, cps, pollutants, pathways
             )
 
+        # Optional dedicated AFO GeoPackage keeps operation-to-field relations
+        # separate from canonical per-variable parcel input_* tables.
+        afo_inputs = None
+        feedlot_bmp_cps = []
+        afo_path = ci_get(cfg, "animal_operations")
+        if afo_path is not None:
+            if load_mode != LOAD_MODE_PLET_RUSLE:
+                raise ValueError("animal_operations requires load_generation.mode=plet_rusle")
+            from .afo import load_afo_inputs
+            afo_inputs = load_afo_inputs(afo_path, parcels, pollutants)
+            feedlot_bmp_cps = [int(c) for c in (ci_get(cfg, "feedlot_bmp_cps") or [])]
+            if len(set(feedlot_bmp_cps)) != len(feedlot_bmp_cps) or not set(feedlot_bmp_cps).issubset(set(cps)):
+                raise ValueError("feedlot_bmp_cps must be distinct CPS codes present in cps")
+            if set(feedlot_bmp_cps).intersection({412, 656, 657}):
+                raise ValueError("feedlot_bmp_cps cannot include buffer or wetland CPS")
+        elif ci_get(cfg, "feedlot_bmp_cps"):
+            raise ValueError("feedlot_bmp_cps requires animal_operations")
+
         delivery_ratios = _load_delivery_ratios(cfg, logger, **input_kwargs)
         delivery_ratios = _complete_delivery_ratio_defaults(delivery_ratios, parcel_out_map)
 
@@ -3078,6 +3097,8 @@ def load_and_validate_all(cfg: Dict[str, Any], logger: Any) -> Dict[str, Any]:
 
     return dict(
         parcels=parcels,
+        afo_inputs=afo_inputs,
+        feedlot_bmp_cps=feedlot_bmp_cps,
         parcel_p=sel,
         parcel_up_map=parcel_up_map,
         parcel_out_map=parcel_out_map,

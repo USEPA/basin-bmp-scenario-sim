@@ -83,6 +83,10 @@ def _get_pathway_load_rates(self: "Model", parcel_idx: int, pol_idx: int, total_
     pathway_load_rates = getattr(self, "current_pathway_load_rates", None)
     if pathway_load_rates is not None:
         values = pathway_load_rates[parcel_idx, pol_idx, :]
+        feedlot = getattr(self, "current_afo_feedlot_pathway_rates", None)
+        if feedlot is not None:
+            direct = feedlot[parcel_idx, pol_idx, :]
+            values = direct if getattr(self, "current_bmp_targets_feedlot", False) else values - direct
         return {pathways[i]: float(values[i]) for i in range(len(pathways))}
 
     fractions = dict(
@@ -164,7 +168,14 @@ def _apply_pathway_reduction(
 
     removed_load_rate = 0.0
     for path_idx, path in enumerate(_active_pathways(self)):
-        current_load_rate = float(pathway_load_rates[parcel_idx, pol_idx, path_idx])
+        total_load_rate = float(pathway_load_rates[parcel_idx, pol_idx, path_idx])
+        direct_component = getattr(self, "current_afo_feedlot_pathway_rates", None)
+        if direct_component is None:
+            current_load_rate = total_load_rate
+        elif getattr(self, "current_bmp_targets_feedlot", False):
+            current_load_rate = float(direct_component[parcel_idx, pol_idx, path_idx])
+        else:
+            current_load_rate = total_load_rate - float(direct_component[parcel_idx, pol_idx, path_idx])
         eff = float(eff_map[path])
         if current_load_rate < 0.0:
             raise RuntimeError("Current pathway load rate cannot be negative")
@@ -174,7 +185,13 @@ def _apply_pathway_reduction(
             raise RuntimeError("BMP efficiency must not exceed 1 after input validation")
         new_value = current_load_rate * (1.0 - treatment_fraction * eff)
         removed_load_rate += current_load_rate - new_value
-        pathway_load_rates[parcel_idx, pol_idx, path_idx] = new_value
+        if direct_component is not None and getattr(self, "current_bmp_targets_feedlot", False):
+            direct_component[parcel_idx, pol_idx, path_idx] = new_value
+        if direct_component is not None and not getattr(self, "current_bmp_targets_feedlot", False):
+            manure = getattr(self, "current_afo_manure_pathway_rates", None)
+            if manure is not None:
+                manure[parcel_idx, pol_idx, path_idx] *= (1.0 - treatment_fraction * eff)
+        pathway_load_rates[parcel_idx, pol_idx, path_idx] = total_load_rate - (current_load_rate - new_value)
     return float(removed_load_rate)
 
 

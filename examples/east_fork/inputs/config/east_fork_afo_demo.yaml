@@ -1,0 +1,22 @@
+# Demonstration only. AFO locations, animals, and manure concentrations are
+# illustrative, NOT a verified East Fork inventory or validated input values.
+verbose: True
+random_seed: 42
+outputs: ../../outputs/run_afo_demo
+domain: ../domain/east_fork_domain.gpkg
+parcels: ../parcels/parcels_ex2dot1_plet_based_load_gen_deterministic.gpkg
+huc_parameters: ../hucs/huc12s_ex1dot1_plet_based_load_gen_deterministic.gpkg
+outlets: ../outlets/outlets.gpkg
+animal_operations: ../afo/afo_example.gpkg
+bmp_efficiency: ../afo/bmp_efficiency_afo_demo.csv
+pollutants: [TN, TP, TSS]
+cps: [313, 590]
+feedlot_bmp_cps: [313]
+load_generation:
+  mode: plet_rusle
+n_scenarios: 2
+bmp_limit_n: 5
+parallel:
+  n_jobs: 1
+bmp_sel_prob_via_costs: False
+bmp_fail_rate: 0.0
