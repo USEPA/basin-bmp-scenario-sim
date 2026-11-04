@@ -55,6 +55,7 @@ from .constants import (
     LOAD_CONCENTRATIONS,
     LOAD_GROUNDWATER_CONCENTRATIONS,
     LOAD_GROUNDWATER_LOADS,
+    LOAD_GENERATION_PATH_KEYS as _LOAD_GENERATION_PATH_KEYS,
     LOAD_TREAT_GROUNDWATER_WITH_BMPS,
     COL_CPS,
     COL_COST_COMPONENT,
@@ -69,6 +70,7 @@ from .constants import (
     COL_PATHWAY,
     PATHWAY_VALUES,
     PLET_PATHWAY_VALUES,
+    PLET_HYDROLOGY_LABEL as _PLET_HYDROLOGY_LABEL,
     DEFAULT_BMP_FAIL_REDUCTION,
     DEFAULT_BUFFER_DEPTH_FT,
     COL_SDR_F_TO_S,
@@ -91,6 +93,7 @@ from .constants import (
     GPKG_INPUT_SURFACE_CONCENTRATION,
     GPKG_INPUT_SUBSURFACE_CONCENTRATION,
     GPKG_DELIVERY_RATIO_TABLES,
+    CONFIG_PATH_KEYS as _CONFIG_PATH_KEYS,
     RUSLE_PARAMETER_NAMES,
     COL_HUC12,
     COL_AREA_FRACTION,
@@ -138,9 +141,6 @@ from .input_schema import (
     KNOWN_INPUT_TABLES,
     required_input_tables,
 )
-
-
-_PLET_HYDROLOGY_LABEL = "plet_hydrology_inputs"
 
 
 def _normalize_integer_identifier_value(
@@ -1096,22 +1096,6 @@ def apply_config_defaults(cfg: Dict[str, Any]) -> None:
     _set_case_insensitive_default(cfg, CFG_DETERMINISTIC_BMP_DESIGN_PARAMETERS, False)
     _set_case_insensitive_default(cfg, CFG_PARALLEL, {"n_jobs": 1})
     _set_case_insensitive_default(cfg, CFG_LOAD_GENERATION, {})
-
-
-_CONFIG_PATH_KEYS = (
-    CFG_DOMAIN,
-    CFG_PARCELS,
-    CFG_PLET_FORCING,
-    CFG_HUC_PARAMETERS,
-    CFG_OUTLETS,
-    "animal_operations",
-    CFG_BMP_EFFICIENCY,
-    CFG_BMP_COST,
-    CFG_BMP_SEL,
-    CFG_OUTPUTS,
-)
-
-_LOAD_GENERATION_PATH_KEYS: tuple[str, ...] = ()
 
 
 def _resolve_config_path_value(value: Any, base_dir: Path) -> Any:
@@ -3075,17 +3059,28 @@ def load_and_validate_all(cfg: Dict[str, Any], logger: Any) -> Dict[str, Any]:
         feedlot_bmp_cps = []
         afo_path = ci_get(cfg, "animal_operations")
         if afo_path is not None:
-            if load_mode != LOAD_MODE_PLET_RUSLE:
-                raise ValueError("animal_operations requires load_generation.mode=plet_rusle")
+            manure_cfg = ci_get(cfg, "manure_loading") or {}
+            if not isinstance(manure_cfg, dict):
+                raise ValueError("manure_loading must be a mapping")
+            method = str(ci_get(manure_cfg, "method") or "concentration_increment").lower()
+            surface_pathway = str(ci_get(manure_cfg, "surface_pathway") or "surface")
+            if method == "concentration_increment" and load_mode != LOAD_MODE_PLET_RUSLE:
+                raise ValueError("concentration_increment manure loading is PLET-only; use mass_based with statistical mode")
+            if method == "mass_based" and not {"TN", "TP"}.issubset(set(pollutants)):
+                raise ValueError("mass_based manure loading requires both TN and TP pollutants")
             from .afo import load_afo_inputs
-            afo_inputs = load_afo_inputs(afo_path, parcels, pollutants)
+            afo_inputs = load_afo_inputs(
+                afo_path, parcels, pollutants, method=method, mode=load_mode,
+                pathways=pathways, surface_pathway=surface_pathway,
+                parcel_path=ci_get(cfg, CFG_PARCELS),
+            )
             feedlot_bmp_cps = [int(c) for c in (ci_get(cfg, "feedlot_bmp_cps") or [])]
             if len(set(feedlot_bmp_cps)) != len(feedlot_bmp_cps) or not set(feedlot_bmp_cps).issubset(set(cps)):
                 raise ValueError("feedlot_bmp_cps must be distinct CPS codes present in cps")
             if set(feedlot_bmp_cps).intersection({412, 656, 657}):
                 raise ValueError("feedlot_bmp_cps cannot include buffer or wetland CPS")
-        elif ci_get(cfg, "feedlot_bmp_cps"):
-            raise ValueError("feedlot_bmp_cps requires animal_operations")
+        elif ci_get(cfg, "feedlot_bmp_cps") or ci_get(cfg, "manure_loading"):
+            raise ValueError("feedlot_bmp_cps and manure_loading require animal_operations")
 
         delivery_ratios = _load_delivery_ratios(cfg, logger, **input_kwargs)
         delivery_ratios = _complete_delivery_ratio_defaults(delivery_ratios, parcel_out_map)

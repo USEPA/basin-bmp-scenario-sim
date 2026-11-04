@@ -181,3 +181,11 @@ Surface concentrations are required for TN and TP and for TSS when complete RUSL
 ## BMP pathways
 
 PLET/RUSLE production pathways are fixed to `surface` and `subsurface`. Surface BMP efficiencies are required. Missing correctly labeled subsurface efficiencies are completed with zero and logged.
+
+## Optional mass-based manure loading
+
+An optional APLE-manure-P/APLE-inspired-N model accepts animal inventories,
+allocates manure TN and TP by field, and converts predicted surface mass
+exports into annual runoff concentration increments. It uses existing
+PLET surface hydrology and leaves groundwater concentrations unchanged.
+See [Mass-based AFO loading](afo_mass_based.md).

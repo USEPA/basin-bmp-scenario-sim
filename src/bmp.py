@@ -17,6 +17,7 @@ if TYPE_CHECKING:
     from .model import Model
 
 from .constants import (
+    FT_TO_M,
     CFG_BUFFER_DEPTH_FT,
     CFG_DETERMINISTIC_BMP_DESIGN_PARAMETERS,
     BMP_CPS_NAME_MAP,
@@ -39,9 +40,6 @@ from .input_config import load_bmp_selection_probabilities
 
 ParcelRecordFn = Callable[[Union[int, str]], pd.Series]
 ParcelUpListFn = Callable[[Union[int, str]], List[str]]
-
-FT_TO_M = 0.3048  # meters per foot
-
 
 def _active_pathways(self: "Model") -> List[str]:
     """Return the model's active pathways, using the configured pathways or the standard three-path default.

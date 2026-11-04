@@ -25,14 +25,11 @@ from .constants import (
     CFG_BUFFER_DEPTH_FT,
     DEFAULT_BUFFER_DEPTH_FT,
     FT_TO_M,
+    PROB_EST_BUFFER_PERIM_FRACTION,
+    PROB_EST_WETLAND_MAX_AREA_HA,
 )
 from .logging_utils import log_scope
 from .input_distributions import row_unit, stats_from_row
-
-# Code-level constants used ONLY for selection-time average-cost heuristics
-PROB_EST_WETLAND_MAX_AREA_HA: float = 0.8
-PROB_EST_BUFFER_PERIM_FRACTION: float = 0.2
-
 
 def _finite_numeric_row_values(row: pd.Series) -> Dict[str, float]:
     """Return finite numeric row values keyed by normalized column name.

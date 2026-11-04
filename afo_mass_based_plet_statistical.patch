@@ -1,0 +1,1406 @@
+diff --git a/docs/afo_mass_based.md b/docs/afo_mass_based.md
+new file mode 100644
+index 0000000..31062c0
+--- /dev/null
++++ b/docs/afo_mass_based.md
+@@ -0,0 +1,190 @@
++# Optional mass-based AFO loading: APLE manure P + runoff-responsive N
++
++This extension allows the **same** annual animal inventory, manure nutrient production,
++spatial allocation, source-specific BMP reductions, and output ledger to operate in
++`plet_rusle` **and** `statistical` load-generation modes. All quantities are one-year
++quantities. This method is a **source addition** to a baseline assumed to exclude
++manure and feedlot loading represented by the module. Do not use without checking
++for baseline double counting. The pre-existing `concentration_increment` mode
++remains available for PLET/RUSLE, with no changes to its equations or input tables.
++
++```yaml
++animal_operations: ../afo/afo_mass_example_generated.gpkg
++manure_loading:
++  method: mass_based
++  surface_pathway: surface # must be one of the statistical-mode pathways
++feedlot_bmp_cps: [313] # optional: selected BMP codes exclusively treating feedlot source
++```
++
++When `manure_loading` is omitted, the existing PLET concentration-increment mode
++is still the default. `mass_based` requires model pollutants `TN` and `TP`.
++All AFO IDs and PIDs must refer to the modeled parcel universe. Baseline loading
++without manure and direct feedlot sources is a **required assumption** for both modes.
++An annual statistical load based on previously manured fields is NOT automatically
++made manure-free and adding manure loads to it can double count.
++
++## Equations and units
++
++The following are calculated once per Monte Carlo scenario. Animal counts are
++realized once and reused for manure production and direct feedlot density.
++
++For an operation with animal classes `s`:
++
++```
++wet_manure_kg = sum(count_s * days_s * manure_kg_head_day_s)
++excreted_N_kg = sum(count_s * days_s * tn_kg_head_day_s)
++excreted_P_kg = sum(count_s * days_s * tp_kg_head_day_s)
++field_N_kg = excreted_N_kg * collection_fraction * (1-export_fraction) * n_retention_fraction
++field_P_kg = excreted_P_kg * collection_fraction * (1-export_fraction) * p_retention_fraction
++field_manure_kg = wet_manure_kg * collection_fraction * (1-export_fraction)
++```
++
++Field nutrient and wet manure masses are allocated proportionally to eligible
++hectares across an operation's selected receiving parcels, unless all explicit
++receivers specify positive `weight` values (then use normalized weights).
++**Allocated N and P are conserved across receiving parcels**, with multiple
++operations contributing additive nutrient masses to overlapping recipients.
++No crop demand/cap or complete manure lifecycle is modeled. Nitrogen handling
++losses enter before the runoff availability factor and must not be duplicated.
++
++### Annual P export: APLE 2.5 manure-derived dissolved-P component
++
++For parcel `i`, applied P mass `M_P` in kg, surface runoff `Q` and annual total
++precipitation `P` in mm, use the actual annual runoff ratio `r=Q/P` (0 to 1).
++
++```
++surface_P = M_P * (0.4 if solids_pct < 15 else 1.0) * (1 - incorporated_fraction)
++WEP_available = surface_P * (wep_fraction + (1-wep_fraction) * mineralization_season)
++WEP_available *= 0.75 if season == 'fall' else 1
++WEP_available *= [2.2*(250*0.5)/(250*0.5+300.1)] if solids_pct < 15 else 1
++P_runoff_dissolved_kg = WEP_available * r**1.225
++```
++
++Annual non-WEP mineralization coefficients from USDA APLE 2.5 are winter=0.20,
++spring=0.15, summer=0.10, fall=0.05. For fall, only 75% of runoff-available
++WEP is counted in the current year; the other 25% is **not** carried into
++future years in this version. The 60% immediate infiltration of liquid manure
++P and 50% surface coverage come from APLE. The incorporation term is an
++**effective user-specified fraction** removed from the soil surface: APLE's
++full injection-rate/depth-dependent module is **not** replicated. This is the
++APLE *manure-derived dissolved P submodel*, **not** complete APLE TP,
++soil-P pools, sediment-P, crop uptake, or multi-year behavior.
++
++Reference: USDA ARS, *Annual Phosphorus Loss Estimator, Theoretical
++Documentation*, ver. 2.5 (2017), equations 1, 3 and 6, pp. 3–4:
++https://www.ars.usda.gov/ARSUserFiles/50901500/SOFTWARE/APLE/APLETHEORETICALDOCUMENTATION25Rev.PDF
++
++### Annual N export: APLE-inspired, not an APLE TN formulation
++
++```
++N_runoff_kg = applied_N_kg * f_n * r**alpha_n
++```
++
++`alpha_n` defaults to 1.0 (parsimonious modeling assumption); `f_n` is
++**required** and must be user specified or sampled between 0 and 1. It is a
++runoff-transfer/availability coefficient *not* a calibrated literature
++constant. `f_n` may NOT simply be set to an observed runoff-loss fraction:
++actual exported fraction is `f_n * (Q/P)**alpha_n`. The MANAGE v6 analysis
++was insufficient to independently identify both parameters from manure-only
++incremental TN loads. Subsurface manure TN/TP increases remain outside scope.
++
++The computed manure-derived `TN` and dissolved `TP` export masses are
++converted to parcel-total kg/ha/year by dividing by parcel area, and added to
++the **surface** pathway. For PLET output, the additional equivalent annual
++concentration is `100 * (kg/ha/yr) / (runoff_mm)` mg/L, when runoff > 0;
++there is **no extra months/12 factor**. Zero runoff produces zero export.
++The modeled manure-derived load never exceeds applied nutrient mass.
++
++### Direct feedlot runoff
++
++Uses the existing PLET pollutant-specific feedlot animal-equivalence and
++manure-pack concentration method. Feedlot wetland/land-cover background loads
++are displaced over each feedlot footprint to avoid double counting. In PLET,
++feedlot runoff is calculated using the documented 91–94 feedlot CN and the
++existing PLET event climate. In **statistical** mode, it uses a separate,
++user-supplied `feedlot_runoff_mm` (annual); this is a runoff-depth substitution,
++not an independent event-CN simulation. Direct feedlot surface loads and
++manure-applied-field loads remain separate BMP components. The animal-excretion
++factors and feedlot animal-equivalence factors are **not interchangeable**.
++
++## GeoPackage tables
++
++Existing tables `afo_operations`, `afo_animals`, and `afo_manure_fields` are
++retained. The old `afo_manure_concentration_increments` table is **not used**
++when `method: mass_based`. New/extended fields:
++
++| Table | Columns | Meaning |
++|---|---|---|
++| `afo_animals` | `species`, `count` (or `count_value`, `count_mean`, etc.), `animal_days` (default 365) | One animal inventory row per class and operation |
++| `afo_animals` | `manure_kg_head_day`, `tn_kg_head_day`, `tp_kg_head_day` | Optional overrides of bundled species factors, as-excreted kg per animal-day |
++| `afo_manure_management` | `afo_id`, `season`, `solids_pct`, `wep_fraction`, `f_n` | **Required** per operation; season winter/spring/summer/fall |
++| `afo_manure_management` | `collection_fraction`, `export_fraction`, `n_retention_fraction`, `p_retention_fraction`, `incorporated_fraction`, `alpha_n` | Optional: defaults 1, 0, 1, 1, 0, 1, respectively |
++| `afo_manure_fields` | `weight` | Optional positive allocation weight: specify for **all** receivers of an operation or none |
++| `afo_field_eligibility` | `pid`, `eligible` (0/1) | **Statistical only**, receiver eligibility for a parcel; no PLET land-cover input required |
++| `afo_hydrology` | `pid`, optional `huc12`, `annual_precip_mm`, `annual_runoff_mm`, `feedlot_runoff_mm` | **Statistical only**: annual total precipitation, field surface runoff, and operation feedlot surface runoff |
++
++When in statistical mode, `afo_hydrology` rows may use an exact integer
++`pid`, a `huc12` (with NULL pid), or NULL `pid`/`huc12` as the domain default;
++precedence is **parcel > HUC12 > domain**. HUC12 associations come from the
++canonical `parcels.gpkg/parcel_huc12` mapping if present; otherwise use parcel
++or domain rows. At least one eligible agricultural parcel and valid hydrology
++for receivers and operation hosts are required. `feedlot_runoff_mm` must be
++provided for each operation host. User-supplied Q/P must satisfy 0 ≤ Q ≤ P.
++
++Fields representing uncertain scalar values may use existing inline
++`*_value`, `*_mean`, `*_sd`, `*_min`, `*_max`, `*_pXX` statistics in place of
++fixed values. Distributions are drawn independently within the existing
++scenario RNG unless the input table/source provides a deliberate grouping.
++
++### Starting animal excretion factors
++
++`src/data/manure_excretion_reference.csv` provides documented, editable
++starting values for five animal classes: `beef_finishing`, `dairy_lactating`,
++`swine_grow_finish`, `poultry_broiler`, `sheep_feeder`. Aliases `beef_steer`,
++`dairy_cow`, `swine`, and `broiler` are accepted. Reference values were
++converted from ASABE D384.2 excretion tables quoted by Michigan State
++University Extension (livestock animal manure kg/head/day, N kg/head/day,
++P2O5 to **elemental P** using 0.4364). Default values are *as excreted*,
++not post-storage and not calibrated to East Fork livestock. Override per
++animal inventory row as needed; unfamiliar species must supply all three
++explicit rates. Data source:
++https://www.canr.msu.edu/resources/manure_management_for_fairs_and_exhibitions
++
++## Outputs and validation
++
++`afo_manure_assignments/sN.parquet` contains each realized AFO-to-field
++allocation (before BMPs). `afo_mass_ledger/sN.parquet` adds annual generated
++manure/N/P, applied manure/N/P, exported surface N/dissolved P, field runoff,
++precipitation, effective coefficients and hectare-based application rates.
++`afo_operation_budgets/sN.parquet` contains one row per AFO with generated,
++available, allocated and surface-exported N/P masses, plus automatic
++allocation-conservation diagnostics. **Operation-wide masses in the per-field
++ledger repeat on every receiver row; do not sum them across receivers.**
++`afo_load_components/sN.parquet` records before/after loads separated by
++feedlot/manure-field source and transport pathway. Receivers are sampled once
++per realization and unchanged along that realization's BMP trajectory.
++
++Input validation rejects unknown parcel IDs, impossible footprints, missing
++management records, invalid excretion factors, missing hydrology and invalid
++surface pathway names. Runtime validation checks the sampled runoff/precip
++ratio, nutrient availability bounds, impossible receiving fields, and mass
++export constraints. Other loads, sediment and groundwater use the original
++PLET or statistical methodology; no manure-related subsurface loading is added.
++
++## Executable example
++
++From the repository root:
++
++```bash
++python scripts/create_afo_mass_example.py
++python run_model.py examples/east_fork/inputs/config/east_fork_afo_mass_demo.yaml
++```
++
++The script creates `afo_mass_example_generated.gpkg` by copying the existing
++AFO demo and adding attribute tables. The example livestock locations, manure
++factors, runoff, WEP and N fractions are **illustrative only**. Do not
++interpret its outputs as measurements of manure in the East Fork watershed.
++A statistical-mode example can reuse the generated AFO GeoPackage with any
++validated `statistical` baseline config that includes TN and TP, provided the
++configured `surface_pathway` matches its statistical pathway names and the
++background rates exclude the separately modeled manure/feedlot loads.
+diff --git a/docs/animal_feeding_operations.md b/docs/animal_feeding_operations.md
+index a623554..8ae3dd6 100644
+--- a/docs/animal_feeding_operations.md
++++ b/docs/animal_feeding_operations.md
+@@ -2,6 +2,11 @@
+ 
+ ## Scope and model interpretation
+ 
++**Two AFO manure-loading modes are now available.** This document describes
++the pre-existing `concentration_increment` method, which remains the PLET
++backward-compatible default. For the optional mass-based method supporting
++PLET **and statistical mode**, see [Mass-based AFO loading](afo_mass_based.md).
++
+ The optional `animal_operations` GeoPackage activates **PLET-style** direct
+ feedlot runoff and explicit/probabilistic field manure exposure in
+ `load_generation.mode: plet_rusle`. The model does **not** simulate a manure
+diff --git a/docs/plet_rusle_mode.md b/docs/plet_rusle_mode.md
+index e8a6ca6..3df442d 100644
+--- a/docs/plet_rusle_mode.md
++++ b/docs/plet_rusle_mode.md
+@@ -181,3 +181,11 @@ Surface concentrations are required for TN and TP and for TSS when complete RUSL
+ ## BMP pathways
+ 
+ PLET/RUSLE production pathways are fixed to `surface` and `subsurface`. Surface BMP efficiencies are required. Missing correctly labeled subsurface efficiencies are completed with zero and logged.
++
++## Optional mass-based manure loading
++
++An optional APLE-manure-P/APLE-inspired-N model accepts animal inventories,
++allocates manure TN and TP by field, and converts predicted surface mass
++exports into annual runoff concentration increments. It uses existing
++PLET surface hydrology and leaves groundwater concentrations unchanged.
++See [Mass-based AFO loading](afo_mass_based.md).
+diff --git a/docs/statistical_mode.md b/docs/statistical_mode.md
+index e92c344..5ec2702 100644
+--- a/docs/statistical_mode.md
++++ b/docs/statistical_mode.md
+@@ -69,3 +69,13 @@ Fractions must match active efficiency pathways and sum to `1.0`.
+ ## Parcel selection
+ 
+ Optional parcel-selection weights are stored in `input_selection_weight`, not on the spatial `parcels` layer. The table is keyed by `pid` and uses deterministic `value` entries. If the table is absent, parcel selection is uniform.
++
++## Optional AFO manure mass and feedlot runoff
++
++`load_generation.mode: statistical` supports the **mass-based** AFO module
++with independent animal/manure production, parcel allocation, annual runoff/
++precipitation and separate direct-feedlot surface loading. An explicit
++statistical `surface_pathway` and a baseline excluding the modeled manure/
++feedlot loads are required. See [Mass-based AFO loading](afo_mass_based.md)
++for inputs, hierarchy and equations. The legacy `concentration_increment`
++AFO method is PLET-only.
+diff --git a/examples/east_fork/inputs/config/east_fork_afo_mass_demo.yaml b/examples/east_fork/inputs/config/east_fork_afo_mass_demo.yaml
+new file mode 100644
+index 0000000..0bae110
+--- /dev/null
++++ b/examples/east_fork/inputs/config/east_fork_afo_mass_demo.yaml
+@@ -0,0 +1,26 @@
++# Demonstration only. AFO locations, animals, and manure concentrations are
++# illustrative, NOT a verified East Fork inventory or calibrated coefficients.
++# Generate the GeoPackage first: python scripts/create_afo_mass_example.py
++verbose: True
++random_seed: 42
++outputs: ../../outputs/run_afo_mass_demo
++domain: ../domain/east_fork_domain.gpkg
++parcels: ../parcels/parcels_ex2dot1_plet_based_load_gen_deterministic.gpkg
++huc_parameters: ../hucs/huc12s_ex1dot1_plet_based_load_gen_deterministic.gpkg
++outlets: ../outlets/outlets.gpkg
++animal_operations: ../afo/afo_mass_example_generated.gpkg
++manure_loading:
++  method: mass_based
++  surface_pathway: surface
++bmp_efficiency: ../afo/bmp_efficiency_afo_demo.csv
++pollutants: [TN, TP, TSS]
++cps: [313, 590]
++feedlot_bmp_cps: [313]
++load_generation:
++  mode: plet_rusle
++n_scenarios: 2
++bmp_limit_n: 5
++parallel:
++  n_jobs: 1
++bmp_sel_prob_via_costs: False
++bmp_fail_rate: 0.0
+diff --git a/readme.md b/readme.md
+index 63ae234..a90d71d 100644
+--- a/readme.md
++++ b/readme.md
+@@ -179,3 +179,7 @@ BMP codes are identified with `feedlot_bmp_cps`. Input tables, selection
+ semantics, examples, and limitations are described in
+ [docs/animal_feeding_operations.md](docs/animal_feeding_operations.md).
+ 
++
++Optional mass-based manure production, allocation and annual TN/TP surface
++export is available in both PLET/RUSLE and statistical modes. See
++[docs/afo_mass_based.md](docs/afo_mass_based.md) for a reproducible example.
+diff --git a/scripts/create_afo_mass_example.py b/scripts/create_afo_mass_example.py
+new file mode 100644
+index 0000000..54db780
+--- /dev/null
++++ b/scripts/create_afo_mass_example.py
+@@ -0,0 +1,48 @@
++"""Create a *demonstration-only* AFO mass-method GeoPackage (no binary patch).
++
++Run from the repository root: python scripts/create_afo_mass_example.py
++This copies, never overwrites, the legacy concentration-increment example.
++Neither operation represents a verified livestock site in East Fork.
++"""
++from pathlib import Path
++import shutil
++import sqlite3
++
++import pandas as pd
++
++ROOT = Path(__file__).resolve().parents[1]
++DIRECTORY = ROOT / "examples" / "east_fork" / "inputs" / "afo"
++SOURCE = DIRECTORY / "afo_example.gpkg"
++TARGET = DIRECTORY / "afo_mass_example_generated.gpkg"
++
++
++def main() -> None:
++    if not SOURCE.is_file():
++        raise FileNotFoundError(SOURCE)
++    if TARGET.exists():
++        raise FileExistsError(f"Refusing to overwrite existing example: {TARGET}")
++    shutil.copyfile(SOURCE, TARGET)
++    with sqlite3.connect(TARGET) as conn:
++        pd.DataFrame([
++            {"afo_id": "AFO_DEMO_01", "season": "spring", "solids_pct": 25.,
++             "wep_fraction": .30, "f_n": .20, "alpha_n": 1.,
++             "collection_fraction": .8, "export_fraction": .1,
++             "n_retention_fraction": .75, "p_retention_fraction": .95,
++             "incorporated_fraction": .1},
++            {"afo_id": "AFO_DEMO_02", "season": "fall", "solids_pct": 20.,
++             "wep_fraction": .30, "f_n": .20, "alpha_n": 1.,
++             "collection_fraction": .8, "export_fraction": .1,
++             "n_retention_fraction": .75, "p_retention_fraction": .95,
++             "incorporated_fraction": .1},
++        ]).to_sql("afo_manure_management", conn, index=False)
++        pd.DataFrame([{"pid": pid, "eligible": 1} for pid in (1,2,3,4)]).to_sql(
++            "afo_field_eligibility", conn, index=False)
++        pd.DataFrame([{"pid": None, "huc12": None, "annual_precip_mm": 1000.,
++                       "annual_runoff_mm": 200., "feedlot_runoff_mm": 300.}]).to_sql(
++            "afo_hydrology", conn, index=False)
++    print(f"Created {TARGET}")
++    print("WARNING: All AFO locations and parameters are illustrative, not observed East Fork data.")
++
++
++if __name__ == "__main__":
++    main()
+diff --git a/src/afo.py b/src/afo.py
+index 4658264..fa59915 100644
+--- a/src/afo.py
++++ b/src/afo.py
+@@ -1,6 +1,6 @@
+ """Optional PLET-style animal feeding operations and spatial manure exposure.
+ 
+-This is deliberately a concentration/area model, *not* a manure mass balance.
++Supports a legacy concentration-increment mode and optional mass-based mode.
+ See docs/animal_feeding_operations.md for inputs, assumptions, and limitations.
+ """
+ from __future__ import annotations
+@@ -74,7 +74,10 @@ def _sample_stats(ctx: Any, row: Mapping[str, Any], *, prefix: str = "", kind: s
+     return float(ctx._sample_from_stats(stats, kind=kind))
+ 
+ 
+-def load_afo_inputs(path: str | Path, parcels: pd.DataFrame, pollutants: Sequence[str]) -> dict[str, Any]:
++def load_afo_inputs(path: str | Path, parcels: pd.DataFrame, pollutants: Sequence[str],
++                    *, method: str = "concentration_increment", mode: str = "plet_rusle",
++                    pathways: Sequence[str] = ("surface",), surface_pathway: str = "surface",
++                    parcel_path: str | Path | None = None) -> dict[str, Any]:
+     """Load and fully validate optional AFO tables before worker processes start."""
+     package = Path(path)
+     if not package.is_file():
+@@ -83,10 +86,28 @@ def load_afo_inputs(path: str | Path, parcels: pd.DataFrame, pollutants: Sequenc
+         operations = _read_table(conn, "afo_operations")
+         animals = _read_table(conn, "afo_animals")
+         fields = _read_table(conn, "afo_manure_fields", optional=True)
+-        increments = _read_table(conn, "afo_manure_concentration_increments")
+-    _need_columns(operations, "afo_operations", ["afo_id", "pid", "feedlot_area_ha", "paved_pct", "allocation", "manure_months"])
+-    _need_columns(animals, "afo_animals", ["afo_id", "species", "count"])
+-    _need_columns(increments, "afo_manure_concentration_increments", ["land_cover", "pollutant"])
++        increments = _read_table(conn, "afo_manure_concentration_increments", optional=method == "mass_based")
++        management = _read_table(conn, "afo_manure_management", optional=method != "mass_based")
++        eligibility = _read_table(conn, "afo_field_eligibility", optional=mode != "statistical")
++        hydrology = _read_table(conn, "afo_hydrology", optional=mode != "statistical")
++    operation_columns = ["afo_id", "pid", "feedlot_area_ha", "paved_pct", "allocation"]
++    if method == "concentration_increment":
++        operation_columns.append("manure_months")
++    _need_columns(operations, "afo_operations", operation_columns)
++    if "manure_months" not in operations.columns:
++        operations["manure_months"] = 12.0
++    _need_columns(animals, "afo_animals", ["afo_id", "species"] + (["count"] if method == "concentration_increment" else []))
++    if method not in {"mass_based", "concentration_increment"}:
++        raise ValueError("manure_loading.method must be mass_based or concentration_increment")
++    if method == "concentration_increment":
++        _need_columns(increments, "afo_manure_concentration_increments", ["land_cover", "pollutant"])
++    else:
++        _need_columns(management, "afo_manure_management", ["afo_id", "season"])
++        if mode == "statistical":
++            _need_columns(eligibility, "afo_field_eligibility", ["pid", "eligible"])
++            _need_columns(hydrology, "afo_hydrology", ["pid"])
++            if surface_pathway not in pathways:
++                raise ValueError(f"Configured surface pathway {surface_pathway!r} is not an active statistical pathway")
+     if not fields.empty:
+         _need_columns(fields, "afo_manure_fields", ["afo_id", "pid"])
+     if operations.empty:
+@@ -108,12 +129,13 @@ def load_afo_inputs(path: str | Path, parcels: pd.DataFrame, pollutants: Sequenc
+         if area > area_by_pid[pid] + 1e-8:
+             raise ValueError(f"Operation {op_id} feedlot area exceeds host parcel area")
+         _finite(row["paved_pct"], f"{op_id}.paved_pct", 0., 100.)
+-        _finite(row["manure_months"], f"{op_id}.manure_months", 0., 12.)
+-        mode = str(row["allocation"]).strip().lower()
+-        if mode not in {"explicit", "sampled"}:
++        if pd.notna(row["manure_months"]):
++            _finite(row["manure_months"], f"{op_id}.manure_months", 0., 12.)
++        allocation_mode = str(row["allocation"]).strip().lower()
++        if allocation_mode not in {"explicit", "sampled"}:
+             raise ValueError(f"Operation {op_id} allocation must be explicit or sampled")
+-        operations.at[k, "allocation"] = mode
+-        if mode == "sampled":
++        operations.at[k, "allocation"] = allocation_mode
++        if allocation_mode == "sampled":
+             selection = str(row.get("selection", "nearest") or "nearest").strip().lower()
+             if selection not in {"nearest", "random"}:
+                 raise ValueError(f"Operation {op_id} selection must be nearest or random")
+@@ -138,7 +160,11 @@ def load_afo_inputs(path: str | Path, parcels: pd.DataFrame, pollutants: Sequenc
+             raise ValueError(f"afo_animals references unknown AFO {op_id}")
+         if not str(row["species"]).strip():
+             raise ValueError("afo_animals.species must not be blank")
+-        _finite(row["count"], f"{op_id}.count")
++        if "count" not in row or pd.isna(row["count"]):
++            if method != "mass_based" or not any(k.startswith("count_") and pd.notna(row[k]) for k in animals.columns):
++                raise ValueError(f"{op_id} requires animal count or count_* distribution")
++        else:
++            _finite(row["count"], f"{op_id}.count")
+         for pol in set(p.upper() for p in pollutants).intersection(_FEEDLOT_MAX_CONC):
+             factor = f"factor_{pol.lower()}"
+             if factor not in animals or pd.isna(row[factor]):
+@@ -161,30 +187,181 @@ def load_afo_inputs(path: str | Path, parcels: pd.DataFrame, pollutants: Sequenc
+     for op_id in operations.loc[operations.allocation == "explicit", "afo_id"]:
+         if not fields["afo_id"].eq(op_id).any():
+             raise ValueError(f"Explicit operation {op_id} has no manure-receiving fields")
+-    increments["land_cover"] = increments["land_cover"].map(normalize_plet_land_cover)
+-    increments["pollutant"] = increments["pollutant"].astype(str).str.upper().str.strip()
+-    if increments.duplicated(["land_cover", "pollutant"]).any():
+-        raise ValueError("Duplicate manure concentration increments by land_cover/pollutant")
+-    if not set(increments["land_cover"]).issubset({"cropland", "pastureland"}):
+-        raise ValueError("Manure concentration increments apply only to cropland/pastureland")
+-    if not set(increments["pollutant"]).issubset(set(map(str.upper, pollutants))):
+-        raise ValueError("Manure concentration increments reference unknown pollutants")
+-    if not any(col in increments.columns for col in statistic_columns(increments.columns)):
+-        raise ValueError("Manure concentration increments require value or distribution statistics")
+-    for _, row in increments.iterrows():
+-        stats = stats_from_row(row, {"land_cover", "pollutant", "sample_group", "units"})
+-        if not stats:
+-            raise ValueError("Each manure concentration increment needs a value or distribution")
+-        for name, value in stats.items():
+-            _finite(value, f"afo_manure_concentration_increments.{name}")
+-    # Treat the field's whole current PLET land cover as eligible, except the host
+-    # operation footprint. Mixed-use parcel subareas are not represented in PLET.
++    if method == "concentration_increment":
++        increments["land_cover"] = increments["land_cover"].map(normalize_plet_land_cover)
++        increments["pollutant"] = increments["pollutant"].astype(str).str.upper().str.strip()
++        if increments.duplicated(["land_cover", "pollutant"]).any():
++            raise ValueError("Duplicate manure concentration increments by land_cover/pollutant")
++        if not set(increments["land_cover"]).issubset({"cropland", "pastureland"}):
++            raise ValueError("Manure concentration increments apply only to cropland/pastureland")
++        if not set(increments["pollutant"]).issubset(set(map(str.upper, pollutants))):
++            raise ValueError("Manure concentration increments reference unknown pollutants")
++        for _, row in increments.iterrows():
++            stats = stats_from_row(row, {"land_cover", "pollutant", "sample_group", "units"})
++            if not stats:
++                raise ValueError("Each manure concentration increment needs a value or distribution")
++            for name, value in stats.items():
++                _finite(value, f"afo_manure_concentration_increments.{name}")
++    else:
++        from .afo_mass import reference_excretion_factors, _SPECIES_ALIAS
++        known = reference_excretion_factors()
++        if management["afo_id"].astype(str).duplicated().any() or set(management["afo_id"].astype(str)) != op_ids:
++            raise ValueError("afo_manure_management requires exactly one row per operation")
++        for _, row in management.iterrows():
++            if str(row["season"]).strip().lower() not in {"winter", "spring", "summer", "fall"}:
++                raise ValueError("afo_manure_management.season must be winter/spring/summer/fall")
++            for name in ("f_n", "wep_fraction", "solids_pct"):
++                fixed_present = name in management.columns and pd.notna(row.get(name))
++                stats_present = any(k.startswith(name + "_") and pd.notna(row[k])
++                                    for k in management.columns)
++                if not (fixed_present or stats_present):
++                    raise ValueError(f"afo_manure_management requires {name} or {name}_* distribution")
++            for name in ("f_n", "wep_fraction", "collection_fraction", "export_fraction",
++                         "n_retention_fraction", "p_retention_fraction", "incorporated_fraction"):
++                if name in row and pd.notna(row[name]):
++                    _finite(row[name], name, 0, 1)
++            if "solids_pct" in row and pd.notna(row["solids_pct"]):
++                _finite(row["solids_pct"], "solids_pct", 0, 100)
++        for _, row in animals.iterrows():
++            species = str(row["species"]).strip().lower()
++            species = _SPECIES_ALIAS.get(species, species)
++            if species not in known and not all(
++                    name in animals.columns and pd.notna(row.get(name)) or
++                    any(k.startswith(name + "_") and pd.notna(row[k]) for k in animals.columns)
++                    for name in ("manure_kg_head_day", "tn_kg_head_day", "tp_kg_head_day")):
++                raise ValueError(f"Unsupported animal species {species!r}; supply all three production rates")
++    eligible_by_pid = {}
++    hydrology_by_pid = {}
++    if method == "mass_based" and mode == "statistical":
++        for _, row in eligibility.iterrows():
++            pid = _integer_pid(row["pid"], "afo_field_eligibility.pid")
++            if pid not in pid_set or pid in eligible_by_pid:
++                raise ValueError(f"Unknown/duplicate AFO eligibility pid {pid}")
++            if float(row["eligible"]) not in (0., 1.):
++                raise ValueError("AFO eligibility must be 0 or 1")
++            eligible_by_pid[pid] = bool(row["eligible"])
++        # Inheritance: parcel-specific -> HUC12 -> NULL-pid domain default.
++        # HUC12 keys are resolved from the canonical parcel_huc12 table.
++        mapping = {}
++        if parcel_path is not None:
++            with sqlite3.connect(parcel_path) as con:
++                names = {x[0] for x in con.execute("SELECT name FROM sqlite_master")}
++                if "parcel_huc12" in names:
++                    cols = {info[1] for info in con.execute("PRAGMA table_info(parcel_huc12)")}
++                    huc_col = "huc_id" if "huc_id" in cols else "huc12"
++                    mapping = {str(int(pid)): str(huc) for pid, huc in
++                               con.execute(f"SELECT pid,{huc_col} FROM parcel_huc12")}
++        by_pid, by_huc, default = {}, {}, None
++        for _, row in hydrology.iterrows():
++            rec = row.to_dict()
++            pid_value = rec.get("pid")
++            huc_value = rec.get("huc12")
++            has_pid = pid_value is not None and not pd.isna(pid_value)
++            has_huc = huc_value is not None and not pd.isna(huc_value)
++            if has_pid and has_huc:
++                raise ValueError("afo_hydrology row cannot specify both pid and huc12")
++            if has_pid:
++                pid = _integer_pid(pid_value, "afo_hydrology.pid")
++                if pid not in pid_set or pid in by_pid:
++                    raise ValueError(f"Unknown/duplicate AFO hydrology pid {pid}")
++                by_pid[pid] = rec
++            elif has_huc:
++                key = str(huc_value).strip()
++                if key in by_huc:
++                    raise ValueError(f"Duplicate AFO hydrology huc12 {key}")
++                by_huc[key] = rec
++            else:
++                if default is not None:
++                    raise ValueError("Duplicate default AFO hydrology row")
++                default = rec
++            for name in ("annual_runoff_mm", "annual_precip_mm", "feedlot_runoff_mm"):
++                if name in row and pd.notna(row[name]):
++                    _finite(row[name], name)
++        for pid in pid_set:
++            rec = by_pid.get(pid) or by_huc.get(mapping.get(pid, "")) or default
++            if rec is not None:
++                hydrology_by_pid[pid] = rec
++        active_hosts = {str(op["pid"]) for op in operations.to_dict("records")}
++        for pid in set(eligible_by_pid).union(active_hosts):
++            if pid not in hydrology_by_pid:
++                raise ValueError(f"Missing statistical AFO hydrology for pid {pid}")
++            row = hydrology_by_pid[pid]
++            required = ["annual_precip_mm", "annual_runoff_mm"]
++            if pid in active_hosts:
++                required.append("feedlot_runoff_mm")
++            for name in required:
++                if not (name in row and pd.notna(row[name])) and not any(
++                    k.startswith(name + "_") and pd.notna(v) for k,v in row.items()
++                ):
++                    raise ValueError(f"Statistical AFO pid {pid} missing {name} or distribution")
++        if not any(eligible_by_pid.values()):
++            raise ValueError("Statistical AFO requires at least one eligible field")
+     return {"operations": operations.to_dict("records"), "animals": animals.to_dict("records"),
+-            "fields": fields.to_dict("records"), "manure_concentration_increments": increments.to_dict("records"),
++            "fields": fields.to_dict("records"),
++            "manure_concentration_increments": increments.to_dict("records") if not increments.empty else [],
++            "management": management.to_dict("records") if not management.empty else [],
++            "eligible": eligible_by_pid, "hydrology": hydrology_by_pid,
++            "surface_pathway": surface_pathway, "method": method,
+             "geometry": {str(r.pid): r.geometry for r in parcels.itertuples()},
+             "area_ha": area_by_pid}
+ 
+ 
++def _select_manure_fields(ctx: Any, inputs: Mapping[str, Any], eligible_area: Mapping[str, float]) -> list[dict[str, Any]]:
++    """Select receivers once per realization with shared explicit/stochastic rules."""
++    operations = inputs["operations"]
++    fields = inputs["fields"]
++    geometry = inputs["geometry"]
++    manure_months: dict[str, float] = {}
++    assignments: list[dict[str, Any]] = []
++    # Reuse exactly the same spatial selection for the legacy concentration
++    # mode and the new mass-conserving nutrient-allocation mode.
++    for op in sorted(operations, key=lambda r: str(r["afo_id"])):
++        op_id, host = str(op["afo_id"]), str(op["pid"])
++        if op["allocation"] == "explicit":
++            chosen = [str(r["pid"]) for r in fields if str(r["afo_id"]) == op_id]
++            if len(chosen) != len(set(chosen)):
++                raise ValueError(f"Duplicate receiving parcel in {op_id}")
++        else:
++            candidates = sorted(eligible_area, key=lambda p: int(p))
++            n_draw = _sample_stats(ctx, op, prefix="n_fields_", kind="nonnegative")
++            if not np.isfinite(n_draw) or n_draw < 1:
++                raise ValueError(f"{op_id}: sampled n_fields must be at least 1")
++            n_fields = int(np.floor(n_draw + 0.5))
++            if n_fields > len(candidates):
++                raise ValueError(f"{op_id}: sampled {n_fields} fields but only {len(candidates)} eligible")
++            chosen = [host] if host in eligible_area else []
++            candidates = [p for p in candidates if p != host]
++            if op.get("selection", "nearest") == "random":
++                candidate_order = list(ctx.rng.permutation(candidates))
++            else:
++                candidate_order = sorted(candidates, key=lambda p: (geometry[host].distance(geometry[p]), int(p)))
++            chosen.extend(candidate_order[:n_fields - len(chosen)])
++        for pid in chosen:
++            if pid not in eligible_area:
++                raise ValueError(f"{op_id}: manure receiving pid {pid} lacks eligible agricultural area")
++            manure_months[pid] = max(manure_months.get(pid, 0.), float(op["manure_months"]))
++            rec = {"afo_id": op_id, "host_pid": host, "receiving_pid": pid,
++                                "manure_months": float(op["manure_months"]),
++                                "eligible_area_ha": float(eligible_area[pid]),
++                                "allocation": op["allocation"]}
++            field_row = next((r for r in fields if str(r["afo_id"]) == op_id and str(r["pid"]) == pid), None)
++            if field_row is not None and field_row.get("weight") is not None and not pd.isna(field_row["weight"]):
++                rec["weight"] = _finite(field_row["weight"], "afo_manure_fields.weight")
++            assignments.append(rec)
++    return assignments
++
++
++
++def _feedlot_concentration(op: Mapping[str, Any], animals: Sequence[Mapping[str, Any]], pol: str) -> float:
++    """PLET feedlot mg/L from pollutant-specific equivalent animal density."""
++    if pol not in _FEEDLOT_MAX_CONC:
++        return 0.
++    area_ac = float(op["feedlot_area_ha"]) / 0.40468564224
++    eau = sum(float(animal["count"]) * float(animal[f"factor_{pol.lower()}"])
++              for animal in animals if str(animal["afo_id"]) == str(op["afo_id"]))
++    return min(eau / area_ac, 100.) / 100. * _FEEDLOT_MAX_CONC[pol]
++
++
+ def _feedlot_runoff_kg(op: Mapping[str, Any], animals: Sequence[Mapping[str, Any]],
+                        parameters: Mapping[str, Any], pollutants: Sequence[str]) -> dict[str, float]:
+     """PLET feedlot CN (91–94), EAU density, manure pack, concentration and load."""
+@@ -201,10 +378,7 @@ def _feedlot_runoff_kg(op: Mapping[str, Any], animals: Sequence[Mapping[str, Any
+         pol = str(pollutant).upper()
+         if pol not in _FEEDLOT_MAX_CONC:
+             continue
+-        eau = sum(float(animal["count"]) * float(animal[f"factor_{pol.lower()}"])
+-                  for animal in animals if str(animal["afo_id"]) == str(op["afo_id"]))
+-        pack = min(eau / area_ac, 100.) / 100.  # EAU per acre, saturated at 100
+-        concentration = pack * _FEEDLOT_MAX_CONC[pol]
++        concentration = _feedlot_concentration(op, animals, pol)
+         # mg/L * L/ha * ha -> kg/yr, using same unit handling as PLET/RUSLE.
+         outputs[pol] = annual_runoff_in * INCH_OVER_HA_TO_LITERS * area_ha * concentration / 1_000_000.
+     return outputs
+@@ -234,39 +408,11 @@ def apply_afo_baseline(ctx: Any, state: Any) -> list[dict[str, Any]]:
+         feedlot_area[str(op["pid"])] += float(op["feedlot_area_ha"])
+     eligible_area = {pid: areas[pid] - feedlot_area[pid] for pid in agricultural
+                      if areas[pid] - feedlot_area[pid] > 1e-10}
+-    manure_months: dict[str, float] = {}
+-    assignments: list[dict[str, Any]] = []
+-    # Treating manure application extent rather than mass is intentional: PLET's
+-    # manured runoff concentration is not scaled to tonnage per acre.
+-    for op in sorted(operations, key=lambda r: str(r["afo_id"])):
+-        op_id, host = str(op["afo_id"]), str(op["pid"])
+-        if op["allocation"] == "explicit":
+-            chosen = [str(r["pid"]) for r in fields if str(r["afo_id"]) == op_id]
+-            if len(chosen) != len(set(chosen)):
+-                raise ValueError(f"Duplicate receiving parcel in {op_id}")
+-        else:
+-            candidates = sorted(eligible_area, key=lambda p: int(p))
+-            n_draw = _sample_stats(ctx, op, prefix="n_fields_", kind="nonnegative")
+-            if not np.isfinite(n_draw) or n_draw < 1:
+-                raise ValueError(f"{op_id}: sampled n_fields must be at least 1")
+-            n_fields = int(np.floor(n_draw + 0.5))
+-            if n_fields > len(candidates):
+-                raise ValueError(f"{op_id}: sampled {n_fields} fields but only {len(candidates)} eligible")
+-            chosen = [host] if host in eligible_area else []
+-            candidates = [p for p in candidates if p != host]
+-            if op.get("selection", "nearest") == "random":
+-                candidate_order = list(ctx.rng.permutation(candidates))
+-            else:
+-                candidate_order = sorted(candidates, key=lambda p: (geometry[host].distance(geometry[p]), int(p)))
+-            chosen.extend(candidate_order[:n_fields - len(chosen)])
+-        for pid in chosen:
+-            if pid not in eligible_area:
+-                raise ValueError(f"{op_id}: manure receiving pid {pid} lacks eligible agricultural area")
+-            manure_months[pid] = max(manure_months.get(pid, 0.), float(op["manure_months"]))
+-            assignments.append({"afo_id": op_id, "host_pid": host, "receiving_pid": pid,
+-                                "manure_months": float(op["manure_months"]),
+-                                "eligible_area_ha": float(eligible_area[pid]),
+-                                "allocation": op["allocation"]})
++    assignments = _select_manure_fields(ctx, inputs, eligible_area)
++    manure_months = {}
++    for rec in assignments:
++        pid = rec["receiving_pid"]
++        manure_months[pid] = max(manure_months.get(pid, 0.), rec["manure_months"])
+     # An increment is a standalone nonnegative concentration added to each
+     # parcel's sampled non-manured concentration. It is deliberately NOT an
+     # absolute manured concentration, and is drawn independently of the base.
+diff --git a/src/afo_mass.py b/src/afo_mass.py
+new file mode 100644
+index 0000000..5818cc1
+--- /dev/null
++++ b/src/afo_mass.py
+@@ -0,0 +1,300 @@
++"""One-year, surface-only animal manure mass and runoff-export accounting.
++
++P calculation follows the *manure-derived dissolved P* part of APLE 2.5,
++not the full APLE soil/erosion/legacy model. N is an explicit, uncalibrated
++APLE-inspired adaptation (default runoff exponent = 1).
++"""
++from __future__ import annotations
++
++import csv
++from pathlib import Path
++from typing import Any, Mapping
++
++import numpy as np
++
++from .afo import _finite, _sample_stats, _feedlot_runoff_kg
++from .plet_rusle import plet_annual_surface_runoff_in
++
++_SEASONS = {"winter": 0.20, "spring": 0.15, "summer": 0.10, "fall": 0.05}
++_SPECIES_ALIAS = {"beef_steer": "beef_finishing", "dairy_cow": "dairy_lactating",
++                  "swine": "swine_grow_finish", "broiler": "poultry_broiler"}
++
++
++def reference_excretion_factors() -> dict[str, dict[str, float]]:
++    """Documented starting animal-class factors in kg/head/day (as excreted)."""
++    with (Path(__file__).parent / "data" / "manure_excretion_reference.csv").open(newline="", encoding="utf-8") as handle:
++        return {row["species"]: {k: float(row[k]) for k in
++                ("manure_kg_head_day", "tn_kg_head_day", "tp_kg_head_day")}
++                for row in csv.DictReader(handle)}
++
++
++def _draw(ctx: Any, row: Mapping[str, Any], key: str, *, default: float | None = None,
++          fraction: bool = False) -> float:
++    """Use existing inline distribution syntax or a deterministic named value."""
++    stats = {k[len(key) + 1:]: v for k, v in row.items()
++             if k.startswith(key + "_") and v is not None and not _nan(v)}
++    if stats:
++        value = _sample_stats(ctx, row, prefix=key + "_", kind="fraction" if fraction else "nonnegative")
++    elif key in row and row[key] is not None and not _nan(row[key]):
++        value = float(row[key])
++    elif default is not None:
++        value = default
++    else:
++        raise ValueError(f"Missing required manure parameter {key}")
++    return _finite(value, key, 0, 1 if fraction else float("inf"))
++
++
++def _nan(value: Any) -> bool:
++    try:
++        return bool(np.isnan(value))
++    except (TypeError, ValueError):
++        return False
++
++
++def animal_production(ctx: Any, animals: list[dict[str, Any]], op_id: str) -> dict[str, float]:
++    """Calculate as-excreted annual wet manure and nutrient N/P inventories.
++
++    Availability/handling losses are applied separately; animal-days is the
++    number of days each enumerated head is present in the modeled year.
++    """
++    factors = reference_excretion_factors()
++    totals = {"manure": 0.0, "TN": 0.0, "TP": 0.0}
++    for animal in animals:
++        if str(animal["afo_id"]) != op_id:
++            continue
++        raw_species = str(animal["species"]).strip().lower()
++        species = _SPECIES_ALIAS.get(raw_species, raw_species)
++        known = factors.get(species, {})
++        number = _draw(ctx, animal, "count")
++        days = _draw(ctx, animal, "animal_days", default=365.)
++        if days > 366:
++            raise ValueError(f"{op_id}: animal_days cannot exceed 366")
++        for nutrient, field in (("manure", "manure_kg_head_day"),
++                                ("TN", "tn_kg_head_day"), ("TP", "tp_kg_head_day")):
++            rate = _draw(ctx, animal, field, default=known.get(field))
++            totals[nutrient] += number * days * rate
++    return totals
++
++
++def manure_surface_export_kg(
++    *, applied_n_kg: float, applied_p_kg: float, runoff_mm: float,
++    precipitation_mm: float, available_n_fraction: float,
++    n_exponent: float, p_wep_fraction: float, solids_pct: float,
++    incorporated_fraction: float, season: str,
++) -> dict[str, float]:
++    """Annual manure-derived surface N and dissolved P exports in kg.
++
++    APLE 2.5 annual manure P release equations (1), (3), (6) and same-year
++    mineralization/fall-availability assumptions. A supplied incorporation
++    fraction represents effective surface P removed; APLE's full injection
++    volume/depth-dependent subroutine is *not* reproduced here.
++    """
++    n = _finite(applied_n_kg, "applied_n_kg")
++    p = _finite(applied_p_kg, "applied_p_kg")
++    q = _finite(runoff_mm, "runoff_mm")
++    rain = _finite(precipitation_mm, "precipitation_mm")
++    f_n = _finite(available_n_fraction, "available_n_fraction", 0, 1)
++    exponent = _finite(n_exponent, "n_exponent", 0)
++    wep = _finite(p_wep_fraction, "p_wep_fraction", 0, 1)
++    solids = _finite(solids_pct, "solids_pct", 0, 100)
++    incorporated = _finite(incorporated_fraction, "incorporated_fraction", 0, 1)
++    season = str(season).lower().strip()
++    if season not in _SEASONS:
++        raise ValueError(f"season must be one of {sorted(_SEASONS)}")
++    if q > rain + 1e-9:
++        raise ValueError("Annual surface runoff cannot exceed annual precipitation")
++    if rain == 0 or q == 0:
++        return {"TN": 0., "TP": 0., "surface_available_p_kg": 0.}
++    ratio = min(q / rain, 1.0)
++    n_export = n * f_n * ratio ** exponent
++    surface_p = p * (0.4 if solids < 15 else 1.0) * (1.0 - incorporated)
++    wep_available = surface_p * (wep + (1. - wep) * _SEASONS[season])
++    if season == "fall":
++        # APLE postpones 25% of available fall WEP to the following year;
++        # the remainder is *not* exported or tracked in our single-year model.
++        wep_available *= .75
++    if solids < 15:
++        cover = .5
++        wep_available *= 2.2 * (250 * cover) / (250 * cover + 300.1)
++    p_export = wep_available * ratio ** 1.225
++    if p_export > p + 1e-8 or n_export > n + 1e-8:
++        raise AssertionError("Nutrient export exceeds applied manure mass")
++    return {"TN": n_export, "TP": p_export, "surface_available_p_kg": wep_available}
++
++
++def mass_afo_realization(ctx: Any, *, state: Any = None) -> tuple[list[dict], list[dict]]:
++    """Add AFO loads to PLET *or* statistical pathway arrays, once per scenario.
++
++    Loads are kg/ha/year in current_pathway_load_rates. The manure allocation
++    ledger records kg, and is unaffected by subsequent BMP applications.
++    """
++    inputs = ctx.afo_inputs
++    if not inputs or inputs.get("method") != "mass_based":
++        return [], []
++    pids = list(map(str, ctx.parcel_ids))
++    idx_map = {pid: i for i, pid in enumerate(pids)}
++    areas = inputs["area_ha"]
++    ops = inputs["operations"]
++    # Draw animal inventory once per realization; feedlot density and manure
++    # production must use the *same* realized animal counts.
++    realized_animals = []
++    for animal in inputs["animals"]:
++        sampled = dict(animal)
++        sampled["count"] = _draw(ctx, animal, "count")
++        for key in list(sampled):
++            if key.startswith("count_"):
++                del sampled[key]
++        realized_animals.append(sampled)
++    footprint = {pid: 0. for pid in pids}
++    for op in ops:
++        footprint[str(op["pid"])] += float(op["feedlot_area_ha"])
++    if state is not None:
++        eligible = {pid: areas[pid] - footprint[pid] for pid in pids
++                    if state.parameters[idx_map[pid]]["land_cover"] in {"cropland", "pastureland"}
++                    and areas[pid] - footprint[pid] > 1e-12}
++        surface_idx = 0
++    else:
++        eligible = {pid: areas[pid] - footprint[pid] for pid in pids
++                    if inputs["eligible"].get(pid, False) and areas[pid] - footprint[pid] > 1e-12}
++        surface = inputs["surface_pathway"]
++        if surface not in ctx.pathway_names:
++            raise ValueError(f"AFO surface pathway {surface!r} not present in statistical pathways")
++        surface_idx = ctx.pathway_names.index(surface)
++    from .afo import _select_manure_fields  # common with the legacy mode
++    assignments = _select_manure_fields(ctx, inputs, eligible)
++    by_op: dict[str, list[dict]] = {}
++    for rec in assignments:
++        by_op.setdefault(rec["afo_id"], []).append(rec)
++    n_parcels, n_pol, n_paths = ctx.current_pathway_load_rates.shape
++    feedlot = np.zeros((n_parcels, n_pol, n_paths), float)
++    manure = np.zeros_like(feedlot)
++    ledger: list[dict] = []
++    management = {str(rec["afo_id"]): rec for rec in inputs["management"]}
++    for op in sorted(ops, key=lambda r: str(r["afo_id"])):
++        op_id = str(op["afo_id"])
++        mgt = management[op_id]
++        produced = animal_production(ctx, realized_animals, op_id)
++        collection = _draw(ctx, mgt, "collection_fraction", default=1, fraction=True)
++        export_fraction = _draw(ctx, mgt, "export_fraction", default=0, fraction=True)
++        available = {
++            "manure": produced["manure"] * collection * (1 - export_fraction),
++            "TN": produced["TN"] * collection * (1 - export_fraction) *
++                  _draw(ctx, mgt, "n_retention_fraction", default=1, fraction=True),
++            "TP": produced["TP"] * collection * (1 - export_fraction) *
++                  _draw(ctx, mgt, "p_retention_fraction", default=1, fraction=True),
++        }
++        available_n = _draw(ctx, mgt, "f_n", fraction=True)
++        exponent_n = _draw(ctx, mgt, "alpha_n", default=1.)
++        p_wep = _draw(ctx, mgt, "wep_fraction", fraction=True)
++        solids = _draw(ctx, mgt, "solids_pct")
++        incorporated = _draw(ctx, mgt, "incorporated_fraction", default=0, fraction=True)
++        season = str(mgt["season"]).strip().lower()
++        chosen = by_op[op_id]
++        custom_weights = [rec.get("weight") for rec in chosen]
++        if any(w is not None for w in custom_weights):
++            if not all(w is not None for w in custom_weights):
++                raise ValueError(f"{op_id}: all receiving parcels must have a weight if one does")
++            weights = [float(w) for w in custom_weights]
++        else:
++            weights = [float(eligible[rec["receiving_pid"]]) for rec in chosen]
++        if sum(weights) <= 0:
++            raise ValueError(f"{op_id}: allocated field weights must sum positive")
++        for rec, weight in zip(chosen, weights):
++            pid = rec["receiving_pid"]
++            idx = idx_map[pid]
++            frac = weight / sum(weights)
++            applied = {k: total * frac for k, total in available.items()}
++            runoff_mm, precip_mm, _ = _hydrology(inputs, pid, state, idx, ctx)
++            exported = manure_surface_export_kg(
++                applied_n_kg=applied["TN"], applied_p_kg=applied["TP"],
++                runoff_mm=runoff_mm, precipitation_mm=precip_mm,
++                available_n_fraction=available_n, n_exponent=exponent_n,
++                p_wep_fraction=p_wep, solids_pct=solids,
++                incorporated_fraction=incorporated, season=season,
++            )
++            for pol_idx, pol in enumerate(ctx.pollutants):
++                pol_upper = str(pol).upper()
++                add = exported.get(pol_upper, 0.) / areas[pid]
++                manure[idx, pol_idx, surface_idx] += add
++                if state is not None and runoff_mm > 0 and pol_upper in ("TN", "TP"):
++                    # 1 mm over 1 hectare = 10,000 L; kg/ha -> mg/L = *100/mm
++                    state.concentrations[idx][pol_upper] += 100 * add / runoff_mm
++            ledger.append(dict(**rec,
++                animal_manure_produced_kg=produced["manure"],
++                animal_n_produced_kg=produced["TN"],
++                animal_p_produced_kg=produced["TP"],
++                operation_available_manure_kg=available["manure"],
++                operation_available_tn_kg=available["TN"],
++                operation_available_tp_kg=available["TP"],
++                manure_applied_kg=applied["manure"],
++                tn_applied_kg=applied["TN"], tp_applied_kg=applied["TP"],
++                tn_exported_kg=exported["TN"], tp_dissolved_exported_kg=exported["TP"],
++                precipitation_mm=precip_mm, runoff_mm=runoff_mm,
++                tn_application_kg_ha=applied["TN"]/eligible[pid],
++                tp_application_kg_ha=applied["TP"]/eligible[pid],
++                f_n=available_n, alpha_n=exponent_n, wep_fraction=p_wep,
++                season=season, incorporated_fraction=incorporated))
++        # Feedlot source calculated separately, with a distinct event hydrology
++        # from PLET or with explicit statistical-mode feedlot runoff inputs.
++        host = str(op["pid"])
++        host_idx = idx_map[host]
++        if state is not None:
++            direct_kg = _feedlot_runoff_kg(op, realized_animals, state.parameters[host_idx], ctx.pollutants)
++        else:
++            _, host_precip_mm, feedlot_runoff_mm = _hydrology(inputs, host, state, host_idx, ctx)
++            if feedlot_runoff_mm is None:
++                raise ValueError(f"Statistical AFO host {host} requires feedlot_runoff_mm")
++            if feedlot_runoff_mm > host_precip_mm:
++                raise ValueError(f"Statistical AFO feedlot runoff exceeds annual precipitation for host {host}")
++            from .afo import _feedlot_concentration
++            direct_kg = {str(pol).upper(): feedlot_runoff_mm * 10000 / 1e6 *
++                         op["feedlot_area_ha"] * _feedlot_concentration(op, realized_animals, str(pol).upper())
++                         for pol in ctx.pollutants}
++        for pol_idx, pol in enumerate(ctx.pollutants):
++            feedlot[host_idx, pol_idx, surface_idx] += direct_kg.get(str(pol).upper(), 0.) / areas[host]
++    # Baseline over the AFO footprint is displaced, not counted twice. Manure
++    # loads are already absolute parcel area-normalized and must NOT be scaled.
++    baseline = ctx.current_pathway_load_rates
++    for pid, footprint_ha in footprint.items():
++        if footprint_ha > 0:
++            baseline[idx_map[pid], :, :] *= (1 - footprint_ha / areas[pid])
++    baseline += manure + feedlot
++    if state is not None:
++        state.baseline_pathway_load_rates = baseline.copy()
++        state.baseline_concentrations = [dict(row) for row in state.concentrations]
++    ctx.current_afo_feedlot_pathway_rates = feedlot
++    ctx.current_afo_manure_pathway_rates = manure
++    ctx.baseline_afo_feedlot_pathway_rates = feedlot.copy()
++    ctx.baseline_afo_manure_pathway_rates = manure.copy()
++    return assignments, ledger
++
++
++def _hydrology(inputs: Mapping, pid: str, state: Any, idx: int, ctx: Any) -> tuple[float, float, float | None]:
++    """Runoff and actual (not runoff-day-corrected) precipitation, in mm/yr."""
++    if state is None:
++        supplied = inputs["hydrology"].get(pid)
++        if not supplied:
++            raise ValueError(f"Statistical AFO parcel {pid} is missing runoff/precipitation inputs")
++        # Keep inherited HUC/domain hydrology draws shared across parcels, and
++        # always reuse a parcel's draw when multiple operations use that field.
++        cache = getattr(ctx, "_afo_hydro_cache", None)
++        if cache is None:
++            cache = {}
++            ctx._afo_hydro_cache = cache
++        key = id(supplied)
++        if key not in cache:
++            cache[key] = (
++                _draw(ctx, supplied, "annual_runoff_mm"),
++                _draw(ctx, supplied, "annual_precip_mm"),
++                _draw(ctx, supplied, "feedlot_runoff_mm") if any(
++                    k == "feedlot_runoff_mm" or k.startswith("feedlot_runoff_mm_") for k in supplied
++                ) else None,
++            )
++        return cache[key]
++    params = state.parameters[idx]
++    runoff_mm = plet_annual_surface_runoff_in(params)[3] * 25.4
++    rain = params.get("annual_precip_in")
++    if rain is None:
++        correction = float(params.get("rain_correction_fraction", 1.0))
++        rain = float(params["avg_rain_in"]) * float(params["rain_days"]) * float(params["runoff_day_fraction"]) / correction
++    return runoff_mm, float(rain) * 25.4, None
+diff --git a/src/data/manure_excretion_reference.csv b/src/data/manure_excretion_reference.csv
+new file mode 100644
+index 0000000..0320131
+--- /dev/null
++++ b/src/data/manure_excretion_reference.csv
+@@ -0,0 +1,6 @@
++species,manure_kg_head_day,tn_kg_head_day,tp_kg_head_day,source
++beef_finishing,29.0299072,0.15875733,0.02178313,ASABE D384.2 through Michigan State University Extension (finishing beef)
++dairy_lactating,68.0388555,0.44905611,0.07622859,ASABE D384.2 through Michigan State University Extension (lactating cow)
++swine_grow_finish,4.5359237,0.03764817,0.00633509,ASABE D384.2 through Michigan State University Extension (growing-finishing pig)
++poultry_broiler,0.10432624,0.00113398,0.00033568,ASABE D384.2 through Michigan State University Extension (broiler)
++sheep_feeder,0.4762720,0.01814369,0.00395607,ASABE D384.2 through Michigan State University Extension (feeder lamb)
+diff --git a/src/input_config.py b/src/input_config.py
+index cfe095c..9dcf105 100644
+--- a/src/input_config.py
++++ b/src/input_config.py
+@@ -3075,17 +3075,28 @@ def load_and_validate_all(cfg: Dict[str, Any], logger: Any) -> Dict[str, Any]:
+         feedlot_bmp_cps = []
+         afo_path = ci_get(cfg, "animal_operations")
+         if afo_path is not None:
+-            if load_mode != LOAD_MODE_PLET_RUSLE:
+-                raise ValueError("animal_operations requires load_generation.mode=plet_rusle")
++            manure_cfg = ci_get(cfg, "manure_loading") or {}
++            if not isinstance(manure_cfg, dict):
++                raise ValueError("manure_loading must be a mapping")
++            method = str(ci_get(manure_cfg, "method") or "concentration_increment").lower()
++            surface_pathway = str(ci_get(manure_cfg, "surface_pathway") or "surface")
++            if method == "concentration_increment" and load_mode != LOAD_MODE_PLET_RUSLE:
++                raise ValueError("concentration_increment manure loading is PLET-only; use mass_based with statistical mode")
++            if method == "mass_based" and not {"TN", "TP"}.issubset(set(pollutants)):
++                raise ValueError("mass_based manure loading requires both TN and TP pollutants")
+             from .afo import load_afo_inputs
+-            afo_inputs = load_afo_inputs(afo_path, parcels, pollutants)
++            afo_inputs = load_afo_inputs(
++                afo_path, parcels, pollutants, method=method, mode=load_mode,
++                pathways=pathways, surface_pathway=surface_pathway,
++                parcel_path=ci_get(cfg, CFG_PARCELS),
++            )
+             feedlot_bmp_cps = [int(c) for c in (ci_get(cfg, "feedlot_bmp_cps") or [])]
+             if len(set(feedlot_bmp_cps)) != len(feedlot_bmp_cps) or not set(feedlot_bmp_cps).issubset(set(cps)):
+                 raise ValueError("feedlot_bmp_cps must be distinct CPS codes present in cps")
+             if set(feedlot_bmp_cps).intersection({412, 656, 657}):
+                 raise ValueError("feedlot_bmp_cps cannot include buffer or wetland CPS")
+-        elif ci_get(cfg, "feedlot_bmp_cps"):
+-            raise ValueError("feedlot_bmp_cps requires animal_operations")
++        elif ci_get(cfg, "feedlot_bmp_cps") or ci_get(cfg, "manure_loading"):
++            raise ValueError("feedlot_bmp_cps and manure_loading require animal_operations")
+ 
+         delivery_ratios = _load_delivery_ratios(cfg, logger, **input_kwargs)
+         delivery_ratios = _complete_delivery_ratio_defaults(delivery_ratios, parcel_out_map)
+diff --git a/src/input_validation.py b/src/input_validation.py
+index 7c94e1b..fc92544 100644
+--- a/src/input_validation.py
++++ b/src/input_validation.py
+@@ -842,7 +842,7 @@ def validate_config(cfg: Dict[str, Any]) -> None:
+ 
+     allowed_top_level = {
+         "domain", "parcels", "plet_forcing", "huc_parameters", "outlets", "pollutants", "cps",
+-        "animal_operations", "feedlot_bmp_cps",
++        "animal_operations", "feedlot_bmp_cps", "manure_loading",
+         "bmp_efficiency", "bmp_cost", "bmp_sel", "n_scenarios",
+         "bmp_limit_n", "bmp_limit_usd", "parallel", "random_seed",
+         "outputs", "verbose", "buffer_depth_ft", "bmp_sel_prob_via_costs",
+diff --git a/src/model.py b/src/model.py
+index 111ea83..b005a6f 100644
+--- a/src/model.py
++++ b/src/model.py
+@@ -35,6 +35,7 @@ from src.io_utils import _write_parquet_atomic, _flatten_plot_records
+ from src.input_distributions import sample_group_key
+ from src.logging_utils import make_worker_logger, log_scope
+ from src.afo import apply_afo_baseline
++from src.afo_mass import mass_afo_realization
+ from src.plet_rusle import (
+     calculate_load_diagnostics,
+     initialize_plet_rusle_state,
+@@ -702,14 +703,18 @@ def _run_one_scenario(
+         n_pol = len(ctx.pollutants)
+         load_state = None
+         afo_assignments = []
++        manure_mass_ledger = []
+ 
+         if ctx.load_generation_mode == LOAD_MODE_PLET_RUSLE:
+             baseline_load_rates, load_state = initialize_plet_rusle_state(ctx)
+-            afo_assignments = apply_afo_baseline(ctx, load_state)
++            ctx.current_pathway_load_rates = load_state.pathway_load_rates
++            if (ctx.afo_inputs or {}).get("method") == "mass_based":
++                afo_assignments, manure_mass_ledger = mass_afo_realization(ctx, state=load_state)
++            else:
++                afo_assignments = apply_afo_baseline(ctx, load_state)
+             if afo_assignments:
+                 baseline_load_rates = load_state.pathway_load_rates.sum(axis=2)
+             load_rates = baseline_load_rates.copy()
+-            ctx.current_pathway_load_rates = load_state.pathway_load_rates
+             ctx.current_untreated_groundwater_load_rates = load_state.untreated_groundwater_load_rates
+             ctx.pathway_names = ["surface", "subsurface"]
+             logger.info("Generated baseline_load_rates PLET/RUSLE load_rates for surface and subsurface pathways")
+@@ -746,6 +751,10 @@ def _run_one_scenario(
+                     baseline_load_rates[i, pol_idx] = float(np.sum(pathway_load_rates[i, pol_idx, :]))
+                     load_rates[i, pol_idx] = baseline_load_rates[i, pol_idx]
+             ctx.current_pathway_load_rates = pathway_load_rates
++            if (ctx.afo_inputs or {}).get("method") == "mass_based":
++                afo_assignments, manure_mass_ledger = mass_afo_realization(ctx)
++                baseline_load_rates[:, :] = pathway_load_rates.sum(axis=2)
++                load_rates[:, :] = baseline_load_rates
+             logger.info(
+                 "Generated statistical baseline_load_rates parcel load_rates across pathways: "
+                 + ", ".join(ctx.pathway_names)
+@@ -983,6 +992,38 @@ def _run_one_scenario(
+                 allocation_dir / f"s{sid}.parquet", logger=logger,
+             )
+ 
++        if manure_mass_ledger:
++            manure_dir = outputs_dir / "afo_mass_ledger"
++            manure_dir.mkdir(parents=True, exist_ok=True)
++            manure_df = pd.DataFrame([dict(scenario=sid, **rec) for rec in manure_mass_ledger])
++            _write_parquet_atomic(manure_df, manure_dir / f"s{sid}.parquet", logger=logger)
++            # One row per operation prevents accidentally summing replicated
++            # operation-wide excretion figures across multiple receiving fields.
++            budget_rows = []
++            for op_id, grouped in manure_df.groupby("afo_id", sort=True):
++                first = grouped.iloc[0]
++                budget = {"scenario": sid, "afo_id": op_id,
++                          "receiver_count": len(grouped)}
++                for source, target in (
++                    ("animal_manure_produced_kg", "manure_produced_kg"),
++                    ("animal_n_produced_kg", "tn_produced_kg"),
++                    ("animal_p_produced_kg", "tp_produced_kg"),
++                    ("operation_available_manure_kg", "manure_available_kg"),
++                    ("operation_available_tn_kg", "tn_available_kg"),
++                    ("operation_available_tp_kg", "tp_available_kg"),
++                ):
++                    budget[target] = float(first[source])
++                for key in ("manure_applied_kg", "tn_applied_kg", "tp_applied_kg",
++                            "tn_exported_kg", "tp_dissolved_exported_kg"):
++                    budget[key] = float(grouped[key].sum())
++                for nutrient in ("manure", "tn", "tp"):
++                    if not np.isclose(budget[f"{nutrient}_available_kg"], budget[f"{nutrient}_applied_kg"], rtol=1e-10, atol=1e-8):
++                        raise AssertionError(f"AFO {op_id}: non-conserved manure {nutrient} allocation")
++                budget_rows.append(budget)
++            budgets_dir = outputs_dir / "afo_operation_budgets"
++            budgets_dir.mkdir(parents=True, exist_ok=True)
++            _write_parquet_atomic(pd.DataFrame(budget_rows), budgets_dir / f"s{sid}.parquet", logger=logger)
++
+         # Direct feedlot and manure-field components retained independently
+         # through BMP application (kg/year) to enable source-specific auditing.
+         if afo_assignments:
+diff --git a/tests/test_afo_mass.py b/tests/test_afo_mass.py
+new file mode 100644
+index 0000000..b399de5
+--- /dev/null
++++ b/tests/test_afo_mass.py
+@@ -0,0 +1,193 @@
++"""APLE-derived P / APLE-inspired N, both baseline modes and mass ledgers."""
++from __future__ import annotations
++
++import logging
++import sqlite3
++from pathlib import Path
++from types import SimpleNamespace
++
++import numpy as np
++import pandas as pd
++import pytest
++
++from src.afo import load_afo_inputs
++from src.afo_mass import (
++    _draw, animal_production, manure_surface_export_kg,
++    mass_afo_realization, reference_excretion_factors,
++)
++from test_afo import _parcels, _state, _ctx, _package
++
++
++def _mass_package(tmp_path, *, weight=False):
++    path = _package(tmp_path / 'afo.gpkg')
++    with sqlite3.connect(path) as con:
++        pd.DataFrame([dict(afo_id='A1', season='spring', solids_pct=25,
++                           wep_fraction=0.4, f_n=0.2,
++                           collection_fraction=0.8, export_fraction=0.1,
++                           n_retention_fraction=0.7, p_retention_fraction=0.9,
++                           incorporated_fraction=0.2)]).to_sql('afo_manure_management', con, index=False)
++        if weight:
++            con.execute("ALTER TABLE afo_manure_fields ADD COLUMN weight REAL")
++            con.execute("UPDATE afo_manure_fields SET weight=2 WHERE pid=1")
++            con.execute("UPDATE afo_manure_fields SET weight=1 WHERE pid=3")
++        pd.DataFrame([dict(pid=1, eligible=1), dict(pid=3, eligible=1)]).to_sql('afo_field_eligibility', con, index=False)
++        pd.DataFrame([dict(pid=None, annual_runoff_mm=200, annual_precip_mm=1000,
++                           feedlot_runoff_mm=300)]).to_sql('afo_hydrology', con, index=False)
++    return path
++
++
++def _load(path, mode='plet_rusle'):
++    return load_afo_inputs(path, _parcels(), ['TN', 'TP'], method='mass_based', mode=mode,
++                           pathways=['surface', 'subsurface'], surface_pathway='surface')
++
++
++def test_aple_manure_p_equation_spring_solid_and_annual_n():
++    result = manure_surface_export_kg(applied_n_kg=100, applied_p_kg=30,
++             runoff_mm=200, precipitation_mm=1000, available_n_fraction=.2,
++             n_exponent=1, p_wep_fraction=.25, solids_pct=30,
++             incorporated_fraction=0, season='spring')
++    expected_available_p = 30*(.25 + .75*.15)
++    assert result['surface_available_p_kg'] == pytest.approx(expected_available_p)
++    assert result['TP'] == pytest.approx(expected_available_p*.2**1.225)
++    assert result['TN'] == pytest.approx(4.0)
++    assert manure_surface_export_kg(applied_n_kg=1, applied_p_kg=1, runoff_mm=0,
++            precipitation_mm=1000, available_n_fraction=.5,n_exponent=1,
++            p_wep_fraction=.4, solids_pct=30,incorporated_fraction=0,
++            season='spring')['TP'] == 0
++    with pytest.raises(ValueError,match='cannot exceed'):
++        manure_surface_export_kg(applied_n_kg=1, applied_p_kg=1,runoff_mm=1200,
++               precipitation_mm=1000,available_n_fraction=.5,n_exponent=1,
++               p_wep_fraction=.4,solids_pct=30,incorporated_fraction=0,season='spring')
++
++
++def test_aple_liquid_fall_and_incorporation_reduce_export():
++    kwargs=dict(applied_n_kg=80,applied_p_kg=50,runoff_mm=300,
++                precipitation_mm=1000, available_n_fraction=.3,n_exponent=1,
++                p_wep_fraction=.3)
++    spring=manure_surface_export_kg(**kwargs,solids_pct=20,incorporated_fraction=0,season='spring')
++    liquid=manure_surface_export_kg(**kwargs,solids_pct=10,incorporated_fraction=0,season='spring')
++    fall=manure_surface_export_kg(**kwargs,solids_pct=20,incorporated_fraction=0,season='fall')
++    incorporated=manure_surface_export_kg(**kwargs,solids_pct=20,incorporated_fraction=1,season='spring')
++    assert 0 < liquid['TP'] < spring['TP']
++    assert 0 < fall['TP'] < spring['TP']
++    assert incorporated['TP'] == 0
++    assert all(r['TN']==pytest.approx(7.2) for r in (spring,liquid,fall,incorporated))
++
++
++def test_production_factors_and_same_animal_count_for_feeding(tmp_path):
++    factors=reference_excretion_factors()
++    assert factors['beef_finishing']['tn_kg_head_day'] > 0
++    ctx=_ctx(None)
++    row=dict(afo_id='A1',species='beef_steer',count=10,animal_days=180)
++    result=animal_production(ctx,[row],'A1')
++    assert result['TN']==pytest.approx(10*180*factors['beef_finishing']['tn_kg_head_day'])
++    row['tn_kg_head_day']=.5
++    assert animal_production(ctx,[row],'A1')['TN']==pytest.approx(900)
++    with pytest.raises(ValueError,match='animal_days'):
++        animal_production(ctx,[dict(row,animal_days=400)],'A1')
++
++
++def test_plet_mass_allocation_conserves_and_preserves_subsurface(tmp_path):
++    inp=_load(_mass_package(tmp_path,weight=True))
++    state=_state()
++    ctx=_ctx(inp)
++    ctx.current_pathway_load_rates=state.pathway_load_rates
++    ctx.parcel_ids = state.parcel_ids
++    assignments,ledger=mass_afo_realization(ctx,state=state)
++    assert len(assignments)==2 and len(ledger)==2
++    assert ledger[0]['tn_applied_kg']/ledger[1]['tn_applied_kg']==pytest.approx(2)
++    factors=reference_excretion_factors()
++    produced_n=10*365*factors['beef_finishing']['tn_kg_head_day']
++    assert sum(r['tn_applied_kg'] for r in ledger)==pytest.approx(produced_n*.8*.9*.7)
++    assert sum(r['tp_applied_kg'] for r in ledger)==pytest.approx(10*365*factors['beef_finishing']['tp_kg_head_day']*.8*.9*.9)
++    assert sum(r['tn_exported_kg'] for r in ledger) <= sum(r['tn_applied_kg'] for r in ledger)
++    assert sum(r['tp_dissolved_exported_kg'] for r in ledger) <= sum(r['tp_applied_kg'] for r in ledger)
++    assert state.pathway_load_rates[2,0,1]==pytest.approx(2.)  # no manure subsurface
++    assert state.pathway_load_rates[0,0,1]==pytest.approx(1.6)  # feedlot footprint
++    assert state.concentrations[2]['TN']>2
++    assert ctx.current_afo_feedlot_pathway_rates[0,0,0]>0
++
++
++def test_statistical_mode_loads_direct_feedlot_and_manure(tmp_path):
++    inp=_load(_mass_package(tmp_path),mode='statistical')
++    ctx=_ctx(inp)
++    ctx.parcel_ids=['1','2','3','4']
++    ctx.current_pathway_load_rates=np.array([[[3.,2.],[1.,.5]]]*4)
++    before=ctx.current_pathway_load_rates.copy()
++    assignments,ledger=mass_afo_realization(ctx)
++    assert len(assignments)==2
++    assert ctx.current_pathway_load_rates[0,0,1]==pytest.approx(before[0,0,1]*.8)
++    assert ctx.current_pathway_load_rates[2,0,0]>before[2,0,0]
++    assert ctx.current_afo_feedlot_pathway_rates[0,0,0]>0
++    assert ctx.current_afo_feedlot_pathway_rates[0,0,1]==0
++    assert ctx.current_afo_manure_pathway_rates[2,0,1]==0
++    assert all(row['runoff_mm']==200 for row in ledger)
++
++
++def test_invalid_missing_management_and_statistical_hydrology(tmp_path):
++    path=_mass_package(tmp_path)
++    with sqlite3.connect(path) as con:
++        con.execute('DELETE FROM afo_manure_management')
++    with pytest.raises(ValueError,match='one row'):
++        _load(path)
++
++
++def test_shared_selection_exact_nonnegative_and_reproducible(tmp_path):
++    path=_mass_package(tmp_path)
++    inp=_load(path,mode='statistical')
++    a_ctx=_ctx(inp,seed=10)
++    a_ctx.parcel_ids=['1','2','3','4']
++    a_ctx.current_pathway_load_rates=np.ones((4,2,2))
++    b_ctx=_ctx(inp,seed=10)
++    b_ctx.parcel_ids=a_ctx.parcel_ids
++    b_ctx.current_pathway_load_rates=np.ones((4,2,2))
++    _,a=mass_afo_realization(a_ctx)
++    _,b=mass_afo_realization(b_ctx)
++    assert a==b
++
++
++def test_distributed_management_fraction_and_count(tmp_path):
++    package = _mass_package(tmp_path)
++    with sqlite3.connect(package) as conn:
++        conn.execute('ALTER TABLE afo_manure_management ADD COLUMN f_n_value REAL')
++        conn.execute('UPDATE afo_manure_management SET f_n=NULL, f_n_value=0.35')
++        conn.execute('ALTER TABLE afo_animals ADD COLUMN count_value REAL')
++        conn.execute('UPDATE afo_animals SET count=NULL, count_value=12')
++    inputs = _load(package, mode='statistical')
++    ctx = _ctx(inputs)
++    ctx.parcel_ids = ['1','2','3','4']
++    ctx.current_pathway_load_rates = np.ones((4,2,2))
++    _, ledger = mass_afo_realization(ctx)
++    assert all(row['f_n'] == pytest.approx(.35) for row in ledger)
++    assert all(row['animal_n_produced_kg'] == pytest.approx(12*365*reference_excretion_factors()['beef_finishing']['tn_kg_head_day']) for row in ledger)
++    assert ctx.current_afo_feedlot_pathway_rates[0,0,0] > 0
++
++
++def test_statistical_huc_hydrology_inheritance(tmp_path):
++    package = _mass_package(tmp_path)
++    with sqlite3.connect(package) as conn:
++        conn.execute('DROP TABLE afo_hydrology')
++        pd.DataFrame([
++            dict(pid=None, huc12=None, annual_runoff_mm=100., annual_precip_mm=800., feedlot_runoff_mm=200.),
++            dict(pid=None, huc12='050900000001', annual_runoff_mm=250., annual_precip_mm=1100., feedlot_runoff_mm=350.),
++            dict(pid=3, huc12=None, annual_runoff_mm=400., annual_precip_mm=1200., feedlot_runoff_mm=500.),
++        ]).to_sql('afo_hydrology', conn, index=False)
++    parcel_package = tmp_path / 'parcels.gpkg'
++    with sqlite3.connect(parcel_package) as conn:
++        pd.DataFrame([dict(pid=1,huc_id='050900000001'),dict(pid=2,huc_id='050900000001'),
++                      dict(pid=3,huc_id='050900000001'),dict(pid=4,huc_id='050900000002')]
++                    ).to_sql('parcel_huc12',conn,index=False)
++    loaded = load_afo_inputs(package,_parcels(),['TN','TP'],method='mass_based',
++           mode='statistical',pathways=['surface','subsurface'],parcel_path=parcel_package)
++    assert loaded['hydrology']['1']['annual_runoff_mm'] == 250.
++    assert loaded['hydrology']['3']['annual_runoff_mm'] == 400.
++    assert loaded['hydrology']['4']['annual_runoff_mm'] == 100.
++    assert loaded['hydrology']['1'] is loaded['hydrology']['2']
++
++
++def test_statistical_invalid_missing_feedlot_runoff_is_rejected(tmp_path):
++    package = _mass_package(tmp_path)
++    with sqlite3.connect(package) as conn:
++        conn.execute('UPDATE afo_hydrology SET feedlot_runoff_mm=NULL')
++    with pytest.raises(ValueError, match='feedlot_runoff_mm'):
++        _load(package,mode='statistical')
+diff --git a/tests/test_plet_end_to_end_regression.py b/tests/test_plet_end_to_end_regression.py
+index 428b921..2ccce32 100644
+--- a/tests/test_plet_end_to_end_regression.py
++++ b/tests/test_plet_end_to_end_regression.py
+@@ -360,3 +360,59 @@ def test_afo_integrated_scenario_keeps_feedlot_and_field_bmps_separate(
+     tn = tn[tn.pollutant == "TN"].iloc[0]
+     assert tn["final_direct_feedlot_surface_kg_yr"] == pytest.approx(tn["baseline_direct_feedlot_surface_kg_yr"])
+     assert tn["final_manure_field_surface_kg_yr"] == pytest.approx(tn["baseline_manure_field_surface_kg_yr"] * .5)
++
++
++def _single_mass_afo_payload(*, statistical: bool) -> dict:
++    from shapely.geometry import box
++    payload = _shared_payload()
++    payload["afo_inputs"] = {
++        "method": "mass_based",
++        "operations": [{"afo_id": "demo", "pid": "P1", "feedlot_area_ha": .2,
++                        "paved_pct": 30., "allocation": "explicit", "manure_months": 12.}],
++        "animals": [{"afo_id": "demo", "species": "beef_finishing", "count": 10.,
++                     "factor_tn": 1., "factor_tp": 1.}],
++        "fields": [{"afo_id": "demo", "pid": "P1"}],
++        "management": [{"afo_id": "demo", "season": "spring", "solids_pct": 25.,
++                         "wep_fraction": .4, "f_n": .2}],
++        "eligible": {"P1": True},
++        "hydrology": {"P1": {"annual_precip_mm": 1000., "annual_runoff_mm": 200.,
++                              "feedlot_runoff_mm": 300.}},
++        "surface_pathway": "surface",
++        "geometry": {"P1": box(0,0,100,100)}, "area_ha": {"P1": 1.},
++    }
++    payload["feedlot_bmp_cps"] = {340}
++    if statistical:
++        payload["load_generation_mode"] = "statistical"
++        payload["load_generation"] = {"mode": "statistical"}
++        payload["pollutant_load_rate_is_aggregate"] = False
++        payload["pollutant_load_rate_stats"] = [[
++            {"surface": {"value": 3.}, "subsurface": {"value": 2.}},
++            {"surface": {"value": 1.}, "subsurface": {"value": .5}},
++            {"surface": {"value": .8}, "subsurface": {"value": 0.}},
++        ]]
++    return payload
++
++
++@pytest.mark.parametrize("statistical", [False, True])
++def test_mass_based_integrated_baseline_bmp_and_outputs(tmp_path, monkeypatch, statistical):
++    """Both modes must pass the same manure ledger to BMP/source accounting."""
++    written = {}
++    monkeypatch.setattr("src.model._write_parquet_atomic",
++                        lambda df, path, logger: written.setdefault((path.parent.name, path.name), df.copy()))
++    payload = _single_mass_afo_payload(statistical=statistical)
++    _run_one_scenario(payload, _config(tmp_path), sidx=0, seed=1234, outputs_dir=tmp_path)
++    ledger = written[("afo_mass_ledger", "s1.parquet")]
++    budget = written[("afo_operation_budgets", "s1.parquet")]
++    assert len(budget) == 1
++    assert budget.iloc[0].tn_available_kg == pytest.approx(budget.iloc[0].tn_applied_kg)
++    assert budget.iloc[0].tp_available_kg == pytest.approx(budget.iloc[0].tp_applied_kg)
++    assert len(ledger)==1
++    assert ledger.iloc[0].tn_applied_kg>ledger.iloc[0].tn_exported_kg>0
++    assert ledger.iloc[0].tp_applied_kg>ledger.iloc[0].tp_dissolved_exported_kg>0
++    source = written[("afo_load_components", "s1.parquet")]
++    tn = source[source.pollutant=="TN"].iloc[0]
++    assert tn.baseline_manure_field_surface_kg_yr>0
++    assert tn.baseline_manure_field_subsurface_kg_yr==0
++    assert tn.final_manure_field_surface_kg_yr==pytest.approx(tn.baseline_manure_field_surface_kg_yr)
++    assert tn.final_direct_feedlot_surface_kg_yr==pytest.approx(.5*tn.baseline_direct_feedlot_surface_kg_yr)
++    assert ("parcels", "s1.parquet") in written

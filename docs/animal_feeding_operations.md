@@ -2,6 +2,11 @@
 
 ## Scope and model interpretation
 
+**Two AFO manure-loading modes are now available.** This document describes
+the pre-existing `concentration_increment` method, which remains the PLET
+backward-compatible default. For the optional mass-based method supporting
+PLET **and statistical mode**, see [Mass-based AFO loading](afo_mass_based.md).
+
 The optional `animal_operations` GeoPackage activates **PLET-style** direct
 feedlot runoff and explicit/probabilistic field manure exposure in
 `load_generation.mode: plet_rusle`. The model does **not** simulate a manure

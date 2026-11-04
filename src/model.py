@@ -34,7 +34,7 @@ from src.cost import _estimate_costs_for_probabilities, _get_bmp_cost, _select_c
 from src.io_utils import _write_parquet_atomic, _flatten_plot_records
 from src.input_distributions import sample_group_key
 from src.logging_utils import make_worker_logger, log_scope
-from src.afo import apply_afo_baseline
+from src.afo import apply_afo_baseline, mass_afo_realization
 from src.plet_rusle import (
     calculate_load_diagnostics,
     initialize_plet_rusle_state,
@@ -50,6 +50,7 @@ from src.parcel import (
 from src.sampling import _piecewise_quantile_sample, _sample_from_stats, _trunc_normal
 from src.summaries import BMPSummaryCollector
 from src.constants import (
+    CURRENT_TIMESTEP_YEARS as _CURRENT_TIMESTEP_YEARS,
     CFG_BMP_COST,
     CFG_BMP_SEL,
     CFG_DETERMINISTIC_BMP_TYPE_ORDER,
@@ -116,13 +117,6 @@ from src.constants import (
     YAXIS_TARGET,
     YAXIS_TOTAL,
 )
-
-
-# Current production runs use an annual timestep. Multiplying annual load rates
-# (kg/yr) by one year converts them to mass (kg) without changing the numeric
-# value. Future dynamic implementations should replace this constant with the
-# actual timestep duration in years before aggregating mass.
-_CURRENT_TIMESTEP_YEARS = 1.0
 
 
 def _safe_mass_ratio(numerator: float, denominator: float) -> Optional[float]:
@@ -702,14 +696,18 @@ def _run_one_scenario(
         n_pol = len(ctx.pollutants)
         load_state = None
         afo_assignments = []
+        manure_mass_ledger = []
 
         if ctx.load_generation_mode == LOAD_MODE_PLET_RUSLE:
             baseline_load_rates, load_state = initialize_plet_rusle_state(ctx)
-            afo_assignments = apply_afo_baseline(ctx, load_state)
+            ctx.current_pathway_load_rates = load_state.pathway_load_rates
+            if (ctx.afo_inputs or {}).get("method") == "mass_based":
+                afo_assignments, manure_mass_ledger = mass_afo_realization(ctx, state=load_state)
+            else:
+                afo_assignments = apply_afo_baseline(ctx, load_state)
             if afo_assignments:
                 baseline_load_rates = load_state.pathway_load_rates.sum(axis=2)
             load_rates = baseline_load_rates.copy()
-            ctx.current_pathway_load_rates = load_state.pathway_load_rates
             ctx.current_untreated_groundwater_load_rates = load_state.untreated_groundwater_load_rates
             ctx.pathway_names = ["surface", "subsurface"]
             logger.info("Generated baseline_load_rates PLET/RUSLE load_rates for surface and subsurface pathways")
@@ -746,6 +744,10 @@ def _run_one_scenario(
                     baseline_load_rates[i, pol_idx] = float(np.sum(pathway_load_rates[i, pol_idx, :]))
                     load_rates[i, pol_idx] = baseline_load_rates[i, pol_idx]
             ctx.current_pathway_load_rates = pathway_load_rates
+            if (ctx.afo_inputs or {}).get("method") == "mass_based":
+                afo_assignments, manure_mass_ledger = mass_afo_realization(ctx)
+                baseline_load_rates[:, :] = pathway_load_rates.sum(axis=2)
+                load_rates[:, :] = baseline_load_rates
             logger.info(
                 "Generated statistical baseline_load_rates parcel load_rates across pathways: "
                 + ", ".join(ctx.pathway_names)
@@ -982,6 +984,38 @@ def _run_one_scenario(
                 pd.DataFrame([dict(scenario=sid, **rec) for rec in afo_assignments]),
                 allocation_dir / f"s{sid}.parquet", logger=logger,
             )
+
+        if manure_mass_ledger:
+            manure_dir = outputs_dir / "afo_mass_ledger"
+            manure_dir.mkdir(parents=True, exist_ok=True)
+            manure_df = pd.DataFrame([dict(scenario=sid, **rec) for rec in manure_mass_ledger])
+            _write_parquet_atomic(manure_df, manure_dir / f"s{sid}.parquet", logger=logger)
+            # One row per operation prevents accidentally summing replicated
+            # operation-wide excretion figures across multiple receiving fields.
+            budget_rows = []
+            for op_id, grouped in manure_df.groupby("afo_id", sort=True):
+                first = grouped.iloc[0]
+                budget = {"scenario": sid, "afo_id": op_id,
+                          "receiver_count": len(grouped)}
+                for source, target in (
+                    ("animal_manure_produced_kg", "manure_produced_kg"),
+                    ("animal_n_produced_kg", "tn_produced_kg"),
+                    ("animal_p_produced_kg", "tp_produced_kg"),
+                    ("operation_available_manure_kg", "manure_available_kg"),
+                    ("operation_available_tn_kg", "tn_available_kg"),
+                    ("operation_available_tp_kg", "tp_available_kg"),
+                ):
+                    budget[target] = float(first[source])
+                for key in ("manure_applied_kg", "tn_applied_kg", "tp_applied_kg",
+                            "tn_exported_kg", "tp_dissolved_exported_kg"):
+                    budget[key] = float(grouped[key].sum())
+                for nutrient in ("manure", "tn", "tp"):
+                    if not np.isclose(budget[f"{nutrient}_available_kg"], budget[f"{nutrient}_applied_kg"], rtol=1e-10, atol=1e-8):
+                        raise AssertionError(f"AFO {op_id}: non-conserved manure {nutrient} allocation")
+                budget_rows.append(budget)
+            budgets_dir = outputs_dir / "afo_operation_budgets"
+            budgets_dir.mkdir(parents=True, exist_ok=True)
+            _write_parquet_atomic(pd.DataFrame(budget_rows), budgets_dir / f"s{sid}.parquet", logger=logger)
 
         # Direct feedlot and manure-field components retained independently
         # through BMP application (kg/year) to enable source-specific auditing.

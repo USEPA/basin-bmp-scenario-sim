@@ -18,6 +18,11 @@ map through ``POLLUTANT_ALIAS_MAP``. Output prefixes such as ``treated_`` and
 ``total_cost_usd`` capture BMP costing.
 """
 
+from dataclasses import dataclass
+import math
+import re
+from typing import Dict, Mapping, Optional, Tuple
+
 # Unit conversions
 FT_TO_M = 0.3048
 M2_PER_HA = 10_000.0
@@ -25,6 +30,24 @@ INCH_OVER_HA_TO_LITERS = 254_000.0
 TON_PER_ACRE_TO_KG_PER_HA = 907.18474 / 0.40468564224
 CURRENT_TIMESTEP_YEARS = 1.0
 
+# AFO manure and feedlot assumptions
+AFO_FEEDLOT_CURVE_NUMBERS = (91.0, 92.0, 93.0, 94.0)
+AFO_FEEDLOT_MAX_CONCENTRATIONS = {"TN": 1500.0, "TP": 300.0, "BOD": 2000.0}
+AFO_SEASONAL_P_WEIGHTS = {"winter": 0.20, "spring": 0.15, "summer": 0.10, "fall": 0.05}
+AFO_SPECIES_ALIASES = {
+    "beef_steer": "beef_finishing",
+    "dairy_cow": "dairy_lactating",
+    "swine": "swine_grow_finish",
+    "broiler": "poultry_broiler",
+}
+
+# Custom logging level
+VERBOSE_LEVEL_NUM = 15
+
+# Input schema metadata
+INPUT_SCHEMA_TABLE = "model_input_schema"
+INPUT_SCHEMA_VERSION = 3
+PLET_REQUIRED_PARAMETERS = frozenset({"land_cover"})
 
 # Config keys
 CFG_DOMAIN = "domain"
@@ -51,6 +74,22 @@ CFG_OUTPUTS = "outputs"
 CFG_VERBOSE = "verbose"
 CFG_BUFFER_DEPTH_FT = "buffer_depth_ft"
 CFG_BMP_SEL_PROB_VIA_COSTS = "bmp_sel_prob_via_costs"
+
+# Configuration path resolution
+PLET_HYDROLOGY_LABEL = "plet_hydrology_inputs"
+CONFIG_PATH_KEYS = (
+    CFG_DOMAIN,
+    CFG_PARCELS,
+    CFG_PLET_FORCING,
+    CFG_HUC_PARAMETERS,
+    CFG_OUTLETS,
+    "animal_operations",
+    CFG_BMP_EFFICIENCY,
+    CFG_BMP_COST,
+    CFG_BMP_SEL,
+    CFG_OUTPUTS,
+)
+LOAD_GENERATION_PATH_KEYS: tuple[str, ...] = ()
 
 # Canonical output folders/files
 DIR_SCENARIO_METRICS = "scenario_metrics"
@@ -379,3 +418,355 @@ BMP_CPS_NAME_MAP = {
 # Canonical pathway labels
 PATHWAY_VALUES = ("surface", "shallow subsurface", "deep subsurface")
 PLET_PATHWAY_VALUES = ("surface", "subsurface")
+
+
+# Unit validation specifications
+@dataclass(frozen=True)
+class UnitSpec:
+    """Describe one canonical unit and accepted conversion aliases."""
+
+    canonical: str
+    aliases: Mapping[str, float]
+
+
+def _unit_key(value: object) -> str:
+    """Normalize a human-authored unit label for comparison."""
+    text = str(value).strip().lower()
+    text = text.replace("µ", "u").replace("μ", "u")
+    text = text.replace("²", "2").replace("^2", "2")
+    text = text.replace("·", "*").replace("×", "*")
+    text = text.replace("$", "usd")
+    text = text.replace("_", " ")
+    text = re.sub(r"\bper\b", "/", text)
+    return re.sub(r"\s+", "", text)
+
+
+def _spec(canonical: str, aliases: Mapping[str, float]) -> UnitSpec:
+    normalized = {_unit_key(canonical): 1.0}
+    normalized.update({_unit_key(label): float(factor) for label, factor in aliases.items()})
+    return UnitSpec(canonical=canonical, aliases=normalized)
+
+
+FRACTION_SPEC = _spec(
+    "fraction",
+    {
+        "ratio": 1.0, "decimal": 1.0, "dimensionless": 1.0, "unitless": 1.0, "1": 1.0,
+        "percent": 0.01, "pct": 0.01, "%": 0.01,
+    },
+)
+PERCENT_SPEC = _spec(
+    "percent",
+    {
+        "pct": 1.0, "%": 1.0, "fraction": 100.0, "ratio": 100.0, "decimal": 100.0,
+        "dimensionless": 100.0, "unitless": 100.0, "1": 100.0,
+    },
+)
+DIMENSIONLESS_SPEC = _spec(
+    "dimensionless", {"unitless": 1.0, "1": 1.0, "ratio": 1.0, "index": 1.0}
+)
+PRECIP_SPEC = _spec(
+    "in/year",
+    {
+        "in/yr": 1.0, "inch/year": 1.0, "inches/year": 1.0, "inch/yr": 1.0,
+        "inches/yr": 1.0, "mm/year": 1.0 / 25.4, "mm/yr": 1.0 / 25.4,
+        "cm/year": 1.0 / 2.54, "cm/yr": 1.0 / 2.54, "m/year": 100.0 / 2.54,
+        "m/yr": 100.0 / 2.54,
+    },
+)
+EVENT_PRECIP_SPEC = _spec(
+    "in/event",
+    {
+        "in": 1.0, "inch": 1.0, "inches": 1.0, "inch/event": 1.0,
+        "inches/event": 1.0, "in/storm": 1.0, "inch/storm": 1.0,
+        "inches/storm": 1.0, "mm": 1.0 / 25.4, "mm/event": 1.0 / 25.4,
+        "mm/storm": 1.0 / 25.4, "cm": 1.0 / 2.54, "cm/event": 1.0 / 2.54,
+        "cm/storm": 1.0 / 2.54,
+    },
+)
+DAYS_PER_YEAR_SPEC = _spec(
+    "days/year",
+    {"day/year": 1.0, "days/yr": 1.0, "day/yr": 1.0, "d/year": 1.0, "d/yr": 1.0},
+)
+CONCENTRATION_SPEC = _spec(
+    "mg/L",
+    {
+        "mg/liter": 1.0, "mg/litre": 1.0, "ug/L": 1.0e-3, "ug/liter": 1.0e-3,
+        "ug/litre": 1.0e-3, "g/L": 1.0e3, "g/liter": 1.0e3, "g/litre": 1.0e3,
+        "mg/m3": 1.0e-3, "g/m3": 1.0, "kg/m3": 1.0e3,
+    },
+)
+LOAD_RATE_SPEC = _spec(
+    "kg/ha/yr",
+    {
+        "kg/ha/year": 1.0, "kg/hectare/yr": 1.0, "kg/hectare/year": 1.0,
+        "kg/ac/yr": 1.0 / 0.40468564224, "kg/acre/yr": 1.0 / 0.40468564224,
+        "lb/ha/yr": 0.45359237, "lb/hectare/yr": 0.45359237,
+        "lb/ac/yr": 0.45359237 / 0.40468564224,
+        "lb/acre/yr": 0.45359237 / 0.40468564224,
+        "lb/ac/year": 0.45359237 / 0.40468564224,
+        "lb/acre/year": 0.45359237 / 0.40468564224, "g/m2/yr": 10.0,
+        "g/m2/year": 10.0, "mg/m2/yr": 0.01, "mg/m2/year": 0.01,
+        "kg/km2/yr": 0.01, "kg/km2/year": 0.01,
+    },
+)
+MASS_RATE_SPEC = _spec(
+    "kg/yr",
+    {
+        "kg/year": 1.0, "g/yr": 1.0e-3, "g/year": 1.0e-3, "mg/yr": 1.0e-6,
+        "mg/year": 1.0e-6, "lb/yr": 0.45359237, "lb/year": 0.45359237,
+        "ton/yr": 907.18474, "ton/year": 907.18474, "tons/yr": 907.18474,
+        "tons/year": 907.18474, "metric ton/yr": 1000.0, "metric ton/year": 1000.0,
+        "tonne/yr": 1000.0, "tonne/year": 1000.0,
+    },
+)
+COST_AREA_SPEC = _spec(
+    "usd/ha",
+    {
+        "usd/hectare": 1.0, "usd/ac": 1.0 / 0.40468564224,
+        "usd/acre": 1.0 / 0.40468564224, "usd/m2": 10000.0,
+        "usd per unit area": 1.0,
+    },
+)
+COST_LENGTH_SPEC = _spec(
+    "usd/m",
+    {
+        "usd/meter": 1.0, "usd/metre": 1.0, "usd/ft": 1.0 / 0.3048,
+        "usd/foot": 1.0 / 0.3048, "usd/km": 0.001, "usd per unit length": 1.0,
+    },
+)
+COST_PROJECT_SPEC = _spec(
+    "usd/project",
+    {"usd/bmp": 1.0, "usd/practice": 1.0, "usd/each": 1.0, "usd/unit": 1.0},
+)
+RUSLE_R_SPEC = _spec(
+    "rusle-r-us-customary",
+    {
+        "us customary rusle r": 1.0, "us-customary-rusle-r": 1.0, "plet-r": 1.0,
+        "index": 1.0,
+    },
+)
+RUSLE_K_SPEC = _spec(
+    "rusle-k-us-customary",
+    {
+        "us customary rusle k": 1.0, "us-customary-rusle-k": 1.0, "plet-k": 1.0,
+        "ton acre hour/(acre foot ton inch)": 1.0,
+    },
+)
+
+_KIND_SPECS: Dict[str, Tuple[UnitSpec, ...]] = {
+    "fraction": (FRACTION_SPEC,),
+    "percent": (PERCENT_SPEC,),
+    "dimensionless": (DIMENSIONLESS_SPEC,),
+    "precip": (PRECIP_SPEC,),
+    "event_precip": (EVENT_PRECIP_SPEC,),
+    "days_per_year": (DAYS_PER_YEAR_SPEC,),
+    "concentration": (CONCENTRATION_SPEC,),
+    "load_rate": (LOAD_RATE_SPEC,),
+    "mass_rate": (MASS_RATE_SPEC,),
+    "cost": (COST_AREA_SPEC, COST_LENGTH_SPEC, COST_PROJECT_SPEC),
+    "rusle_r": (RUSLE_R_SPEC,),
+    "rusle_k": (RUSLE_K_SPEC,),
+}
+_PARAMETER_KINDS: Dict[str, str] = {
+    "annual_precip_in": "precip",
+    "avg_rain_in": "event_precip",
+    "rain_days": "days_per_year",
+    "rain_correction_fraction": "fraction",
+    "runoff_day_fraction": "fraction",
+    "cn": "dimensionless",
+    "ia_ratio": "fraction",
+    "infiltration_fraction": "fraction",
+    "runoff_multiplier": "dimensionless",
+    "groundwater_multiplier": "dimensionless",
+    "r": "rusle_r",
+    "k": "rusle_k",
+    "ls": "dimensionless",
+    "c": "dimensionless",
+    "p": "dimensionless",
+    "sdr": "fraction",
+    "sediment_multiplier": "dimensionless",
+    "sediment_delivery_multiplier": "dimensionless",
+    "sediment_n_pct": "percent",
+    "sediment_p_pct": "percent",
+    "enrichment_ratio": "dimensionless",
+    "fraction_subsurface_shallow": "fraction",
+}
+
+
+# Physical input validation domains
+@dataclass(frozen=True)
+class PhysicalDomain:
+    """Allowed physical domain for a user-supplied numeric quantity."""
+
+    low: Optional[float] = None
+    high: Optional[float] = None
+    low_inclusive: bool = True
+    high_inclusive: bool = True
+
+    def contains(self, value: float) -> bool:
+        numeric = float(value)
+        if not math.isfinite(numeric):
+            return False
+        if self.low is not None:
+            if self.low_inclusive and numeric < self.low:
+                return False
+            if not self.low_inclusive and numeric <= self.low:
+                return False
+        if self.high is not None:
+            if self.high_inclusive and numeric > self.high:
+                return False
+            if not self.high_inclusive and numeric >= self.high:
+                return False
+        return True
+
+    def describe(self) -> str:
+        if self.low is None and self.high is None:
+            return "all finite values"
+        if self.low is None:
+            operator = "<=" if self.high_inclusive else "<"
+            return f"{operator} {self.high:g}"
+        if self.high is None:
+            operator = ">=" if self.low_inclusive else ">"
+            return f"{operator} {self.low:g}"
+        left = "[" if self.low_inclusive else "("
+        right = "]" if self.high_inclusive else ")"
+        return f"{left}{self.low:g}, {self.high:g}{right}"
+
+
+NONNEGATIVE_DOMAIN = PhysicalDomain(low=0.0)
+POSITIVE_DOMAIN = PhysicalDomain(low=0.0, low_inclusive=False)
+FRACTION_DOMAIN = PhysicalDomain(low=0.0, high=1.0)
+EFFICIENCY_DOMAIN = PhysicalDomain(high=1.0)
+PERCENT_DOMAIN = PhysicalDomain(low=0.0, high=100.0)
+CN_DOMAIN = PhysicalDomain(low=0.0, high=100.0, low_inclusive=False)
+IA_RATIO_DOMAIN = PhysicalDomain(low=0.0, high=0.20)
+_TABLE_PHYSICAL_DOMAINS: Dict[str, PhysicalDomain] = {
+    CFG_POLLUTANT_LOAD_RATE: NONNEGATIVE_DOMAIN,
+    CFG_BMP_EFFICIENCY: EFFICIENCY_DOMAIN,
+    CFG_BMP_COST: NONNEGATIVE_DOMAIN,
+    LOAD_CONCENTRATIONS: NONNEGATIVE_DOMAIN,
+    LOAD_GROUNDWATER_CONCENTRATIONS: NONNEGATIVE_DOMAIN,
+}
+_PARAMETER_PHYSICAL_DOMAINS: Dict[str, PhysicalDomain] = {
+    "annual_precip_in": NONNEGATIVE_DOMAIN,
+    "avg_rain_in": NONNEGATIVE_DOMAIN,
+    "rain_days": NONNEGATIVE_DOMAIN,
+    "rain_correction_fraction": FRACTION_DOMAIN,
+    "runoff_day_fraction": FRACTION_DOMAIN,
+    "cn": CN_DOMAIN,
+    "ia_ratio": IA_RATIO_DOMAIN,
+    "infiltration_fraction": FRACTION_DOMAIN,
+    "runoff_multiplier": NONNEGATIVE_DOMAIN,
+    "groundwater_multiplier": NONNEGATIVE_DOMAIN,
+    "r": NONNEGATIVE_DOMAIN,
+    "k": NONNEGATIVE_DOMAIN,
+    "ls": NONNEGATIVE_DOMAIN,
+    "c": NONNEGATIVE_DOMAIN,
+    "p": NONNEGATIVE_DOMAIN,
+    "sdr": FRACTION_DOMAIN,
+    "sediment_multiplier": NONNEGATIVE_DOMAIN,
+    "sediment_delivery_multiplier": NONNEGATIVE_DOMAIN,
+    "sediment_n_pct": PERCENT_DOMAIN,
+    "sediment_p_pct": PERCENT_DOMAIN,
+    "enrichment_ratio": NONNEGATIVE_DOMAIN,
+    "fraction_subsurface_shallow": FRACTION_DOMAIN,
+}
+_SAMPLING_KIND_PHYSICAL_DOMAINS: Dict[str, PhysicalDomain] = {
+    "efficiency": EFFICIENCY_DOMAIN,
+    "load_rate": NONNEGATIVE_DOMAIN,
+    "nonnegative": NONNEGATIVE_DOMAIN,
+    "fraction": FRACTION_DOMAIN,
+    "cn": CN_DOMAIN,
+    "ia_ratio": IA_RATIO_DOMAIN,
+    "percent": PERCENT_DOMAIN,
+    "positive": POSITIVE_DOMAIN,
+}
+
+
+# Consolidated input schema
+@dataclass(frozen=True)
+class InputVariableSpec:
+    """Description of one user-facing ``input_*`` table."""
+
+    name: str
+    table: str
+    key_columns: Tuple[str, ...]
+    kind: str
+    required_modes: Tuple[str, ...] = ()
+    canonical_units: str | None = None
+    default_row_allowed: bool = False
+
+
+def _build_input_variable_specs() -> Dict[str, InputVariableSpec]:
+    registry: Dict[str, InputVariableSpec] = {}
+    for parameter, table in PARCEL_PARAMETER_INPUT_TABLES.items():
+        kind = (
+            "classification"
+            if parameter in PLET_CLASSIFICATION_PARAMETERS
+            else "numeric_distribution"
+        )
+        required_modes = ("plet_rusle",) if parameter in PLET_REQUIRED_PARAMETERS else ()
+        registry[table] = InputVariableSpec(
+            name=parameter,
+            table=table,
+            key_columns=("pid",),
+            kind=kind,
+            required_modes=required_modes,
+            default_row_allowed=True,
+        )
+    registry[GPKG_INPUT_SELECTION_WEIGHT] = InputVariableSpec(
+        name="selection_weight",
+        table=GPKG_INPUT_SELECTION_WEIGHT,
+        key_columns=("pid",),
+        kind="fixed_numeric",
+        default_row_allowed=True,
+    )
+    registry[GPKG_INPUT_CURVE_NUMBER] = InputVariableSpec(
+        name="cn",
+        table=GPKG_INPUT_CURVE_NUMBER,
+        key_columns=("land_cover", "hsg"),
+        kind="numeric_distribution",
+        required_modes=("plet_rusle",),
+    )
+    registry[GPKG_INPUT_INFILTRATION_FRACTION] = InputVariableSpec(
+        name="infiltration_fraction",
+        table=GPKG_INPUT_INFILTRATION_FRACTION,
+        key_columns=("land_cover", "hsg"),
+        kind="numeric_distribution",
+        required_modes=("plet_rusle",),
+    )
+    registry[GPKG_INPUT_POLLUTANT_LOAD_RATE] = InputVariableSpec(
+        name="pollutant_load_rate",
+        table=GPKG_INPUT_POLLUTANT_LOAD_RATE,
+        key_columns=("pid", "pollutant"),
+        kind="numeric_distribution",
+        required_modes=("statistical",),
+        default_row_allowed=True,
+    )
+    registry[GPKG_INPUT_SURFACE_CONCENTRATION] = InputVariableSpec(
+        name="surface_concentration",
+        table=GPKG_INPUT_SURFACE_CONCENTRATION,
+        key_columns=("pid", "pollutant"),
+        kind="numeric_distribution",
+        default_row_allowed=True,
+    )
+    registry[GPKG_INPUT_SUBSURFACE_CONCENTRATION] = InputVariableSpec(
+        name="subsurface_concentration",
+        table=GPKG_INPUT_SUBSURFACE_CONCENTRATION,
+        key_columns=("pid", "pollutant"),
+        kind="numeric_distribution",
+        default_row_allowed=True,
+    )
+    for name, table in GPKG_DELIVERY_RATIO_TABLES.items():
+        registry[table] = InputVariableSpec(
+            name=name,
+            table=table,
+            key_columns=("pid", "oid"),
+            kind="fixed_numeric",
+            default_row_allowed=True,
+        )
+    return registry
+
+
+INPUT_VARIABLE_SPECS: Dict[str, InputVariableSpec] = _build_input_variable_specs()
+KNOWN_INPUT_TABLES = frozenset(INPUT_VARIABLE_SPECS)

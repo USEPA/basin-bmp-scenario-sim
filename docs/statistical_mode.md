@@ -69,3 +69,13 @@ Fractions must match active efficiency pathways and sum to `1.0`.
 ## Parcel selection
 
 Optional parcel-selection weights are stored in `input_selection_weight`, not on the spatial `parcels` layer. The table is keyed by `pid` and uses deterministic `value` entries. If the table is absent, parcel selection is uniform.
+
+## Optional AFO manure mass and feedlot runoff
+
+`load_generation.mode: statistical` supports the **mass-based** AFO module
+with independent animal/manure production, parcel allocation, annual runoff/
+precipitation and separate direct-feedlot surface loading. An explicit
+statistical `surface_pathway` and a baseline excluding the modeled manure/
+feedlot loads are required. See [Mass-based AFO loading](afo_mass_based.md)
+for inputs, hierarchy and equations. The legacy `concentration_increment`
+AFO method is PLET-only.

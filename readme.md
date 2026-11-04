@@ -179,3 +179,7 @@ BMP codes are identified with `feedlot_bmp_cps`. Input tables, selection
 semantics, examples, and limitations are described in
 [docs/animal_feeding_operations.md](docs/animal_feeding_operations.md).
 
+
+Optional mass-based manure production, allocation and annual TN/TP surface
+export is available in both PLET/RUSLE and statistical modes. See
+[docs/afo_mass_based.md](docs/afo_mass_based.md) for a reproducible example.

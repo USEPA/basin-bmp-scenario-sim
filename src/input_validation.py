@@ -9,7 +9,6 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from dataclasses import dataclass
 from typing import Any, Dict, List, Mapping, Optional, Sequence, Tuple
 
 import numpy as np
@@ -36,108 +35,20 @@ from .constants import (
     COL_PROBABILITY,
     LOAD_CONCENTRATIONS,
     LOAD_GROUNDWATER_CONCENTRATIONS,
+    CN_DOMAIN,
+    EFFICIENCY_DOMAIN,
+    FRACTION_DOMAIN,
+    IA_RATIO_DOMAIN,
+    NONNEGATIVE_DOMAIN,
+    PERCENT_DOMAIN,
+    POSITIVE_DOMAIN,
+    PhysicalDomain,
+    _PARAMETER_PHYSICAL_DOMAINS,
+    _SAMPLING_KIND_PHYSICAL_DOMAINS,
+    _TABLE_PHYSICAL_DOMAINS,
 )
 from .input_distributions import stats_from_row
 from .utils import ci_get
-
-
-@dataclass(frozen=True)
-class PhysicalDomain:
-    """Allowed physical domain for a user-supplied numeric quantity.
-
-    Parameters
-    ----------
-    low : float or None
-        Lower bound, or ``None`` when no lower bound applies.
-    high : float or None
-        Upper bound, or ``None`` when no upper bound applies.
-    low_inclusive : bool, optional
-        Whether the lower bound is included.
-    high_inclusive : bool, optional
-        Whether the upper bound is included.
-    """
-
-    low: Optional[float] = None
-    high: Optional[float] = None
-    low_inclusive: bool = True
-    high_inclusive: bool = True
-
-    def contains(self, value: float) -> bool:
-        """Return whether ``value`` is finite and inside the domain."""
-        if not np.isfinite(float(value)):
-            return False
-        numeric = float(value)
-        if self.low is not None:
-            if self.low_inclusive:
-                if numeric < self.low:
-                    return False
-            elif numeric <= self.low:
-                return False
-        if self.high is not None:
-            if self.high_inclusive:
-                if numeric > self.high:
-                    return False
-            elif numeric >= self.high:
-                return False
-        return True
-
-    def describe(self) -> str:
-        """Return a compact human-readable description of the domain."""
-        if self.low is None and self.high is None:
-            return "all finite values"
-        if self.low is None:
-            operator = "<=" if self.high_inclusive else "<"
-            return f"{operator} {self.high:g}"
-        if self.high is None:
-            operator = ">=" if self.low_inclusive else ">"
-            return f"{operator} {self.low:g}"
-        left = "[" if self.low_inclusive else "("
-        right = "]" if self.high_inclusive else ")"
-        return f"{left}{self.low:g}, {self.high:g}{right}"
-
-
-NONNEGATIVE_DOMAIN = PhysicalDomain(low=0.0)
-POSITIVE_DOMAIN = PhysicalDomain(low=0.0, low_inclusive=False)
-FRACTION_DOMAIN = PhysicalDomain(low=0.0, high=1.0)
-EFFICIENCY_DOMAIN = PhysicalDomain(high=1.0)
-PERCENT_DOMAIN = PhysicalDomain(low=0.0, high=100.0)
-CN_DOMAIN = PhysicalDomain(low=0.0, high=100.0, low_inclusive=False)
-IA_RATIO_DOMAIN = PhysicalDomain(low=0.0, high=0.20)
-
-
-_TABLE_PHYSICAL_DOMAINS: Dict[str, PhysicalDomain] = {
-    CFG_POLLUTANT_LOAD_RATE: NONNEGATIVE_DOMAIN,
-    CFG_BMP_EFFICIENCY: EFFICIENCY_DOMAIN,
-    CFG_BMP_COST: NONNEGATIVE_DOMAIN,
-    LOAD_CONCENTRATIONS: NONNEGATIVE_DOMAIN,
-    LOAD_GROUNDWATER_CONCENTRATIONS: NONNEGATIVE_DOMAIN,
-}
-
-
-_PARAMETER_PHYSICAL_DOMAINS: Dict[str, PhysicalDomain] = {
-    "annual_precip_in": NONNEGATIVE_DOMAIN,
-    "avg_rain_in": NONNEGATIVE_DOMAIN,
-    "rain_days": NONNEGATIVE_DOMAIN,
-    "rain_correction_fraction": FRACTION_DOMAIN,
-    "runoff_day_fraction": FRACTION_DOMAIN,
-    "cn": CN_DOMAIN,
-    "ia_ratio": IA_RATIO_DOMAIN,
-    "infiltration_fraction": FRACTION_DOMAIN,
-    "runoff_multiplier": NONNEGATIVE_DOMAIN,
-    "groundwater_multiplier": NONNEGATIVE_DOMAIN,
-    "r": NONNEGATIVE_DOMAIN,
-    "k": NONNEGATIVE_DOMAIN,
-    "ls": NONNEGATIVE_DOMAIN,
-    "c": NONNEGATIVE_DOMAIN,
-    "p": NONNEGATIVE_DOMAIN,
-    "sdr": FRACTION_DOMAIN,
-    "sediment_multiplier": NONNEGATIVE_DOMAIN,
-    "sediment_delivery_multiplier": NONNEGATIVE_DOMAIN,
-    "sediment_n_pct": PERCENT_DOMAIN,
-    "sediment_p_pct": PERCENT_DOMAIN,
-    "enrichment_ratio": NONNEGATIVE_DOMAIN,
-    "fraction_subsurface_shallow": FRACTION_DOMAIN,
-}
 
 
 def physical_parameter_domain(parameter: Any) -> Optional[PhysicalDomain]:
@@ -146,18 +57,6 @@ def physical_parameter_domain(parameter: Any) -> Optional[PhysicalDomain]:
     if name.startswith("load_multiplier_"):
         return NONNEGATIVE_DOMAIN
     return _PARAMETER_PHYSICAL_DOMAINS.get(name)
-
-
-_SAMPLING_KIND_PHYSICAL_DOMAINS: Dict[str, PhysicalDomain] = {
-    "efficiency": EFFICIENCY_DOMAIN,
-    "load_rate": NONNEGATIVE_DOMAIN,
-    "nonnegative": NONNEGATIVE_DOMAIN,
-    "fraction": FRACTION_DOMAIN,
-    "cn": CN_DOMAIN,
-    "ia_ratio": IA_RATIO_DOMAIN,
-    "percent": PERCENT_DOMAIN,
-    "positive": POSITIVE_DOMAIN,
-}
 
 
 def physical_domain_for_sampling_kind(kind: Optional[str]) -> Optional[PhysicalDomain]:
@@ -842,7 +741,7 @@ def validate_config(cfg: Dict[str, Any]) -> None:
 
     allowed_top_level = {
         "domain", "parcels", "plet_forcing", "huc_parameters", "outlets", "pollutants", "cps",
-        "animal_operations", "feedlot_bmp_cps",
+        "animal_operations", "feedlot_bmp_cps", "manure_loading",
         "bmp_efficiency", "bmp_cost", "bmp_sel", "n_scenarios",
         "bmp_limit_n", "bmp_limit_usd", "parallel", "random_seed",
         "outputs", "verbose", "buffer_depth_ft", "bmp_sel_prob_via_costs",
