@@ -102,7 +102,8 @@ def load_afo_inputs(path: str | Path, parcels: pd.DataFrame, pollutants: Sequenc
                     parcel_path: str | Path | None = None,
                     excretion_factors_path: str | Path | None = None,
                     runoff_adjusted_export: bool = False,
-                    reference_runoff_mm: float | None = None) -> dict[str, Any]:
+                    reference_runoff_mm: float | None = None,
+                    feedlot_bmp_cps: Sequence[int] = ()) -> dict[str, Any]:
     """Load and validate AFO inputs and the optional mass-based runoff adjustment."""
     if not isinstance(runoff_adjusted_export, bool):
         raise ValueError("manure_loading.runoff_adjusted_export must be boolean")
@@ -128,6 +129,7 @@ def load_afo_inputs(path: str | Path, parcels: pd.DataFrame, pollutants: Sequenc
         management = _read_table(conn, "afo_manure_management", optional=method != "mass_based")
         eligibility = _read_table(conn, "afo_field_eligibility", optional=mode != "statistical")
         hydrology = _read_table(conn, "afo_hydrology", optional=mode != "statistical")
+        recovery = _read_table(conn, "afo_feedlot_manure_effects", optional=True)
     operation_columns = ["afo_id", "pid", "feedlot_area_ha", "paved_pct", "allocation"]
     excretion_factors = {}
     if method == "concentration_increment":
@@ -149,6 +151,10 @@ def load_afo_inputs(path: str | Path, parcels: pd.DataFrame, pollutants: Sequenc
                 raise ValueError(f"Configured surface pathway {surface_pathway!r} is not an active statistical pathway")
     if not fields.empty:
         _need_columns(fields, "afo_manure_fields", ["afo_id", "pid"])
+    if not recovery.empty:
+        if method != "mass_based":
+            raise ValueError("afo_feedlot_manure_effects requires mass_based manure loading")
+        _need_columns(recovery, "afo_feedlot_manure_effects", ["afo_id", "cps"])
     if operations.empty:
         raise ValueError("AFO package requires at least one operation")
     operations["afo_id"] = operations["afo_id"].astype(str).str.strip()
@@ -156,6 +162,37 @@ def load_afo_inputs(path: str | Path, parcels: pd.DataFrame, pollutants: Sequenc
     if operations["afo_id"].eq("").any() or operations["afo_id"].duplicated().any():
         raise ValueError("afo_operations.afo_id must contain distinct nonblank IDs")
     op_ids = set(operations["afo_id"])
+    if not recovery.empty:
+        cps_allowed = {int(c) for c in feedlot_bmp_cps}
+        recovery["afo_id"] = recovery["afo_id"].astype(str).str.strip()
+        cps_normalized = []
+        for _, row in recovery.iterrows():
+            op_id = row["afo_id"]
+            if op_id not in op_ids:
+                raise ValueError(f"afo_feedlot_manure_effects references unknown operation {op_id!r}")
+            cps = _integer_pid(row["cps"], "afo_feedlot_manure_effects.cps")
+            cps = int(cps)
+            if cps not in cps_allowed:
+                raise ValueError(f"afo_feedlot_manure_effects CPS {cps} must be in feedlot_bmp_cps")
+            cps_normalized.append(cps)
+            key = "additional_collection_fraction"
+            fixed = row.get(key)
+            stats = {k[len(key)+1:]: v for k, v in row.items()
+                     if str(k).startswith(key + "_") and pd.notna(v)}
+            if pd.notna(fixed):
+                if stats:
+                    raise ValueError(f"{op_id}/CPS {cps}: cannot mix fixed and distributed {key}")
+                stats = {"value": fixed}
+            if not stats:
+                raise ValueError(f"{op_id}/CPS {cps}: requires {key} or {key}_* statistics")
+            validate_stats_rows(pd.DataFrame([{"parameter": key, **stats}]),
+                                f"afo_feedlot_manure_effects[{op_id}/{cps}]")
+            for name, value in stats.items():
+                _finite(value, f"afo_feedlot_manure_effects[{op_id}/{cps}].additional_collection_fraction_{name}",
+                        0, float('inf') if name == 'sd' else 1)
+        recovery["cps"] = cps_normalized
+        if recovery.duplicated(["afo_id", "cps"]).any():
+            raise ValueError("Duplicate afo_feedlot_manure_effects operation/CPS pair")
     pid_set = set(parcels["pid"].astype(str))
     area_by_pid = dict(zip(parcels["pid"].astype(str), parcels["area_ha"].astype(float)))
     for k, row in operations.iterrows():
@@ -388,6 +425,7 @@ def load_afo_inputs(path: str | Path, parcels: pd.DataFrame, pollutants: Sequenc
             "fields": fields.to_dict("records"),
             "manure_concentration_increments": increments.to_dict("records") if not increments.empty else [],
             "management": management.to_dict("records") if not management.empty else [],
+            "feedlot_manure_effects": recovery.to_dict("records") if not recovery.empty else [],
             "eligible": eligible_by_pid, "hydrology": hydrology_by_pid,
             "surface_pathway": surface_pathway, "method": method,
             "runoff_adjusted_export": runoff_adjusted_export,
@@ -789,6 +827,10 @@ def mass_afo_realization(
     feedlot = np.zeros((n_parcels, n_pol, n_paths), float)
     manure = np.zeros_like(feedlot)
     ledger: list[dict] = []
+    # Sparse per-operation field sources allow later feedlot BMPs to change
+    # manure availability without erasing earlier receiving-field BMP effects.
+    operation_state: dict[str, dict[str, Any]] = {}
+    sources_by_parcel: dict[int, list[dict[str, Any]]] = {}
     management = {str(rec["afo_id"]): rec for rec in inputs["management"]}
     excretion_cache: dict[tuple[str, str], float] = {}
     for op in sorted(ops, key=lambda row: str(row["afo_id"])):
@@ -797,12 +839,18 @@ def mass_afo_realization(
         produced = animal_production(ctx, realized_animals, op_id, excretion_cache=excretion_cache)
         collection = _draw(ctx, mgt, "collection_fraction", default=1, fraction=True)
         export_fraction = _draw(ctx, mgt, "export_fraction", default=0, fraction=True)
-        available = {
-            "TN": produced["TN"] * collection * (1 - export_fraction)
+        available_full = {
+            "TN": produced["TN"] * (1 - export_fraction)
             * _draw(ctx, mgt, "n_retention_fraction", default=1, fraction=True),
-            "TP": produced["TP"] * collection * (1 - export_fraction)
+            "TP": produced["TP"] * (1 - export_fraction)
             * _draw(ctx, mgt, "p_retention_fraction", default=1, fraction=True),
         }
+        available = {pol: mass * collection for pol, mass in available_full.items()}
+        operation_state[op_id] = dict(host_pid=str(op["pid"]),
+                                      initial_collection=collection,
+                                      current_collection=collection,
+                                      available_full=available_full,
+                                      sources=[])
         tn_export_fraction = _draw(ctx, mgt, "tn_surface_export_fraction", fraction=True)
         tp_export_fraction = _draw(ctx, mgt, "tp_surface_export_fraction", fraction=True)
         adjust_for_runoff = inputs.get("runoff_adjusted_export", False)
@@ -831,19 +879,27 @@ def mass_afo_realization(
                 # Observed PLET runoff is used only for reporting and an
                 # equivalent concentration, never as a factor in Option A.
                 runoff_mm = plet_annual_surface_runoff_in(state.parameters[idx])[3] * 25.4
-            exported = manure_surface_export_kg(
-                applied_n_kg=applied["TN"],
-                applied_p_kg=applied["TP"],
+            exported_full = manure_surface_export_kg(
+                applied_n_kg=available_full["TN"] * frac,
+                applied_p_kg=available_full["TP"] * frac,
                 tn_surface_export_fraction=tn_export_fraction,
                 tp_surface_export_fraction=tp_export_fraction,
                 runoff_adjusted_export=adjust_for_runoff,
                 runoff_mm=runoff_mm,
                 reference_runoff_mm=reference_runoff,
             )
+            exported = {pol: val * collection for pol, val in exported_full.items()}
             for pol_idx, pol in enumerate(ctx.pollutants):
                 pol_upper = str(pol).upper()
-                add = exported.get(pol_upper, 0.) / areas[pid]
+                full_rate = exported_full.get(pol_upper, 0.) / areas[pid]
+                add = full_rate * collection
                 manure[idx, pol_idx, surface_idx] += add
+                if pol_upper in ("TN", "TP"):
+                    source = dict(op_id=op_id, parcel_idx=idx, pol_idx=pol_idx,
+                                  path_idx=surface_idx, full_rate=full_rate,
+                                  current_rate=add)
+                    operation_state[op_id]["sources"].append(source)
+                    sources_by_parcel.setdefault(idx, []).append(source)
                 if state is not None and runoff_mm > 0 and pol_upper in ("TN", "TP"):
                     # 1 mm over 1 hectare = 10,000 L; kg/ha -> mg/L = *100/mm.
                     state.concentrations[idx][pol_upper] += 100 * add / runoff_mm
@@ -904,6 +960,15 @@ def mass_afo_realization(
     if state is not None:
         state.baseline_pathway_load_rates = baseline.copy()
         state.baseline_concentrations = [dict(row) for row in state.concentrations]
+    ctx.afo_bmp_operation_state = operation_state
+    ctx.afo_bmp_sources_by_parcel = sources_by_parcel
+    effect_index: dict[tuple[str, int], list[dict[str, Any]]] = {}
+    for effect in sorted(inputs.get("feedlot_manure_effects", []),
+                         key=lambda rec: str(rec["afo_id"])):
+        host = operation_state[str(effect["afo_id"])]["host_pid"]
+        effect_index.setdefault((host, int(effect["cps"])), []).append(effect)
+    ctx.afo_bmp_effects_by_host_cps = effect_index
+    ctx.afo_bmp_effect_records = []
     ctx.current_afo_feedlot_pathway_rates = feedlot
     ctx.current_afo_manure_pathway_rates = manure
     ctx.baseline_afo_feedlot_pathway_rates = feedlot.copy()
@@ -953,3 +1018,62 @@ def _hydrology(
             / correction
         )
     return runoff_mm, float(rain) * 25.4, None
+
+
+def apply_afo_feedlot_manure_effect(
+    ctx: Any, host_pid: str, cps: int, load_rates: np.ndarray,
+    *, bmp_effect_scale: float = 1.0,
+) -> list[dict[str, Any]]:
+    """Apply an explicitly configured manure-collection gain after a feedlot BMP.
+
+    The gain is the recovered fraction of the *remaining uncollected* manure,
+    applied sequentially. The returned changes in kg/year are signed increases
+    in receiving-field surface exports, after earlier field BMP treatment.
+    No recovery effect is inferred from a CPS code or a runoff efficiency.
+    """
+    inputs = getattr(ctx, "afo_inputs", None) or {}
+    if inputs.get("method") != "mass_based":
+        return []
+    operation_state = getattr(ctx, "afo_bmp_operation_state", {})
+    if not operation_state:
+        return []
+    bmp_effect_scale = _finite(bmp_effect_scale, "bmp_effect_scale", 0, 1)
+    rows = getattr(ctx, "afo_bmp_effects_by_host_cps", {}).get(
+        (str(host_pid), int(cps)), []
+    )
+    changes: list[dict[str, Any]] = []
+    for effect in rows:
+        op_id = str(effect["afo_id"])
+        op = operation_state[op_id]
+        gain = _draw(ctx, effect, "additional_collection_fraction", fraction=True)
+        gain *= bmp_effect_scale
+        old = op["current_collection"]
+        new = old + (1. - old) * gain
+        for source in op["sources"]:
+            updated_rate = source["full_rate"] * new
+            delta_rate = updated_rate - source["current_rate"]
+            source["current_rate"] = updated_rate
+            idx, pol_idx, path_idx = source["parcel_idx"], source["pol_idx"], source["path_idx"]
+            ctx.current_pathway_load_rates[idx, pol_idx, path_idx] += delta_rate
+            ctx.current_afo_manure_pathway_rates[idx, pol_idx, path_idx] += delta_rate
+            load_rates[idx, pol_idx] += delta_rate
+            if delta_rate:
+                changes.append(dict(afo_id=op_id, cps=int(cps),
+                                    receiving_pid=str(ctx.parcel_ids[idx]),
+                                    parcel_idx=idx, pol_idx=pol_idx,
+                                    added_export_kg=delta_rate * float(ctx.parcel_area_ha[idx])))
+        op["current_collection"] = new
+        ctx.afo_bmp_effect_records.append(dict(
+            afo_id=op_id, cps=int(cps), host_pid=str(host_pid),
+            recovery_fraction=gain, collection_before=old,
+            collection_after=new,
+            added_available_tn_kg=(new - old) * op["available_full"]["TN"],
+            added_available_tp_kg=(new - old) * op["available_full"]["TP"],
+            added_surface_tn_kg=sum(rec["added_export_kg"] for rec in changes
+                                    if rec["afo_id"] == op_id and
+                                    str(ctx.pollutants[rec["pol_idx"]]).upper() == "TN"),
+            added_surface_tp_kg=sum(rec["added_export_kg"] for rec in changes
+                                    if rec["afo_id"] == op_id and
+                                    str(ctx.pollutants[rec["pol_idx"]]).upper() == "TP"),
+        ))
+    return changes

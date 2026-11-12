@@ -63,8 +63,76 @@ hectares across an operation's selected receiving parcels, unless all explicit
 receivers specify positive `weight` values (then use normalized weights).
 **Allocated N and P are conserved across receiving parcels**, with multiple
 operations contributing additive nutrient masses to overlapping recipients.
+This is **allocation conservation only**: the separately estimated direct
+feedlot runoff is **not deducted** from manure available for field allocation,
+and the model does not enforce a combined feedlot-plus-field annual nutrient
+mass balance. Users must assess whether treating these two sources as separate
+increments is defensible for their inventory and management assumptions.
 No crop demand/cap or complete manure lifecycle is modeled. Nitrogen handling
 losses enter before field export fractions and must not be duplicated.
+
+### Optional coupling of feedlot BMPs to field manure availability
+
+A feedlot BMP may increase the fraction of manure collected for subsequent
+field application (for example, collection/storage of previously uncollected
+material). The optional **nonspatial** `afo_feedlot_manure_effects` table in the
+AFO GeoPackage describes this effect **per operation and feedlot-only CPS**.
+The table is optional and omitted by the shipped synthetic examples. Include
+one row for each desired `(afo_id, cps)` pair:
+
+| Column | Meaning |
+|---|---|
+| `afo_id` | Existing operation ID in `afo_operations` |
+| `cps` | Integer CPS code also listed in YAML `feedlot_bmp_cps` |
+| `additional_collection_fraction` | Fraction (0–1) of *remaining uncollected* nutrient mass collected when the BMP is installed; may use supported `additional_collection_fraction_*` distribution columns instead |
+| `notes` | Optional justification and site-specific provenance (ignored by the loader) |
+
+For example, a GeoPackage edited in SQLite could add the table with:
+
+```sql
+CREATE TABLE afo_feedlot_manure_effects (
+    afo_id TEXT NOT NULL,
+    cps INTEGER NOT NULL,
+    additional_collection_fraction REAL NOT NULL,
+    notes TEXT
+);
+INSERT INTO afo_feedlot_manure_effects
+VALUES ('AFO_DEMO_01', 313, 0.25,
+        'Illustrative recovery assumption; replace with documented site data');
+```
+
+This would recover 25% of that operation's previously uncollected manure
+when CPS 313 is actually selected on its host parcel, provided that CPS 313
+is in `feedlot_bmp_cps`. **The 0.25 value is illustrative, not an EPA/NRCS
+efficiency or recommended value.** The model cannot derive this
+fraction from the CPS code or pollutant-removal efficiency: it must be supplied
+and justified independently. With baseline collection fraction `c` and BMP
+recovery fraction `r`, the new fraction is
+
+```text
+c_after = c_before + (1 - c_before) * r
+field_available_N_after = excreted_N * c_after * (1-export_fraction) * n_retention_fraction
+field_available_P_after = excreted_P * c_after * (1-export_fraction) * p_retention_fraction
+```
+
+For multiple selected BMPs, this equation is applied sequentially to the
+remaining uncollected fraction, never exceeding 1. BMP failure scales `r`
+with the same failure-reduction factor as its runoff efficiencies. TN/TP
+availability is reallocated over the **same already selected field parcels and
+weights**, and the existing Option A/B field export equations are reapplied.
+An earlier field BMP's reduction continues to apply to any newly collected
+manure on that receiving parcel. A later field BMP treats the expanded field
+source. Net BMP loads and outlet reductions include induced field export from
+the **receiving parcels**, which can partially offset a feedlot reduction.
+
+This is an *explicit collection-management scenario*, not proof that avoided
+feedlot runoff automatically becomes land-applied manure. Feedlot runoff and
+manure production remain independently estimated: **the optional coupling
+does not create a complete operation-wide N/P mass balance**. Other BMPs and
+all BMPs without a matching operation/CPS row continue to reduce their assigned
+load source without changing collection. The older concentration-increment
+method does not accept this table. The spatial receiving-parcel assignments
+are fixed within a realization; only annual nutrient masses change.
 
 ### Field surface loading: Option A (default)
 
@@ -157,6 +225,10 @@ user-supplied `feedlot_runoff_mm` (annual); this is a runoff-depth substitution,
 not an independent event-CN simulation. Direct feedlot surface loads and
 manure-applied-field loads remain separate BMP components. The animal-excretion
 factors and feedlot animal-equivalence factors are **not interchangeable**.
+**`animal_days` scales annual excreted nutrient mass but does not scale direct
+feedlot loading**: the latter uses the realized `count`, feedlot area, and
+annual runoff. A seasonal or short-duration animal inventory therefore needs
+special care when interpreting year-round direct feedlot loading.
 
 ## GeoPackage tables
 
@@ -307,8 +379,15 @@ N/P, applied N/P, exported surface TN/TP (`tn_exported_kg`, `tp_exported_kg`),
 sampled and effective export fractions, optional field runoff and reference depth,
 and hectare-based application rates.
 `afo_operation_budgets/sN.parquet` contains one row per AFO with generated,
-available, allocated and surface-exported N/P masses, plus automatic
-allocation-conservation diagnostics. **Operation-wide masses in the per-field
+**baseline** available, allocated and surface-exported N/P masses, plus automatic
+allocation-conservation diagnostics. It also reports `final_tn/tp_available_kg`,
+`final_tn/tp_applied_kg`, and `final_tn/tp_exported_kg` after the BMP sequence.
+The final exported values reflect feedlot recovery and agricultural BMPs.
+If a matching recovery effect is applied, `afo_manure_bmp_effects/sN.parquet`
+records the operation, CPS, effective recovery fraction, before/after collection,
+additional nutrient availability and induced field surface TN/TP exports.
+The normal `bmps` output includes `induced_manure_tn/tp_kg_yr` and incorporates
+the signed added loads into net removal and delivery calculations. **Operation-wide masses in the per-field
 ledger repeat on every receiver row; do not sum them across receivers.**
 `afo_load_components/sN.parquet` records before/after loads separated by
 feedlot/manure-field source and transport pathway. Receivers are sampled once
@@ -379,13 +458,15 @@ python run_model.py examples/east_fork/inputs/config/east_fork_afo_mass_statisti
 
 It explicitly sets `manure_loading.surface_pathway: surface` and partitions
 aggregate background loads into `surface: 0.30` and `subsurface: 0.70`,
-matching the two pathways in the AFO demo BMP efficiency CSV. These fractions
-apply to background loads only; AFO nutrient and direct-feedlot loads are
-added to the selected surface pathway. The example assumes that background
-rates exclude these additional sources. PLET climate/HUC parameters are not
-required for this statistical example.
+matching the two pathways in the AFO demo BMP efficiency CSV. These **30%/70%
+pathway shares are demonstration assumptions, not an empirically established
+partition for East Fork**. The fractions apply to background loads only; AFO
+nutrient and direct-feedlot loads are added to the selected surface pathway.
+The example assumes that background rates exclude these additional sources;
+that exclusion is not independently verified by the demonstration. PLET
+climate/HUC parameters are not required for this statistical example.
 
-## Audited example input packages
+## Example input package reference
 
 The three example AFO GeoPackages are intentionally distinct. In each,
 `afo_operations` is a **POINT feature layer** at the geometric centroid of its
@@ -394,13 +475,16 @@ model still uses the **PID**, not this illustrative geometry, for calculations.
 All other AFO inputs remain attribute tables, each with its own `notes` column.
 No stand-alone documentation tables or dummy geometry layer are included.
 AFO example-specific table/column inventories and validation are documented
-in [the example GeoPackage audit](afo_example_geopackage_audit.md).
+in [the example GeoPackage reference](afo_example_geopackage_reference.md).
 
-To rebuild all three checked-in examples (including the legacy example), run:
+When changing the example GeoPackages, keep their row-level notes and host-point
+geometry consistent with the input values and host parcel IDs. Inspect the
+updated package and run its associated example configuration to check the
+resulting manure allocations, operation budgets, and source-component loads.
+See the [example GeoPackage reference](afo_example_geopackage_reference.md)
+for the mode-specific table inventory and validation checks.
 
-```bash
-python scripts/create_afo_example_packages.py
-```
-
-Changing inputs for Option B in statistical mode is a separate user action;
-this regeneration restores the *Option A* statistical demonstration.
+Changing the statistical example to Option B requires new receiving-field
+runoff inputs; the committed GeoPackage is the default *Option A* example.
+If you edit values manually, keep row-specific notes and illustrative POINT
+geometries in sync with the updated fields and host parcels.

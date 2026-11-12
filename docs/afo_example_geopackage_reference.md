@@ -1,9 +1,11 @@
-# Audit of the example AFO GeoPackages
+# Reference for the example AFO GeoPackages
 
 The East Fork example configurations use **three separate, deliberately minimal
 AFO GeoPackages**. They exercise software behavior; their AFO sites,
 animal counts, nutrient coefficients, and hydrology are synthetic and **not**
 a surveyed watershed inventory or calibrated nutrient export factors.
+All three configurations set `n_scenarios: 2` to demonstrate the workflow;
+this is **not** enough Monte Carlo realizations for stable uncertainty estimates.
 
 | Example configuration | GeoPackage | Necessary AFO tables |
 |---|---|---|
@@ -66,22 +68,19 @@ supported distributions) to its `afo_hydrology` table and set the same two
 YAML options. Otherwise the loader will correctly reject the incomplete
 Option B inputs. Do **not** introduce runoff dependency into Option A.
 
-## Regeneration and validation
+## Inspection and validation
 
-From the repository root:
+The three GeoPackages are committed with the example configurations and can be
+inspected in QGIS or SQLite. They do not include the optional
+`afo_feedlot_manure_effects` table, so their feedlot BMPs do not change manure
+collection. To model manure capture, add the optional operation/CPS rows as
+described in [mass-based AFO](afo_mass_based.md); input values need defensible
+site-specific justification. When updating an example, confirm its SQLite
+integrity, AFO table and column inventory, required row-specific `notes`, and
+`gpkg_contents` feature/attribute registration. Verify that every operation's
+point geometry remains consistent with its configured host `pid` parcel.
 
-```bash
-python scripts/create_afo_example_packages.py
-pytest -q tests/test_afo_example_metadata.py tests/test_afo_example_gpkgs.py tests/test_afo.py tests/test_afo_mass.py
-```
-
-The script uses Python's standard library and Shapely to compute geometric
-centroids from the host parcels. It regenerates the notes described in
-`afo_example_metadata.md`, normalizes the committed PLET-style `afo_example.gpkg`,
-and rebuilds the two mass-based files. It registers `afo_operations` as a
-GeoPackage feature layer, other AFO tables as attributes, and checks SQLite
-integrity.
-The dedicated test checks exact mode-specific input tables and columns,
-GeoPackage registration, retained sample values, and successful loading using
-the appropriate AFO method. It also verifies that the statistical default
-requires no field runoff observations while leaving Option B opt-in.
+Run the configured example and inspect its AFO outputs, particularly
+`afo_manure_assignments`, `afo_mass_ledger`, `afo_operation_budgets` and
+`afo_load_components` for the mass-based modes. The included values are
+synthetic; update the explanatory notes whenever changing numeric inputs.

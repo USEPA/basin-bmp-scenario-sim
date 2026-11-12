@@ -25,8 +25,8 @@ For example, `AFO_DEMO_01` is placed at the centroid of **pid 1**, and
 `AFO_DEMO_02` at **pid 3**. The geographic point is **only for locating the
 synthetic demonstration visually in QGIS**; the model identifies operations
 and computes feedlot and manure loading using `afo_operations.pid`, not the
-point coordinates. Editing a `pid` alone will not move the point: regenerate
-the examples (or update the geometry) to keep the two consistent. Geometric
+point coordinates. Editing a `pid` alone will not move the point: update
+the geometry to keep the two consistent. Geometric
 centroids can lie outside irregular polygons; that is consistent with the
 requested centroid rule and is not an error in facility siting.
 
@@ -83,18 +83,12 @@ SELECT afo_id, tn_surface_export_fraction, tp_surface_export_fraction, notes
 FROM afo_manure_management;
 ```
 
-## Regeneration and tests
+## Maintaining the example packages
 
-From the repository root:
-
-```bash
-python scripts/create_afo_example_packages.py
-pytest -q tests/test_afo_example_gpkgs.py tests/test_afo_example_metadata.py
-```
-
-Regeneration uses `sqlite3` plus **Shapely** to calculate host parcel
-centroids and write valid GeoPackage POINT blobs. It rebuilds all three files
-and refreshes notes from the current example values. If you manually edit
-values in QGIS, also edit their notes or regenerate the examples; otherwise the
-notes could describe older values. The regeneration script intentionally
-recreates the demonstration defaults, not user data.
+If a GeoPackage is changed in QGIS or SQLite, update the notes in the same
+rows, verify its registration and integrity, and check that host-point
+coordinates correspond to the current host `pid` centroids. For the mass-based
+examples, run the associated model configuration and inspect the allocation,
+operation budget, and source-component outputs. The [example GeoPackage
+reference](afo_example_geopackage_reference.md) describes the expected tables
+and mode-specific inputs.

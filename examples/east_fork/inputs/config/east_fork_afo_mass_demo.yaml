@@ -1,7 +1,6 @@
 # Demonstration only. AFO locations, animals, and manure export fractions are
 # illustrative, NOT a verified East Fork inventory or calibrated coefficients.
-# The lean PLET AFO GeoPackage is checked in; regenerate with:
-# python scripts/create_afo_example_packages.py
+# The PLET AFO example GeoPackage is included; keep input values and row notes consistent.
 verbose: True
 random_seed: 42
 outputs: ../../outputs/run_afo_mass_demo

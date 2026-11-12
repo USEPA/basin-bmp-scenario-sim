@@ -186,9 +186,14 @@ def _apply_pathway_reduction(
         if direct_component is not None and getattr(self, "current_bmp_targets_feedlot", False):
             direct_component[parcel_idx, pol_idx, path_idx] = new_value
         if direct_component is not None and not getattr(self, "current_bmp_targets_feedlot", False):
+            multiplier = 1.0 - treatment_fraction * eff
             manure = getattr(self, "current_afo_manure_pathway_rates", None)
             if manure is not None:
-                manure[parcel_idx, pol_idx, path_idx] *= (1.0 - treatment_fraction * eff)
+                manure[parcel_idx, pol_idx, path_idx] *= multiplier
+            for source in getattr(self, "afo_bmp_sources_by_parcel", {}).get(parcel_idx, []):
+                if source["pol_idx"] == pol_idx and source["path_idx"] == path_idx:
+                    source["full_rate"] *= multiplier
+                    source["current_rate"] *= multiplier
         pathway_load_rates[parcel_idx, pol_idx, path_idx] = total_load_rate - (current_load_rate - new_value)
     return float(removed_load_rate)
 

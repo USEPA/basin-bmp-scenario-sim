@@ -34,8 +34,9 @@ from src.cost import _estimate_costs_for_probabilities, _get_bmp_cost, _select_c
 from src.io_utils import _write_parquet_atomic, _flatten_plot_records
 from src.input_distributions import sample_group_key
 from src.logging_utils import make_worker_logger, log_scope
-from src.afo import apply_afo_baseline, mass_afo_realization
+from src.afo import apply_afo_baseline, mass_afo_realization, apply_afo_feedlot_manure_effect
 from src.plet_rusle import (
+    plet_annual_surface_runoff_in,
     calculate_load_diagnostics,
     initialize_plet_rusle_state,
 )
@@ -862,12 +863,14 @@ def _run_one_scenario(
                 failed_flag = False
                 fr_cfg = ctx.cfg[CFG_BMP_FAIL_RATE]
                 fail_rate = float(fr_cfg if fr_cfg is not None else 0.0)
+                recovery_effect_scale = 1.0
                 if fail_rate > 0.0:
                     failed = int(ctx.rng.choice([0, 1], p=[1.0 - fail_rate, fail_rate]))
                     if failed == 1:
                         red_cfg = ctx.cfg[CFG_BMP_FAIL_REDUCTION]
                         reduction = float(red_cfg if red_cfg is not None else DEFAULT_BMP_FAIL_REDUCTION)
                         eff_maps = [{k: float(v) * reduction for k, v in emap.items()} for emap in eff_maps]
+                        recovery_effect_scale = reduction
                         failed_flag = True
                         ctx.logger.verbose(f"BMP failure triggered for cps={cps}; scaling efficiencies by {reduction:.2f}")
 
@@ -915,6 +918,32 @@ def _run_one_scenario(
                     ctx._simulate_infield(parcel_idx, eff_maps, load_rates, bmp_rec, bmp_mass_rate_outputs)
                     quantity = float(ctx.parcel_area_ha[parcel_idx])
 
+                # A manure-capturing feedlot BMP can increase field application
+                # and therefore *increase* loading at different parcels. Count
+                # those signed changes in both net BMP mass and outlet impacts.
+                direct_bmp_removed = np.asarray(bmp_mass_rate_outputs[OUTPUT_REMOVED], dtype=float).copy()
+                manure_changes = (
+                    apply_afo_feedlot_manure_effect(
+                        ctx, str(pid), cps, load_rates,
+                        bmp_effect_scale=recovery_effect_scale,
+                    ) if ctx.current_bmp_targets_feedlot else []
+                )
+                for change in manure_changes:
+                    bmp_mass_rate_outputs[OUTPUT_REMOVED][change["pol_idx"]] -= change["added_export_kg"]
+                    if load_state is not None:
+                        # Keep PLET's equivalent manure concentration diagnostic
+                        # aligned with the reallocated surface nutrient mass.
+                        idx = change["parcel_idx"]
+                        pol = str(ctx.pollutants[change["pol_idx"]]).upper()
+                        runoff_mm = plet_annual_surface_runoff_in(load_state.parameters[idx])[3] * 25.4
+                        if runoff_mm > 0 and pol in load_state.concentrations[idx]:
+                            rate = change["added_export_kg"] / float(ctx.parcel_area_ha[idx])
+                            load_state.concentrations[idx][pol] += 100 * rate / runoff_mm
+                for pol_idx, pol in enumerate(ctx.pollutants):
+                    bmp_rec[f"induced_manure_{str(pol).lower()}_kg_yr"] = sum(
+                        ch["added_export_kg"] for ch in manure_changes if ch["pol_idx"] == pol_idx
+                    )
+
                 # Costing and totals
                 cost_this = ctx._get_bmp_cost(cps, quantity)
                 total_cost += cost_this
@@ -947,13 +976,25 @@ def _run_one_scenario(
                 # Delivered reductions for plots
                 oids = ctx._get_parcel_out_oids(parcel_idx)
                 for pol_idx, pol in enumerate(ctx.pollutants):
-                    removed_mass_rate_kg_per_yr = float(bmp_mass_rate_outputs[OUTPUT_REMOVED][pol_idx])
+                    # Host direct-feedlot reduction; redirected manure is
+                    # delivered from its actual receiving parcel below.
+                    removed_mass_rate_kg_per_yr = float(direct_bmp_removed[pol_idx])
                     for oid in oids:
                         dr = ctx._delivery_coeffs(pid, oid)
                         deliver = (
                             removed_mass_rate_kg_per_yr * dr[COL_SDR_F_TO_S] * dr[COL_SDR_S_TO_O]
                             if pol == "TSS"
                             else removed_mass_rate_kg_per_yr * dr[COL_NDR_F_TO_S] * dr[COL_NDR_S_TO_O]
+                        )
+                        cumul[pol][oid] += deliver
+                for change in manure_changes:
+                    rec_pid = change["receiving_pid"]
+                    pol = ctx.pollutants[change["pol_idx"]]
+                    for oid in ctx._get_parcel_out_oids(change["parcel_idx"]):
+                        dr = ctx._delivery_coeffs(rec_pid, oid)
+                        deliver = -change["added_export_kg"] * (
+                            dr[COL_SDR_F_TO_S] * dr[COL_SDR_S_TO_O] if pol == "TSS"
+                            else dr[COL_NDR_F_TO_S] * dr[COL_NDR_S_TO_O]
                         )
                         cumul[pol][oid] += deliver
 
@@ -1007,6 +1048,18 @@ def _run_one_scenario(
                 for key in ("tn_applied_kg", "tp_applied_kg",
                             "tn_exported_kg", "tp_exported_kg"):
                     budget[key] = float(grouped[key].sum())
+                op_state = getattr(ctx, "afo_bmp_operation_state", {}).get(op_id)
+                if op_state:
+                    for nutrient in ("tn", "tp"):
+                        full = op_state["available_full"][nutrient.upper()]
+                        budget[f"final_{nutrient}_available_kg"] = full * op_state["current_collection"]
+                        budget[f"final_{nutrient}_applied_kg"] = full * op_state["current_collection"]
+                        pol_idx = next(i for i, pol in enumerate(ctx.pollutants)
+                                       if str(pol).upper() == nutrient.upper())
+                        budget[f"final_{nutrient}_exported_kg"] = sum(
+                            src["current_rate"] * float(ctx.parcel_area_ha[src["parcel_idx"]])
+                            for src in op_state["sources"] if src["pol_idx"] == pol_idx
+                        )
                 for nutrient in ("tn", "tp"):
                     if not np.isclose(budget[f"{nutrient}_available_kg"], budget[f"{nutrient}_applied_kg"], rtol=1e-10, atol=1e-8):
                         raise AssertionError(f"AFO {op_id}: non-conserved {nutrient} allocation")
@@ -1014,6 +1067,12 @@ def _run_one_scenario(
             budgets_dir = outputs_dir / "afo_operation_budgets"
             budgets_dir.mkdir(parents=True, exist_ok=True)
             _write_parquet_atomic(pd.DataFrame(budget_rows), budgets_dir / f"s{sid}.parquet", logger=logger)
+            effects = getattr(ctx, "afo_bmp_effect_records", [])
+            if effects:
+                effects_dir = outputs_dir / "afo_manure_bmp_effects"
+                effects_dir.mkdir(parents=True, exist_ok=True)
+                _write_parquet_atomic(pd.DataFrame([dict(scenario=sid, **rec) for rec in effects]),
+                                      effects_dir / f"s{sid}.parquet", logger=logger)
 
         # Direct feedlot and manure-field components retained independently
         # through BMP application (kg/year) to enable source-specific auditing.

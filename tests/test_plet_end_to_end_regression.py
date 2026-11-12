@@ -412,6 +412,9 @@ def test_mass_based_integrated_baseline_bmp_and_outputs(tmp_path, monkeypatch, s
         "scenario", "afo_id", "receiver_count",
         "tn_produced_kg", "tp_produced_kg", "tn_available_kg", "tp_available_kg",
         "tn_applied_kg", "tp_applied_kg", "tn_exported_kg", "tp_exported_kg",
+        "final_tn_available_kg", "final_tp_available_kg",
+        "final_tn_applied_kg", "final_tp_applied_kg",
+        "final_tn_exported_kg", "final_tp_exported_kg",
     }
     assert len(budget) == 1
     assert budget.iloc[0].tn_available_kg == pytest.approx(budget.iloc[0].tn_applied_kg)

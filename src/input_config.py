@@ -3085,6 +3085,11 @@ def load_and_validate_all(cfg: Dict[str, Any], logger: Any) -> Dict[str, Any]:
                 not isinstance(excretion_path, (str, Path)) or not str(excretion_path).strip()
             ):
                 raise ValueError("manure_loading.excretion_factors must be a nonblank CSV path")
+            feedlot_bmp_cps = [int(c) for c in (ci_get(cfg, "feedlot_bmp_cps") or [])]
+            if len(set(feedlot_bmp_cps)) != len(feedlot_bmp_cps) or not set(feedlot_bmp_cps).issubset(set(cps)):
+                raise ValueError("feedlot_bmp_cps must be distinct CPS codes present in cps")
+            if set(feedlot_bmp_cps).intersection({412, 656, 657}):
+                raise ValueError("feedlot_bmp_cps cannot include buffer or wetland CPS")
             from .afo import load_afo_inputs
             afo_inputs = load_afo_inputs(
                 afo_path, parcels, pollutants, method=method, mode=load_mode,
@@ -3094,12 +3099,8 @@ def load_and_validate_all(cfg: Dict[str, Any], logger: Any) -> Dict[str, Any]:
                 runoff_adjusted_export=ci_get(manure_cfg, "runoff_adjusted_export")
                 if "runoff_adjusted_export" in manure_cfg else False,
                 reference_runoff_mm=ci_get(manure_cfg, "reference_runoff_mm"),
+                feedlot_bmp_cps=feedlot_bmp_cps,
             )
-            feedlot_bmp_cps = [int(c) for c in (ci_get(cfg, "feedlot_bmp_cps") or [])]
-            if len(set(feedlot_bmp_cps)) != len(feedlot_bmp_cps) or not set(feedlot_bmp_cps).issubset(set(cps)):
-                raise ValueError("feedlot_bmp_cps must be distinct CPS codes present in cps")
-            if set(feedlot_bmp_cps).intersection({412, 656, 657}):
-                raise ValueError("feedlot_bmp_cps cannot include buffer or wetland CPS")
         elif ci_get(cfg, "feedlot_bmp_cps") or ci_get(cfg, "manure_loading"):
             raise ValueError("feedlot_bmp_cps and manure_loading require animal_operations")
 

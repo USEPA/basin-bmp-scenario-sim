@@ -91,4 +91,4 @@ The checked-in statistical AFO demonstration uses its own minimal
 `examples/east_fork/inputs/afo/afo_mass_statistical_example.gpkg`. For default
 Option A it supplies precipitation and direct-feedlot runoff, but no annual
 receiving-field runoff. The separate PLET example has no statistical AFO tables.
-See [AFO example GeoPackage audit](afo_example_geopackage_audit.md).
+See [AFO example GeoPackage reference](afo_example_geopackage_reference.md).

@@ -88,7 +88,10 @@ and not the direct feedlot source. Provide the relevant pollutant/pathway
 removal efficiencies in the usual BMP efficiency CSV. Only place feedlot-only
 CPS on operation host parcels. It is the user's responsibility to select
 appropriate feedlot efficiencies and CPS definitions; the model does not
-infer an animal-manure management pathway from the CPS code alone.
+infer an animal-manure management pathway from the CPS code alone. In mass-based
+mode, matching rows in `afo_feedlot_manure_effects` optionally increase manure
+collection and field loading in addition to source-specific runoff reductions.
+The amount recovered must be supplied explicitly rather than inferred from a CPS.
 
 Wetland/buffer CPS 412, 656, 657 cannot be flagged as feedlot-only. Other
 legacy BMP designs and selection probabilities remain in force; all BMPs are
@@ -192,8 +195,10 @@ concentration is specified.
   the largest `manure_months` is used once per receiving parcel. This is a
   modeling assumption, not a nutrient mass balance.
 * Assignment is sampled **once per realization** before BMP application. It
-  is unchanged throughout that realization's BMP trajectory. BMPs never
-  automatically change allocation.
+  is unchanged throughout that realization's BMP trajectory. Receiving-parcel IDs do not
+  change within the realization; mass-based feedlot BMPs can optionally alter
+  the *amount* of manure allocated to those parcels through the documented
+  `afo_feedlot_manure_effects` table. See [mass-based AFO](afo_mass_based.md).
 * Selecting more recipient fields can increase total manure-related
   pollutant loads, because the original PLET concentration model **does not
   dilute a conserved manure nutrient mass over receiving acres**. This is
@@ -235,7 +240,7 @@ This file contains no mass-based management/hydrology inputs, BOD equivalence
 factor (BOD is not in the demonstration pollutants), or dummy geometry layer;
 its `afo_operations` feature layer shows two synthetic host parcel centroids.
 The two mass-based demos use distinct, purpose-specific GeoPackages; see
-[the example GeoPackage audit](afo_example_geopackage_audit.md). Run:
+[the example GeoPackage reference](afo_example_geopackage_reference.md). Run:
 
 ```bash
 python run_model.py examples/east_fork/inputs/config/east_fork_afo_demo.yaml

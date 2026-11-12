@@ -147,4 +147,4 @@ All input paths are resolved and all input tables are loaded before parallel sce
 The AFO examples use mode-specific GeoPackages: legacy
 `afo_example.gpkg`, PLET mass-based `afo_mass_example_generated.gpkg`, and
 statistical mass-based `afo_mass_statistical_example.gpkg`. See the
-[GeoPackage audit](afo_example_geopackage_audit.md) for table/column inventories.
+[GeoPackage reference](afo_example_geopackage_reference.md) for table/column inventories.
