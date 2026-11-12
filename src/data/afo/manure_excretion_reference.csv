@@ -1,0 +1,34 @@
+species,parameter,value,mean,sd,units,source
+Dairy,representative_mass_kg,640,,,kg,ASAE D384.1 FEB03 Table 1 footnote
+Dairy,tn_kg_1000kg_day,,0.45,0.096,kg/1000kg/day,ASAE D384.1 FEB03 Table 1 (TKN as TN)
+Dairy,tp_kg_1000kg_day,,0.094,0.024,kg/1000kg/day,ASAE D384.1 FEB03 Table 1 (elemental P)
+Beef,representative_mass_kg,360,,,kg,ASAE D384.1 FEB03 Table 1 footnote
+Beef,tn_kg_1000kg_day,,0.34,0.073,kg/1000kg/day,ASAE D384.1 FEB03 Table 1 (TKN as TN)
+Beef,tp_kg_1000kg_day,,0.092,0.027,kg/1000kg/day,ASAE D384.1 FEB03 Table 1 (elemental P)
+Veal,representative_mass_kg,91,,,kg,ASAE D384.1 FEB03 Table 1 footnote
+Veal,tn_kg_1000kg_day,,0.27,0.045,kg/1000kg/day,ASAE D384.1 FEB03 Table 1 (TKN as TN)
+Veal,tp_kg_1000kg_day,,0.066,0.011,kg/1000kg/day,ASAE D384.1 FEB03 Table 1 (elemental P)
+Swine,representative_mass_kg,61,,,kg,ASAE D384.1 FEB03 Table 1 footnote
+Swine,tn_kg_1000kg_day,,0.52,0.21,kg/1000kg/day,ASAE D384.1 FEB03 Table 1 (TKN as TN)
+Swine,tp_kg_1000kg_day,,0.18,0.10,kg/1000kg/day,ASAE D384.1 FEB03 Table 1 (elemental P)
+Sheep,representative_mass_kg,27,,,kg,ASAE D384.1 FEB03 Table 1 footnote
+Sheep,tn_kg_1000kg_day,,0.42,0.11,kg/1000kg/day,ASAE D384.1 FEB03 Table 1 (TKN as TN)
+Sheep,tp_kg_1000kg_day,,0.087,0.030,kg/1000kg/day,ASAE D384.1 FEB03 Table 1 (elemental P)
+Goat,representative_mass_kg,64,,,kg,ASAE D384.1 FEB03 Table 1 footnote
+Goat,tn_kg_1000kg_day,,0.45,0.12,kg/1000kg/day,ASAE D384.1 FEB03 Table 1 (TKN as TN)
+Goat,tp_kg_1000kg_day,,0.11,0.016,kg/1000kg/day,ASAE D384.1 FEB03 Table 1 (elemental P)
+Horse,representative_mass_kg,450,,,kg,ASAE D384.1 FEB03 Table 1 footnote
+Horse,tn_kg_1000kg_day,,0.30,0.063,kg/1000kg/day,ASAE D384.1 FEB03 Table 1 (TKN as TN)
+Horse,tp_kg_1000kg_day,,0.071,0.026,kg/1000kg/day,ASAE D384.1 FEB03 Table 1 (elemental P)
+Layer,representative_mass_kg,1.8,,,kg,ASAE D384.1 FEB03 Table 1 footnote
+Layer,tn_kg_1000kg_day,,0.84,0.22,kg/1000kg/day,ASAE D384.1 FEB03 Table 1 (TKN as TN)
+Layer,tp_kg_1000kg_day,,0.30,0.081,kg/1000kg/day,ASAE D384.1 FEB03 Table 1 (elemental P)
+Broiler,representative_mass_kg,0.9,,,kg,ASAE D384.1 FEB03 Table 1 footnote
+Broiler,tn_kg_1000kg_day,,1.1,0.24,kg/1000kg/day,ASAE D384.1 FEB03 Table 1 (TKN as TN)
+Broiler,tp_kg_1000kg_day,,0.30,0.053,kg/1000kg/day,ASAE D384.1 FEB03 Table 1 (elemental P)
+Turkey,representative_mass_kg,6.8,,,kg,ASAE D384.1 FEB03 Table 1 footnote
+Turkey,tn_kg_1000kg_day,,0.62,0.13,kg/1000kg/day,ASAE D384.1 FEB03 Table 1 (TKN as TN)
+Turkey,tp_kg_1000kg_day,,0.23,0.093,kg/1000kg/day,ASAE D384.1 FEB03 Table 1 (elemental P)
+Duck,representative_mass_kg,1.4,,,kg,ASAE D384.1 FEB03 Table 1 footnote
+Duck,tn_kg_1000kg_day,,1.5,0.54,kg/1000kg/day,ASAE D384.1 FEB03 Table 1 (TKN as TN)
+Duck,tp_kg_1000kg_day,,0.54,0.21,kg/1000kg/day,ASAE D384.1 FEB03 Table 1 (elemental P)

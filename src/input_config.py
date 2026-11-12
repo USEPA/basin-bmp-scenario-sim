@@ -1157,6 +1157,16 @@ def resolve_config_paths(cfg: Dict[str, Any], config_path: Union[str, Path]) -> 
                     load_generation[key], base_dir
                 )
 
+    manure_loading = ci_get(cfg, "manure_loading")
+    if isinstance(manure_loading, dict):
+        normalized_manure_loading = {str(key).lower(): value for key, value in manure_loading.items()}
+        manure_loading.clear()
+        manure_loading.update(normalized_manure_loading)
+        if manure_loading.get("excretion_factors") is not None:
+            manure_loading["excretion_factors"] = _resolve_config_path_value(
+                manure_loading["excretion_factors"], base_dir
+            )
+
     return cfg
 
 
@@ -3068,11 +3078,22 @@ def load_and_validate_all(cfg: Dict[str, Any], logger: Any) -> Dict[str, Any]:
                 raise ValueError("concentration_increment manure loading is PLET-only; use mass_based with statistical mode")
             if method == "mass_based" and not {"TN", "TP"}.issubset(set(pollutants)):
                 raise ValueError("mass_based manure loading requires both TN and TP pollutants")
+            excretion_path = ci_get(manure_cfg, "excretion_factors")
+            if excretion_path is not None and method != "mass_based":
+                raise ValueError("manure_loading.excretion_factors requires method: mass_based")
+            if excretion_path is not None and (
+                not isinstance(excretion_path, (str, Path)) or not str(excretion_path).strip()
+            ):
+                raise ValueError("manure_loading.excretion_factors must be a nonblank CSV path")
             from .afo import load_afo_inputs
             afo_inputs = load_afo_inputs(
                 afo_path, parcels, pollutants, method=method, mode=load_mode,
                 pathways=pathways, surface_pathway=surface_pathway,
                 parcel_path=ci_get(cfg, CFG_PARCELS),
+                excretion_factors_path=excretion_path,
+                runoff_adjusted_export=ci_get(manure_cfg, "runoff_adjusted_export")
+                if "runoff_adjusted_export" in manure_cfg else False,
+                reference_runoff_mm=ci_get(manure_cfg, "reference_runoff_mm"),
             )
             feedlot_bmp_cps = [int(c) for c in (ci_get(cfg, "feedlot_bmp_cps") or [])]
             if len(set(feedlot_bmp_cps)) != len(feedlot_bmp_cps) or not set(feedlot_bmp_cps).issubset(set(cps)):

@@ -35,11 +35,15 @@ AFO_FEEDLOT_CURVE_NUMBERS = (91.0, 92.0, 93.0, 94.0)
 AFO_FEEDLOT_MAX_CONCENTRATIONS = {"TN": 1500.0, "TP": 300.0, "BOD": 2000.0}
 AFO_SEASONAL_P_WEIGHTS = {"winter": 0.20, "spring": 0.15, "summer": 0.10, "fall": 0.05}
 AFO_SPECIES_ALIASES = {
-    "beef_steer": "beef_finishing",
-    "dairy_cow": "dairy_lactating",
-    "swine": "swine_grow_finish",
-    "broiler": "poultry_broiler",
+    "beef_steer": "beef",
+    "beef_finishing": "beef",
+    "dairy_cow": "dairy",
+    "dairy_lactating": "dairy",
+    "swine_grow_finish": "swine",
+    "poultry_broiler": "broiler",
+    "sheep_feeder": "sheep",
 }
+AFO_SPECIES = ("dairy", "beef", "veal", "swine", "sheep", "goat", "horse", "layer", "broiler", "turkey", "duck")
 
 # Custom logging level
 VERBOSE_LEVEL_NUM = 15
@@ -519,6 +523,14 @@ MASS_RATE_SPEC = _spec(
         "tonne/yr": 1000.0, "tonne/year": 1000.0,
     },
 )
+EXCRETION_RATE_SPEC = _spec(
+    "kg/1000kg/day",
+    {
+        "kg/1000 kg live animal mass/day": 1.0,
+        "g/1000kg/day": 1.0e-3,
+    },
+)
+ANIMAL_MASS_SPEC = _spec("kg", {"g": 1.0e-3, "lb": 0.45359237})
 COST_AREA_SPEC = _spec(
     "usd/ha",
     {
@@ -563,6 +575,8 @@ _KIND_SPECS: Dict[str, Tuple[UnitSpec, ...]] = {
     "concentration": (CONCENTRATION_SPEC,),
     "load_rate": (LOAD_RATE_SPEC,),
     "mass_rate": (MASS_RATE_SPEC,),
+    "excretion_rate": (EXCRETION_RATE_SPEC,),
+    "animal_mass": (ANIMAL_MASS_SPEC,),
     "cost": (COST_AREA_SPEC, COST_LENGTH_SPEC, COST_PROJECT_SPEC),
     "rusle_r": (RUSLE_R_SPEC,),
     "rusle_k": (RUSLE_K_SPEC,),
@@ -590,6 +604,9 @@ _PARAMETER_KINDS: Dict[str, str] = {
     "sediment_p_pct": "percent",
     "enrichment_ratio": "dimensionless",
     "fraction_subsurface_shallow": "fraction",
+    "tn_kg_1000kg_day": "excretion_rate",
+    "tp_kg_1000kg_day": "excretion_rate",
+    "representative_mass_kg": "animal_mass",
 }
 
 
@@ -670,6 +687,9 @@ _PARAMETER_PHYSICAL_DOMAINS: Dict[str, PhysicalDomain] = {
     "sediment_p_pct": PERCENT_DOMAIN,
     "enrichment_ratio": NONNEGATIVE_DOMAIN,
     "fraction_subsurface_shallow": FRACTION_DOMAIN,
+    "tn_kg_1000kg_day": NONNEGATIVE_DOMAIN,
+    "tp_kg_1000kg_day": NONNEGATIVE_DOMAIN,
+    "representative_mass_kg": POSITIVE_DOMAIN,
 }
 _SAMPLING_KIND_PHYSICAL_DOMAINS: Dict[str, PhysicalDomain] = {
     "efficiency": EFFICIENCY_DOMAIN,

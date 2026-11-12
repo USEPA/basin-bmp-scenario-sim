@@ -95,11 +95,23 @@ legacy BMP designs and selection probabilities remain in force; all BMPs are
 scored with the existing full-parcel-cost assumptions, including a feedlot-only
 BMP. BMP failure and signed efficiency conventions are unchanged.
 
+## Annotated AFO example GeoPackages
+
+The three repository AFO example packages provide one `notes` column **in
+each input table** explaining units, row values, method citations and synthetic
+provenance. `afo_operations` itself is a POINT layer, with one example point
+per operation at the centroid of its host parcel `pid`; these are **not known
+AFO locations**. No separate documentation tables are included. See
+[afo_example_metadata.md](afo_example_metadata.md).
+
 ## Required GeoPackage attribute tables
 
-The AFO file is a standalone GeoPackage with four relational **attribute**
-tables. QGIS can edit them; their PIDs reference the canonical
-`parcels.gpkg/parcels.pid` after domain clipping. IDs must be integers.
+For legacy `concentration_increment` mode, the AFO file is a standalone
+GeoPackage with **one spatial** `afo_operations` POINT feature layer and three
+nonspatial attribute tables. QGIS can edit them; host and receiving PIDs refer
+to the configured parcel GeoPackage. The point geometry is illustrative, and
+the model calculates using PID, not the point. Each table also has an optional
+`notes` column that the loader ignores. IDs must be integers.
 
 **`afo_operations`** (one row per AFO):
 
@@ -111,7 +123,7 @@ tables. QGIS can edit them; their PIDs reference the canonical
 | `paved_pct` | 0–100 impervious percentage used to select feedlot CN |
 | `allocation` | `explicit` or `sampled` |
 | `selection` | For `sampled`, `nearest` or `random` |
-| `manure_months` | Number of application months, 0–12 |
+| `manure_months` | **Legacy `concentration_increment` only**, number of application months, 0–12. Ignored in `mass_based`. |
 | `n_fields_value` | Fixed number of receiving fields for `sampled`; includes eligible host |
 | `n_fields_mean`, `n_fields_sd`, `n_fields_min`, `n_fields_max`, `n_fields_p50`, etc. | Alternative inline field-count distribution (same statistics as existing input tables) |
 
@@ -201,8 +213,10 @@ The source component table reports baseline and final direct feedlot and
 manure-associated **surface/subsurface** kg/year by parcel and pollutant;
 manure-associated subsurface contributions remain zero in this version.
 
-Each record includes `scenario`, `afo_id`, `host_pid`, `receiving_pid`,
-`manure_months`, `eligible_area_ha`, and `allocation`. Paired baseline/final
+Each record in legacy concentration mode includes `scenario`, `afo_id`,
+`host_pid`, `receiving_pid`, `manure_months`, `eligible_area_ha`, and
+`allocation`. Mass-based assignments omit `manure_months` and include their
+own nutrient mass ledger; see [mass-based AFO](afo_mass_based.md). Paired baseline/final
 loads appear in existing parcel and load-parameter outputs. Surface
 `initial_concentration` includes the nonnegative manure increment; `initial_subsurface`
 loads do not include any manure-specific addition. Source-specific feedlot
@@ -216,7 +230,12 @@ factors, inappropriate concentration coverage, and impossible field counts.
 ## Repeatable demonstration
 
 `examples/east_fork/inputs/config/east_fork_afo_demo.yaml` references the
-illustrative AFO GeoPackage and a small example efficiency table. Run:
+**legacy-only** `afo_example.gpkg` and a small example efficiency table.
+This file contains no mass-based management/hydrology inputs, BOD equivalence
+factor (BOD is not in the demonstration pollutants), or dummy geometry layer;
+its `afo_operations` feature layer shows two synthetic host parcel centroids.
+The two mass-based demos use distinct, purpose-specific GeoPackages; see
+[the example GeoPackage audit](afo_example_geopackage_audit.md). Run:
 
 ```bash
 python run_model.py examples/east_fork/inputs/config/east_fork_afo_demo.yaml

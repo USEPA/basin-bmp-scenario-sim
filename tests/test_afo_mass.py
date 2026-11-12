@@ -1,4 +1,4 @@
-"""APLE-derived P / APLE-inspired N, both baseline modes and mass ledgers."""
+"""Annual TN/TP export fractions, optional runoff adjustment and mass ledgers."""
 from __future__ import annotations
 
 import logging
@@ -20,11 +20,11 @@ from test_afo import _parcels, _state, _ctx, _package
 def _mass_package(tmp_path, *, weight=False):
     path = _package(tmp_path / 'afo.gpkg')
     with sqlite3.connect(path) as con:
-        pd.DataFrame([dict(afo_id='A1', season='spring', solids_pct=25,
-                           wep_fraction=0.4, f_n=0.2,
+        pd.DataFrame([dict(afo_id='A1',
+                           tn_surface_export_fraction=0.2,
+                           tp_surface_export_fraction=0.04,
                            collection_fraction=0.8, export_fraction=0.1,
-                           n_retention_fraction=0.7, p_retention_fraction=0.9,
-                           incorporated_fraction=0.2)]).to_sql('afo_manure_management', con, index=False)
+                           n_retention_fraction=0.7, p_retention_fraction=0.9)]).to_sql('afo_manure_management', con, index=False)
         if weight:
             con.execute("ALTER TABLE afo_manure_fields ADD COLUMN weight REAL")
             con.execute("UPDATE afo_manure_fields SET weight=2 WHERE pid=1")
@@ -35,53 +35,44 @@ def _mass_package(tmp_path, *, weight=False):
     return path
 
 
-def _load(path, mode='plet_rusle'):
+def _load(path, mode='plet_rusle', **kwargs):
     return load_afo_inputs(path, _parcels(), ['TN', 'TP'], method='mass_based', mode=mode,
-                           pathways=['surface', 'subsurface'], surface_pathway='surface')
+                           pathways=['surface', 'subsurface'], surface_pathway='surface', **kwargs)
 
 
-def test_aple_manure_p_equation_spring_solid_and_annual_n():
-    result = manure_surface_export_kg(applied_n_kg=100, applied_p_kg=30,
-             runoff_mm=200, precipitation_mm=1000, available_n_fraction=.2,
-             n_exponent=1, p_wep_fraction=.25, solids_pct=30,
-             incorporated_fraction=0, season='spring')
-    expected_available_p = 30*(.25 + .75*.15)
-    assert result['surface_available_p_kg'] == pytest.approx(expected_available_p)
-    assert result['TP'] == pytest.approx(expected_available_p*.2**1.225)
-    assert result['TN'] == pytest.approx(4.0)
-    assert manure_surface_export_kg(applied_n_kg=1, applied_p_kg=1, runoff_mm=0,
-            precipitation_mm=1000, available_n_fraction=.5,n_exponent=1,
-            p_wep_fraction=.4, solids_pct=30,incorporated_fraction=0,
-            season='spring')['TP'] == 0
-    with pytest.raises(ValueError,match='cannot exceed'):
-        manure_surface_export_kg(applied_n_kg=1, applied_p_kg=1,runoff_mm=1200,
-               precipitation_mm=1000,available_n_fraction=.5,n_exponent=1,
-               p_wep_fraction=.4,solids_pct=30,incorporated_fraction=0,season='spring')
+def test_default_annual_export_is_independent_of_runoff():
+    basic = dict(applied_n_kg=100, applied_p_kg=30,
+                 tn_surface_export_fraction=0.2, tp_surface_export_fraction=0.04)
+    assert manure_surface_export_kg(**basic) == pytest.approx({'TN': 20., 'TP': 1.2})
+    assert manure_surface_export_kg(**basic, runoff_mm=0) == pytest.approx({'TN': 20., 'TP': 1.2})
+    assert manure_surface_export_kg(**basic, runoff_mm=2000) == pytest.approx({'TN': 20., 'TP': 1.2})
 
 
-def test_aple_liquid_fall_and_incorporation_reduce_export():
-    kwargs=dict(applied_n_kg=80,applied_p_kg=50,runoff_mm=300,
-                precipitation_mm=1000, available_n_fraction=.3,n_exponent=1,
-                p_wep_fraction=.3)
-    spring=manure_surface_export_kg(**kwargs,solids_pct=20,incorporated_fraction=0,season='spring')
-    liquid=manure_surface_export_kg(**kwargs,solids_pct=10,incorporated_fraction=0,season='spring')
-    fall=manure_surface_export_kg(**kwargs,solids_pct=20,incorporated_fraction=0,season='fall')
-    incorporated=manure_surface_export_kg(**kwargs,solids_pct=20,incorporated_fraction=1,season='spring')
-    assert 0 < liquid['TP'] < spring['TP']
-    assert 0 < fall['TP'] < spring['TP']
-    assert incorporated['TP'] == 0
-    assert all(r['TN']==pytest.approx(7.2) for r in (spring,liquid,fall,incorporated))
+def test_opt_in_runoff_adjustment_and_mass_cap():
+    basic = dict(applied_n_kg=100, applied_p_kg=30,
+                 tn_surface_export_fraction=0.2, tp_surface_export_fraction=0.04,
+                 runoff_adjusted_export=True, reference_runoff_mm=200.)
+    for runoff, n, p in ((0, 0, 0), (100, 10, .6), (200, 20, 1.2),
+                         (400, 40, 2.4), (10000, 100, 30)):
+        assert manure_surface_export_kg(**basic, runoff_mm=runoff) == pytest.approx(
+            {'TN': n, 'TP': p})
+    with pytest.raises(ValueError, match='reference_runoff_mm'):
+        manure_surface_export_kg(**dict(basic, reference_runoff_mm=0), runoff_mm=5)
+    with pytest.raises(ValueError, match='requires runoff'):
+        manure_surface_export_kg(**dict(basic, reference_runoff_mm=None), runoff_mm=5)
+    with pytest.raises(ValueError, match='tn_surface_export_fraction'):
+        manure_surface_export_kg(**dict(basic, tn_surface_export_fraction=1.01), runoff_mm=5)
 
 
 def test_production_factors_and_same_animal_count_for_feeding(tmp_path):
     factors=reference_excretion_factors()
-    assert factors['beef_finishing']['tn_kg_head_day'] > 0
-    ctx=_ctx(None)
+    assert factors['beef']['tn_kg_1000kg_day']['mean'] > 0
+    ctx=_ctx({"excretion_factors": factors})
     row=dict(afo_id='A1',species='beef_steer',count=10,animal_days=180)
     result=animal_production(ctx,[row],'A1')
-    assert result['TN']==pytest.approx(10*180*factors['beef_finishing']['tn_kg_head_day'])
-    row['tn_kg_head_day']=.5
-    assert animal_production(ctx,[row],'A1')['TN']==pytest.approx(900)
+    assert result['TN']==pytest.approx(10*180*.36*factors['beef']['tn_kg_1000kg_day']['mean'])
+    row['tn_kg_1000kg_day']=.5
+    assert animal_production(ctx,[row],'A1')['TN']==pytest.approx(324)
     with pytest.raises(ValueError,match='animal_days'):
         animal_production(ctx,[dict(row,animal_days=400)],'A1')
 
@@ -96,11 +87,11 @@ def test_plet_mass_allocation_conserves_and_preserves_subsurface(tmp_path):
     assert len(assignments)==2 and len(ledger)==2
     assert ledger[0]['tn_applied_kg']/ledger[1]['tn_applied_kg']==pytest.approx(2)
     factors=reference_excretion_factors()
-    produced_n=10*365*factors['beef_finishing']['tn_kg_head_day']
+    produced_n=10*365*.36*factors['beef']['tn_kg_1000kg_day']['mean']
     assert sum(r['tn_applied_kg'] for r in ledger)==pytest.approx(produced_n*.8*.9*.7)
-    assert sum(r['tp_applied_kg'] for r in ledger)==pytest.approx(10*365*factors['beef_finishing']['tp_kg_head_day']*.8*.9*.9)
+    assert sum(r['tp_applied_kg'] for r in ledger)==pytest.approx(10*365*.36*factors['beef']['tp_kg_1000kg_day']['mean']*.8*.9*.9)
     assert sum(r['tn_exported_kg'] for r in ledger) <= sum(r['tn_applied_kg'] for r in ledger)
-    assert sum(r['tp_dissolved_exported_kg'] for r in ledger) <= sum(r['tp_applied_kg'] for r in ledger)
+    assert sum(r['tp_exported_kg'] for r in ledger) <= sum(r['tp_applied_kg'] for r in ledger)
     assert state.pathway_load_rates[2,0,1]==pytest.approx(2.)  # no manure subsurface
     assert state.pathway_load_rates[0,0,1]==pytest.approx(1.6)  # feedlot footprint
     assert state.concentrations[2]['TN']>2
@@ -120,7 +111,7 @@ def test_statistical_mode_loads_direct_feedlot_and_manure(tmp_path):
     assert ctx.current_afo_feedlot_pathway_rates[0,0,0]>0
     assert ctx.current_afo_feedlot_pathway_rates[0,0,1]==0
     assert ctx.current_afo_manure_pathway_rates[2,0,1]==0
-    assert all(row['runoff_mm']==200 for row in ledger)
+    assert all(row['runoff_mm'] is None for row in ledger)  # no field runoff required in default mode
 
 
 def test_invalid_missing_management_and_statistical_hydrology(tmp_path):
@@ -148,8 +139,8 @@ def test_shared_selection_exact_nonnegative_and_reproducible(tmp_path):
 def test_distributed_management_fraction_and_count(tmp_path):
     package = _mass_package(tmp_path)
     with sqlite3.connect(package) as conn:
-        conn.execute('ALTER TABLE afo_manure_management ADD COLUMN f_n_value REAL')
-        conn.execute('UPDATE afo_manure_management SET f_n=NULL, f_n_value=0.35')
+        conn.execute('ALTER TABLE afo_manure_management ADD COLUMN tn_surface_export_fraction_value REAL')
+        conn.execute('UPDATE afo_manure_management SET tn_surface_export_fraction=NULL, tn_surface_export_fraction_value=0.35')
         conn.execute('ALTER TABLE afo_animals ADD COLUMN count_value REAL')
         conn.execute('UPDATE afo_animals SET count=NULL, count_value=12')
     inputs = _load(package, mode='statistical')
@@ -157,8 +148,8 @@ def test_distributed_management_fraction_and_count(tmp_path):
     ctx.parcel_ids = ['1','2','3','4']
     ctx.current_pathway_load_rates = np.ones((4,2,2))
     _, ledger = mass_afo_realization(ctx)
-    assert all(row['f_n'] == pytest.approx(.35) for row in ledger)
-    assert all(row['animal_n_produced_kg'] == pytest.approx(12*365*reference_excretion_factors()['beef_finishing']['tn_kg_head_day']) for row in ledger)
+    assert all(row['tn_surface_export_fraction'] == pytest.approx(.35) for row in ledger)
+    assert all(row['animal_n_produced_kg'] == pytest.approx(12*365*.36*reference_excretion_factors()['beef']['tn_kg_1000kg_day']['mean']) for row in ledger)
     assert ctx.current_afo_feedlot_pathway_rates[0,0,0] > 0
 
 
@@ -190,3 +181,73 @@ def test_statistical_invalid_missing_feedlot_runoff_is_rejected(tmp_path):
         conn.execute('UPDATE afo_hydrology SET feedlot_runoff_mm=NULL')
     with pytest.raises(ValueError, match='feedlot_runoff_mm'):
         _load(package,mode='statistical')
+
+
+@pytest.mark.parametrize('runoff,expected_factor', [(0.,0.),(100.,.5),(200.,1.),(400.,2.),(10000.,5.)])
+def test_statistical_runoff_option_scales_and_caps(tmp_path, runoff, expected_factor):
+    path = _mass_package(tmp_path)
+    with sqlite3.connect(path) as con:
+        con.execute('UPDATE afo_hydrology SET annual_runoff_mm=?', (runoff,))
+        # For this test the host feedlot runoff is independent of field runoff.
+    inp = _load(path,mode='statistical', runoff_adjusted_export=True,reference_runoff_mm=200.)
+    ctx=_ctx(inp)
+    ctx.parcel_ids=['1','2','3','4']
+    ctx.current_pathway_load_rates=np.ones((4,2,2))
+    _,ledger=mass_afo_realization(ctx)
+    assert all(row['runoff_mm'] == runoff for row in ledger)
+    assert all(row['runoff_adjusted_export'] is True for row in ledger)
+    assert all(row['tn_effective_export_fraction'] == pytest.approx(min(1., .2*runoff/200.)) for row in ledger)
+    assert all(row['tp_effective_export_fraction'] == pytest.approx(min(1., .04*runoff/200.)) for row in ledger)
+
+
+def test_default_statistical_requires_only_feedlot_hydrology(tmp_path):
+    path=_mass_package(tmp_path)
+    with sqlite3.connect(path) as con:
+        con.execute('UPDATE afo_hydrology SET annual_runoff_mm=NULL')
+    inp=_load(path,mode='statistical')
+    ctx=_ctx(inp)
+    ctx.parcel_ids=['1','2','3','4']
+    ctx.current_pathway_load_rates=np.ones((4,2,2))
+    _,ledger=mass_afo_realization(ctx)
+    assert all(row['runoff_mm'] is None for row in ledger)
+    assert all(row['tn_effective_export_fraction']==pytest.approx(.2) for row in ledger)
+    with pytest.raises(ValueError,match='annual_runoff_mm'):
+        _load(path,mode='statistical',runoff_adjusted_export=True,reference_runoff_mm=200.)
+
+
+@pytest.mark.parametrize('kwargs,error', [
+    ({'runoff_adjusted_export': True},'reference_runoff_mm'),
+    ({'runoff_adjusted_export': True,'reference_runoff_mm': -1},'reference_runoff_mm'),
+    ({'reference_runoff_mm': 100},'requires runoff_adjusted_export'),
+    ({'runoff_adjusted_export': 'true'},'must be boolean'),
+])
+def test_runoff_config_validation(tmp_path, kwargs, error):
+    with pytest.raises(ValueError,match=error):
+        _load(_mass_package(tmp_path), **kwargs)
+
+
+def test_legacy_aple_coefficients_cannot_silently_pass(tmp_path):
+    path = _mass_package(tmp_path)
+    with sqlite3.connect(path) as con:
+        con.execute('ALTER TABLE afo_manure_management ADD COLUMN wep_fraction REAL')
+        con.execute('UPDATE afo_manure_management SET wep_fraction=.4')
+    with pytest.raises(ValueError,match='obsolete APLE parameters'):
+        _load(path)
+
+
+def test_invalid_fraction_distribution_fails_early(tmp_path):
+    path = _mass_package(tmp_path)
+    with sqlite3.connect(path) as con:
+        con.execute('UPDATE afo_manure_management SET tp_surface_export_fraction=2')
+    with pytest.raises(ValueError,match='tp_surface_export_fraction'):
+        _load(path)
+
+
+def test_no_manure_months_in_mass_based_allocation(tmp_path):
+    inp = _load(_mass_package(tmp_path), mode='statistical')
+    ctx=_ctx(inp)
+    ctx.parcel_ids=['1','2','3','4']
+    ctx.current_pathway_load_rates=np.ones((4,2,2))
+    assigns, ledger=mass_afo_realization(ctx)
+    assert all('manure_months' not in row for row in assigns + ledger)
+    assert all('season' not in row and 'wep_fraction' not in row for row in ledger)

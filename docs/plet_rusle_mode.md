@@ -184,8 +184,10 @@ PLET/RUSLE production pathways are fixed to `surface` and `subsurface`. Surface 
 
 ## Optional mass-based manure loading
 
-An optional APLE-manure-P/APLE-inspired-N model accepts animal inventories,
-allocates manure TN and TP by field, and converts predicted surface mass
-exports into annual runoff concentration increments. It uses existing
-PLET surface hydrology and leaves groundwater concentrations unchanged.
+An optional mass-based model accepts animal inventories, allocates manure TN
+and TP by field, and calculates annual surface exports using independently
+specified N and P export fractions (default). A runoff-adjusted export option
+uses PLET annual surface runoff relative to user-provided reference runoff.
+Equivalent PLET concentrations are calculated when runoff is positive; the
+default mass export does not depend on runoff. Groundwater stays unchanged.
 See [Mass-based AFO loading](afo_mass_based.md).

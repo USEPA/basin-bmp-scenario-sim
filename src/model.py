@@ -998,20 +998,18 @@ def _run_one_scenario(
                 budget = {"scenario": sid, "afo_id": op_id,
                           "receiver_count": len(grouped)}
                 for source, target in (
-                    ("animal_manure_produced_kg", "manure_produced_kg"),
                     ("animal_n_produced_kg", "tn_produced_kg"),
                     ("animal_p_produced_kg", "tp_produced_kg"),
-                    ("operation_available_manure_kg", "manure_available_kg"),
                     ("operation_available_tn_kg", "tn_available_kg"),
                     ("operation_available_tp_kg", "tp_available_kg"),
                 ):
                     budget[target] = float(first[source])
-                for key in ("manure_applied_kg", "tn_applied_kg", "tp_applied_kg",
-                            "tn_exported_kg", "tp_dissolved_exported_kg"):
+                for key in ("tn_applied_kg", "tp_applied_kg",
+                            "tn_exported_kg", "tp_exported_kg"):
                     budget[key] = float(grouped[key].sum())
-                for nutrient in ("manure", "tn", "tp"):
+                for nutrient in ("tn", "tp"):
                     if not np.isclose(budget[f"{nutrient}_available_kg"], budget[f"{nutrient}_applied_kg"], rtol=1e-10, atol=1e-8):
-                        raise AssertionError(f"AFO {op_id}: non-conserved manure {nutrient} allocation")
+                        raise AssertionError(f"AFO {op_id}: non-conserved {nutrient} allocation")
                 budget_rows.append(budget)
             budgets_dir = outputs_dir / "afo_operation_budgets"
             budgets_dir.mkdir(parents=True, exist_ok=True)

@@ -101,6 +101,38 @@ sample_group, units, notes
 ```
 
 
+## Optional mass-based AFO inputs
+
+```yaml
+animal_operations: ../afo/afo_mass_example_generated.gpkg
+manure_loading:
+  method: mass_based
+  excretion_factors: ../afo/my_excretion_factors.csv # optional
+  runoff_adjusted_export: false # default (annual mass * export fraction)
+  # When true, also specify reference_runoff_mm: <positive annual mm>
+```
+
+Omit `excretion_factors` to use the bundled
+`src/data/afo/manure_excretion_reference.csv`. A custom CSV replaces this
+reference and its path is relative to the YAML file. Both use long-form
+`species, parameter, value/mean/sd/...` rows for TN and TP production
+rates in kg per 1,000 kg live animal mass per day, plus a required
+`representative_mass_kg` row per species. Mass uses the PDF's fixed value by
+default and may instead use a distribution. Standard species names are
+Dairy, Beef, Veal, Swine, Sheep, Goat, Horse, Layer, Broiler, Turkey, and Duck.
+Wet-manure production rates are not inputs; only nutrient masses are calculated.
+Supply `tn_surface_export_fraction` and `tp_surface_export_fraction` (0–1,
+fixed or sampled) per AFO in the GeoPackage `afo_manure_management` table.
+If `runoff_adjusted_export: true`, both fractions are multiplied by annual
+surface runoff divided by `reference_runoff_mm`, with the result capped at 1.
+The default requires no receiving-field runoff data for manure export.
+APLE `season`, `solids_pct`, `wep_fraction`, `f_n`, `alpha_n` and
+`incorporated_fraction` are not supported in the mass-based method.
+The option applies only to `mass_based` loading;
+animal-row rate overrides retain precedence. See
+[mass-based AFO loading](afo_mass_based.md) for all required GeoPackage
+tables, distribution semantics, and D384.1 source assumptions.
+
 ## Parallel configuration
 
 ```yaml
@@ -111,3 +143,8 @@ parallel:
 ```
 
 All input paths are resolved and all input tables are loaded before parallel scenario workers are launched.
+
+The AFO examples use mode-specific GeoPackages: legacy
+`afo_example.gpkg`, PLET mass-based `afo_mass_example_generated.gpkg`, and
+statistical mass-based `afo_mass_statistical_example.gpkg`. See the
+[GeoPackage audit](afo_example_geopackage_audit.md) for table/column inventories.

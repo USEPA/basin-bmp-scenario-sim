@@ -70,12 +70,25 @@ Fractions must match active efficiency pathways and sum to `1.0`.
 
 Optional parcel-selection weights are stored in `input_selection_weight`, not on the spatial `parcels` layer. The table is keyed by `pid` and uses deterministic `value` entries. If the table is absent, parcel selection is uniform.
 
-## Optional AFO manure mass and feedlot runoff
+## Optional AFO manure nutrients and feedlot runoff
 
 `load_generation.mode: statistical` supports the **mass-based** AFO module
-with independent animal/manure production, parcel allocation, annual runoff/
-precipitation and separate direct-feedlot surface loading. An explicit
-statistical `surface_pathway` and a baseline excluding the modeled manure/
-feedlot loads are required. See [Mass-based AFO loading](afo_mass_based.md)
+with animal-based N/P production, nutrient allocation to parcels, annual
+manure surface export fractions and separate direct-feedlot surface loading.
+By default, the receiving fields need no hydrology: feedlot hosts still need
+annual precipitation and feedlot runoff. If `runoff_adjusted_export: true`,
+receiving fields additionally require `afo_hydrology.annual_runoff_mm` and
+`manure_loading.reference_runoff_mm` must be positive. The configured
+`manure_loading.surface_pathway` (default `surface`) must match an active
+statistical pathway, and the baseline must exclude the modeled manure/
+feedlot loads. The [statistical AFO demo](../examples/east_fork/inputs/config/east_fork_afo_mass_statistical_demo.yaml)
+sets this key explicitly and supplies matching background pathway fractions.
+See [Mass-based AFO loading](afo_mass_based.md)
 for inputs, hierarchy and equations. The legacy `concentration_increment`
 AFO method is PLET-only.
+
+The checked-in statistical AFO demonstration uses its own minimal
+`examples/east_fork/inputs/afo/afo_mass_statistical_example.gpkg`. For default
+Option A it supplies precipitation and direct-feedlot runoff, but no annual
+receiving-field runoff. The separate PLET example has no statistical AFO tables.
+See [AFO example GeoPackage audit](afo_example_geopackage_audit.md).

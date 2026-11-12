@@ -6,7 +6,7 @@
 
 Numeric model inputs use one common **inline** row-level convention. A row contains either a fixed value or all statistics needed to define its distribution directly. There is no separate distribution catalog and no named distribution reference.
 
-The convention is used by statistical parcel load rates, PLET/RUSLE numeric parameters, curve number and infiltration fraction, pollutant concentrations, BMP efficiencies, and BMP costs.
+The convention is used by statistical parcel load rates, PLET/RUSLE numeric parameters, curve number and infiltration fraction, pollutant concentrations, BMP efficiencies, BMP costs, and the [AFO manure excretion reference CSV](afo_mass_based.md#starting-animal-excretion-distributions).
 
 ## Canonical distribution columns
 

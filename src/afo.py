@@ -5,7 +5,6 @@ See docs/animal_feeding_operations.md for inputs, assumptions, and limitations.
 """
 from __future__ import annotations
 
-import csv
 from pathlib import Path
 from typing import Any, Mapping, Sequence
 import sqlite3
@@ -16,12 +15,28 @@ import pandas as pd
 from .constants import (
     AFO_FEEDLOT_CURVE_NUMBERS as _FEEDLOT_CN,
     AFO_FEEDLOT_MAX_CONCENTRATIONS as _FEEDLOT_MAX_CONC,
-    AFO_SEASONAL_P_WEIGHTS as _SEASONS,
     AFO_SPECIES_ALIASES as _SPECIES_ALIAS,
+    AFO_SPECIES,
     INCH_OVER_HA_TO_LITERS,
 )
-from .input_distributions import stats_from_row, statistic_columns
+from .input_distributions import sample_group_key, stats_from_row, statistic_columns
+from .input_validation import validate_stats_rows, validate_unique_rows
+from .io_utils import read_csv_table
 from .plet_rusle import plet_annual_surface_runoff_in, normalize_plet_land_cover
+from .utils import normalize_columns
+
+
+_EXCRETION_PARAMETERS = (
+    "representative_mass_kg", "tn_kg_1000kg_day", "tp_kg_1000kg_day",
+)
+
+
+def _animal_species(value: Any) -> str:
+    species = str(value).strip().lower()
+    species = _SPECIES_ALIAS.get(species, species)
+    if species not in AFO_SPECIES:
+        raise ValueError(f"Unknown AFO species {value!r}; expected one of {', '.join(AFO_SPECIES)}")
+    return species
 
 
 def _read_table(conn: sqlite3.Connection, name: str, *, optional: bool = False) -> pd.DataFrame:
@@ -30,7 +45,14 @@ def _read_table(conn: sqlite3.Connection, name: str, *, optional: bool = False) 
         if optional:
             return pd.DataFrame()
         raise ValueError(f"AFO GeoPackage is missing table {name!r}")
-    frame = pd.read_sql_query(f'SELECT * FROM "{name}"', conn)
+    # AFO example GeoPackages expose operation point geometry and explanatory
+    # per-record notes in QGIS. Neither is a numerical model input; in
+    # particular, the notes field must not be mistaken for a distribution
+    # statistic in legacy concentration-increment mode.
+    model_columns = [col[1] for col in conn.execute(f'PRAGMA table_info("{name}")')
+                     if str(col[1]).strip().lower() not in {"fid", "geom", "notes"}]
+    projection = ", ".join('"' + col.replace('"', '""') + '"' for col in model_columns)
+    frame = pd.read_sql_query(f'SELECT {projection} FROM "{name}"', conn)
     frame.columns = [str(col).strip().lower() for col in frame.columns]
     return frame
 
@@ -77,8 +99,24 @@ def _sample_stats(ctx: Any, row: Mapping[str, Any], *, prefix: str = "", kind: s
 def load_afo_inputs(path: str | Path, parcels: pd.DataFrame, pollutants: Sequence[str],
                     *, method: str = "concentration_increment", mode: str = "plet_rusle",
                     pathways: Sequence[str] = ("surface",), surface_pathway: str = "surface",
-                    parcel_path: str | Path | None = None) -> dict[str, Any]:
-    """Load and fully validate optional AFO tables before worker processes start."""
+                    parcel_path: str | Path | None = None,
+                    excretion_factors_path: str | Path | None = None,
+                    runoff_adjusted_export: bool = False,
+                    reference_runoff_mm: float | None = None) -> dict[str, Any]:
+    """Load and validate AFO inputs and the optional mass-based runoff adjustment."""
+    if not isinstance(runoff_adjusted_export, bool):
+        raise ValueError("manure_loading.runoff_adjusted_export must be boolean")
+    if method == "mass_based":
+        if runoff_adjusted_export:
+            if reference_runoff_mm is None:
+                raise ValueError("runoff-adjusted manure export requires reference_runoff_mm")
+            reference_runoff_mm = _finite(
+                reference_runoff_mm, "manure_loading.reference_runoff_mm", low=1e-12
+            )
+        elif reference_runoff_mm is not None:
+            raise ValueError("reference_runoff_mm requires runoff_adjusted_export: true")
+    elif runoff_adjusted_export or reference_runoff_mm is not None:
+        raise ValueError("runoff-adjusted manure export requires method: mass_based")
     package = Path(path)
     if not package.is_file():
         raise FileNotFoundError(f"AFO GeoPackage not found: {package}")
@@ -91,6 +129,7 @@ def load_afo_inputs(path: str | Path, parcels: pd.DataFrame, pollutants: Sequenc
         eligibility = _read_table(conn, "afo_field_eligibility", optional=mode != "statistical")
         hydrology = _read_table(conn, "afo_hydrology", optional=mode != "statistical")
     operation_columns = ["afo_id", "pid", "feedlot_area_ha", "paved_pct", "allocation"]
+    excretion_factors = {}
     if method == "concentration_increment":
         operation_columns.append("manure_months")
     _need_columns(operations, "afo_operations", operation_columns)
@@ -102,7 +141,7 @@ def load_afo_inputs(path: str | Path, parcels: pd.DataFrame, pollutants: Sequenc
     if method == "concentration_increment":
         _need_columns(increments, "afo_manure_concentration_increments", ["land_cover", "pollutant"])
     else:
-        _need_columns(management, "afo_manure_management", ["afo_id", "season"])
+        _need_columns(management, "afo_manure_management", ["afo_id"])
         if mode == "statistical":
             _need_columns(eligibility, "afo_field_eligibility", ["pid", "eligible"])
             _need_columns(hydrology, "afo_hydrology", ["pid"])
@@ -129,7 +168,7 @@ def load_afo_inputs(path: str | Path, parcels: pd.DataFrame, pollutants: Sequenc
         if area > area_by_pid[pid] + 1e-8:
             raise ValueError(f"Operation {op_id} feedlot area exceeds host parcel area")
         _finite(row["paved_pct"], f"{op_id}.paved_pct", 0., 100.)
-        if pd.notna(row["manure_months"]):
+        if method == "concentration_increment" and pd.notna(row["manure_months"]):
             _finite(row["manure_months"], f"{op_id}.manure_months", 0., 12.)
         allocation_mode = str(row["allocation"]).strip().lower()
         if allocation_mode not in {"explicit", "sampled"}:
@@ -203,32 +242,78 @@ def load_afo_inputs(path: str | Path, parcels: pd.DataFrame, pollutants: Sequenc
             for name, value in stats.items():
                 _finite(value, f"afo_manure_concentration_increments.{name}")
     else:
-        known = reference_excretion_factors()
+        excretion_factors = reference_excretion_factors(excretion_factors_path)
         if management["afo_id"].astype(str).duplicated().any() or set(management["afo_id"].astype(str)) != op_ids:
             raise ValueError("afo_manure_management requires exactly one row per operation")
+        # APLE-specific coefficients are not interchangeable with annual
+        # export fractions. Fail rather than silently ignoring old inputs.
+        deprecated = (
+            "f_n", "alpha_n", "wep_fraction", "solids_pct", "season",
+            "incorporated_fraction",
+        )
         for _, row in management.iterrows():
-            if str(row["season"]).strip().lower() not in {"winter", "spring", "summer", "fall"}:
-                raise ValueError("afo_manure_management.season must be winter/spring/summer/fall")
-            for name in ("f_n", "wep_fraction", "solids_pct"):
-                fixed_present = name in management.columns and pd.notna(row.get(name))
-                stats_present = any(k.startswith(name + "_") and pd.notna(row[k])
-                                    for k in management.columns)
-                if not (fixed_present or stats_present):
-                    raise ValueError(f"afo_manure_management requires {name} or {name}_* distribution")
-            for name in ("f_n", "wep_fraction", "collection_fraction", "export_fraction",
-                         "n_retention_fraction", "p_retention_fraction", "incorporated_fraction"):
+            op_id = str(row["afo_id"])
+            old = [name for name in deprecated if any(
+                (column == name or column.startswith(name + "_")) and pd.notna(value)
+                for column, value in row.items()
+            )]
+            if old:
+                raise ValueError(
+                    f"afo_manure_management[{op_id}] uses obsolete APLE parameters {old}; "
+                    "replace with tn_surface_export_fraction and tp_surface_export_fraction "
+                    "(do not convert coefficients mechanically)"
+                )
+            for name in ("tn_surface_export_fraction", "tp_surface_export_fraction"):
+                value = row.get(name)
+                stats = {
+                    key[len(name) + 1:]: val for key, val in row.items()
+                    if key.startswith(name + "_") and pd.notna(val)
+                }
+                if pd.notna(value):
+                    if stats:
+                        raise ValueError(f"{op_id}: {name} cannot mix fixed and distribution inputs")
+                    stats = {"value": value}
+                if not stats:
+                    raise ValueError(f"afo_manure_management[{op_id}] requires {name} or {name}_* distribution")
+                validate_stats_rows(
+                    pd.DataFrame([{"parameter": name, **stats}]),
+                    f"afo_manure_management[{op_id}].{name}",
+                )
+                for stat, stat_value in stats.items():
+                    if stat == "sd":
+                        _finite(stat_value, f"{op_id}.{name}_sd")
+                    else:
+                        _finite(stat_value, f"{op_id}.{name}_{stat}", 0, 1)
+            for name in ("collection_fraction", "export_fraction",
+                         "n_retention_fraction", "p_retention_fraction"):
                 if name in row and pd.notna(row[name]):
                     _finite(row[name], name, 0, 1)
-            if "solids_pct" in row and pd.notna(row["solids_pct"]):
-                _finite(row["solids_pct"], "solids_pct", 0, 100)
         for _, row in animals.iterrows():
-            species = str(row["species"]).strip().lower()
-            species = _SPECIES_ALIAS.get(species, species)
-            if species not in known and not all(
-                    name in animals.columns and pd.notna(row.get(name)) or
-                    any(k.startswith(name + "_") and pd.notna(row[k]) for k in animals.columns)
-                    for name in ("manure_kg_head_day", "tn_kg_head_day", "tp_kg_head_day")):
-                raise ValueError(f"Unsupported animal species {species!r}; supply all three production rates")
+            species = _animal_species(row["species"])
+            unsupported = [
+                column for column in animals.columns
+                if any(column == name or column.startswith(name + "_")
+                       for name in ("manure_kg_head_day", "tn_kg_head_day", "tp_kg_head_day",
+                                    "manure_kg_1000kg_day"))
+                and pd.notna(row[column])
+            ]
+            if unsupported:
+                raise ValueError(
+                    f"afo_animals contains unsupported excretion inputs {unsupported}; "
+                    f"supported parameters are {', '.join(_EXCRETION_PARAMETERS)}"
+                )
+            for parameter in _EXCRETION_PARAMETERS:
+                stats = _excretion_override_stats(row, parameter)
+                if stats:
+                    validate_stats_rows(
+                        pd.DataFrame([{"parameter": parameter, **stats}]),
+                        f"afo_animals[{row['afo_id']}/{species}].{parameter}",
+                    )
+                elif parameter not in excretion_factors.get(species, {}):
+                    raise ValueError(
+                        f"afo_animals[{row['afo_id']}/{species}] requires {parameter}; "
+                        "supply an animal-row override or a species row in the excretion CSV"
+                    )
     eligible_by_pid = {}
     hydrology_by_pid = {}
     if method == "mass_based" and mode == "statistical":
@@ -281,13 +366,16 @@ def load_afo_inputs(path: str | Path, parcels: pd.DataFrame, pollutants: Sequenc
             if rec is not None:
                 hydrology_by_pid[pid] = rec
         active_hosts = {str(op["pid"]) for op in operations.to_dict("records")}
-        for pid in set(eligible_by_pid).union(active_hosts):
+        # Constant-export mode needs no receiving-field hydrology. Direct
+        # feedlot loading still needs precipitation and feedlot runoff at hosts.
+        required_pids = active_hosts | ({pid for pid, yes in eligible_by_pid.items() if yes} if runoff_adjusted_export else set())
+        for pid in required_pids:
             if pid not in hydrology_by_pid:
                 raise ValueError(f"Missing statistical AFO hydrology for pid {pid}")
             row = hydrology_by_pid[pid]
-            required = ["annual_precip_mm", "annual_runoff_mm"]
+            required = ["annual_runoff_mm"] if runoff_adjusted_export and eligible_by_pid.get(pid) else []
             if pid in active_hosts:
-                required.append("feedlot_runoff_mm")
+                required.extend(("annual_precip_mm", "feedlot_runoff_mm"))
             for name in required:
                 if not (name in row and pd.notna(row[name])) and not any(
                     k.startswith(name + "_") and pd.notna(v) for k,v in row.items()
@@ -296,11 +384,14 @@ def load_afo_inputs(path: str | Path, parcels: pd.DataFrame, pollutants: Sequenc
         if not any(eligible_by_pid.values()):
             raise ValueError("Statistical AFO requires at least one eligible field")
     return {"operations": operations.to_dict("records"), "animals": animals.to_dict("records"),
+            "excretion_factors": excretion_factors,
             "fields": fields.to_dict("records"),
             "manure_concentration_increments": increments.to_dict("records") if not increments.empty else [],
             "management": management.to_dict("records") if not management.empty else [],
             "eligible": eligible_by_pid, "hydrology": hydrology_by_pid,
             "surface_pathway": surface_pathway, "method": method,
+            "runoff_adjusted_export": runoff_adjusted_export,
+            "reference_runoff_mm": reference_runoff_mm,
             "geometry": {str(r.pid): r.geometry for r in parcels.itertuples()},
             "area_ha": area_by_pid}
 
@@ -310,7 +401,6 @@ def _select_manure_fields(ctx: Any, inputs: Mapping[str, Any], eligible_area: Ma
     operations = inputs["operations"]
     fields = inputs["fields"]
     geometry = inputs["geometry"]
-    manure_months: dict[str, float] = {}
     assignments: list[dict[str, Any]] = []
     # Reuse exactly the same spatial selection for the legacy concentration
     # mode and the new mass-conserving nutrient-allocation mode.
@@ -338,11 +428,11 @@ def _select_manure_fields(ctx: Any, inputs: Mapping[str, Any], eligible_area: Ma
         for pid in chosen:
             if pid not in eligible_area:
                 raise ValueError(f"{op_id}: manure receiving pid {pid} lacks eligible agricultural area")
-            manure_months[pid] = max(manure_months.get(pid, 0.), float(op["manure_months"]))
             rec = {"afo_id": op_id, "host_pid": host, "receiving_pid": pid,
-                                "manure_months": float(op["manure_months"]),
-                                "eligible_area_ha": float(eligible_area[pid]),
-                                "allocation": op["allocation"]}
+                   "eligible_area_ha": float(eligible_area[pid]),
+                   "allocation": op["allocation"]}
+            if inputs.get("method") != "mass_based":
+                rec["manure_months"] = float(op["manure_months"])
             field_row = next((r for r in fields if str(r["afo_id"]) == op_id and str(r["pid"]) == pid), None)
             if field_row is not None and field_row.get("weight") is not None and not pd.isna(field_row["weight"]):
                 rec["weight"] = _finite(field_row["weight"], "afo_manure_fields.weight")
@@ -483,17 +573,52 @@ def apply_afo_baseline(ctx: Any, state: Any) -> list[dict[str, Any]]:
     return assignments
 
 
-def reference_excretion_factors() -> dict[str, dict[str, float]]:
-    """Documented starting animal-class factors in kg/head/day (as excreted)."""
-    path = Path(__file__).parent / "data" / "manure_excretion_reference.csv"
-    with path.open(newline="", encoding="utf-8") as handle:
-        return {
-            row["species"]: {
-                key: float(row[key])
-                for key in ("manure_kg_head_day", "tn_kg_head_day", "tp_kg_head_day")
-            }
-            for row in csv.DictReader(handle)
-        }
+def reference_excretion_factors(
+    path: str | Path | None = None,
+) -> dict[str, dict[str, dict[str, Any]]]:
+    """Load native D384.1 rate statistics and required representative masses."""
+    if path is None:
+        path = Path(__file__).parent / "data" / "afo" / "manure_excretion_reference.csv"
+    label = f"manure excretion factors ({path})"
+    table = normalize_columns(read_csv_table(path))
+    _need_columns(table, label, ["species", "parameter"])
+    if table.empty:
+        raise ValueError(f"{label} requires at least one species")
+    for column in ("species", "parameter"):
+        if table[column].isna().any() or table[column].astype(str).str.strip().eq("").any():
+            raise ValueError(f"{label}.{column} must not be blank")
+        table[column] = table[column].astype(str).str.strip().str.lower()
+    table["species"] = table["species"].map(_animal_species)
+    unexpected = set(table["parameter"]) - set(_EXCRETION_PARAMETERS)
+    if unexpected:
+        raise ValueError(f"{label} contains unsupported parameters: {sorted(unexpected)}")
+    validate_unique_rows(table, ["species", "parameter"], label)
+    validate_stats_rows(table, label)
+    factors = {}
+    for species, rows in table.groupby("species", sort=False):
+        missing = set(_EXCRETION_PARAMETERS) - set(rows["parameter"])
+        if missing:
+            raise ValueError(f"{label} species {species!r} is missing parameters: {sorted(missing)}")
+        factors[species] = {}
+        for _, row in rows.iterrows():
+            stats = stats_from_row(row)
+            group = row.get("sample_group")
+            record: dict[str, Any] = dict(stats)
+            if group is not None and pd.notna(group) and str(group).strip():
+                record["sample_group"] = str(group).strip()
+            factors[species][row["parameter"]] = record
+    return factors
+
+
+def _excretion_override_stats(animal: Mapping[str, Any], parameter: str) -> dict[str, float]:
+    """Select a complete animal-row override without merging reference statistics."""
+    prefix = parameter + "_"
+    row = {key[len(prefix):]: value for key, value in animal.items() if key.startswith(prefix)}
+    if parameter in animal and pd.notna(animal[parameter]):
+        if "value" in row and pd.notna(row["value"]):
+            raise ValueError(f"afo_animals supplies both {parameter} and {parameter}_value")
+        row["value"] = animal[parameter]
+    return stats_from_row({"parameter": parameter, **row})
 
 
 def _draw(
@@ -531,32 +656,48 @@ def _nan(value: Any) -> bool:
 
 
 def animal_production(
-    ctx: Any, animals: list[dict[str, Any]], op_id: str
+    ctx: Any, animals: list[dict[str, Any]], op_id: str,
+    *, excretion_cache: dict[tuple[str, str], float] | None = None,
 ) -> dict[str, float]:
-    """Calculate as-excreted annual wet manure and nutrient N/P inventories.
+    """Calculate as-excreted annual nutrient N/P inventories.
 
     Availability/handling losses are applied separately; animal-days is the
     number of days each enumerated head is present in the modeled year.
     """
-    factors = reference_excretion_factors()
-    totals = {"manure": 0.0, "TN": 0.0, "TP": 0.0}
+    factors = ctx.afo_inputs["excretion_factors"]
+    if excretion_cache is None:
+        excretion_cache = {}
+    totals = {"TN": 0.0, "TP": 0.0}
     for animal in animals:
         if str(animal["afo_id"]) != op_id:
             continue
-        raw_species = str(animal["species"]).strip().lower()
-        species = _SPECIES_ALIAS.get(raw_species, raw_species)
+        species = _animal_species(animal["species"])
         known = factors.get(species, {})
         number = _draw(ctx, animal, "count")
         days = _draw(ctx, animal, "animal_days", default=365.)
         if days > 366:
             raise ValueError(f"{op_id}: animal_days cannot exceed 366")
-        for nutrient, field in (
-            ("manure", "manure_kg_head_day"),
-            ("TN", "tn_kg_head_day"),
-            ("TP", "tp_kg_head_day"),
-        ):
-            rate = _draw(ctx, animal, field, default=known.get(field))
-            totals[nutrient] += number * days * rate
+        realized = {}
+        for field in _EXCRETION_PARAMETERS:
+            kind = "positive" if field == "representative_mass_kg" else "nonnegative"
+            stats = _excretion_override_stats(animal, field)
+            if stats:
+                rate = float(ctx._sample_from_stats(stats, kind=kind))
+            else:
+                if field not in known:
+                    raise ValueError(f"{op_id}/{species}: missing manure excretion parameter {field}")
+                reference = known[field]
+                key = sample_group_key(reference, pid=repr((op_id, species)), variable=field)
+                if key not in excretion_cache:
+                    excretion_cache[key] = _sample_stats(ctx, reference, kind=kind)
+                rate = excretion_cache[key]
+            rate = _finite(rate, f"{op_id}/{species}.{field}")
+            if field == "representative_mass_kg" and rate <= 0:
+                raise ValueError(f"{op_id}/{species}.representative_mass_kg must be positive")
+            realized[field] = rate
+        scale = number * days * realized["representative_mass_kg"] / 1000.
+        for nutrient, field in zip(("TN", "TP"), _EXCRETION_PARAMETERS[1:]):
+            totals[nutrient] += scale * realized[field]
     return totals
 
 
@@ -564,53 +705,33 @@ def manure_surface_export_kg(
     *,
     applied_n_kg: float,
     applied_p_kg: float,
-    runoff_mm: float,
-    precipitation_mm: float,
-    available_n_fraction: float,
-    n_exponent: float,
-    p_wep_fraction: float,
-    solids_pct: float,
-    incorporated_fraction: float,
-    season: str,
+    tn_surface_export_fraction: float,
+    tp_surface_export_fraction: float,
+    runoff_adjusted_export: bool = False,
+    runoff_mm: float | None = None,
+    reference_runoff_mm: float | None = None,
 ) -> dict[str, float]:
-    """Annual manure-derived surface N and dissolved P exports in kg.
+    """Same-year manure-attributable surface TN/TP exports (kg/year).
 
-    APLE 2.5 annual manure P release equations (1), (3), (6) and same-year
-    mineralization/fall-availability assumptions. A supplied incorporation
-    fraction represents effective surface P removed; APLE's full injection
-    volume/depth-dependent subroutine is *not* reproduced here.
+    Default: applied nutrient mass times its annual export fraction.
+    Opt-in: multiply each fraction by annual runoff/reference runoff and cap
+    at unity. This is an empirical screening approximation, not APLE.
     """
     n = _finite(applied_n_kg, "applied_n_kg")
     p = _finite(applied_p_kg, "applied_p_kg")
-    q = _finite(runoff_mm, "runoff_mm")
-    rain = _finite(precipitation_mm, "precipitation_mm")
-    f_n = _finite(available_n_fraction, "available_n_fraction", 0, 1)
-    exponent = _finite(n_exponent, "n_exponent", 0)
-    wep = _finite(p_wep_fraction, "p_wep_fraction", 0, 1)
-    solids = _finite(solids_pct, "solids_pct", 0, 100)
-    incorporated = _finite(incorporated_fraction, "incorporated_fraction", 0, 1)
-    season = str(season).lower().strip()
-    if season not in _SEASONS:
-        raise ValueError(f"season must be one of {sorted(_SEASONS)}")
-    if q > rain + 1e-9:
-        raise ValueError("Annual surface runoff cannot exceed annual precipitation")
-    if rain == 0 or q == 0:
-        return {"TN": 0., "TP": 0., "surface_available_p_kg": 0.}
-    ratio = min(q / rain, 1.0)
-    n_export = n * f_n * ratio ** exponent
-    surface_p = p * (0.4 if solids < 15 else 1.0) * (1.0 - incorporated)
-    wep_available = surface_p * (wep + (1. - wep) * _SEASONS[season])
-    if season == "fall":
-        # APLE postpones 25% of available fall WEP to the following year;
-        # the remainder is not exported or tracked in our single-year model.
-        wep_available *= .75
-    if solids < 15:
-        cover = .5
-        wep_available *= 2.2 * (250 * cover) / (250 * cover + 300.1)
-    p_export = wep_available * ratio ** 1.225
-    if p_export > p + 1e-8 or n_export > n + 1e-8:
-        raise AssertionError("Nutrient export exceeds applied manure mass")
-    return {"TN": n_export, "TP": p_export, "surface_available_p_kg": wep_available}
+    n_fraction = _finite(tn_surface_export_fraction, "tn_surface_export_fraction", 0, 1)
+    p_fraction = _finite(tp_surface_export_fraction, "tp_surface_export_fraction", 0, 1)
+    if not isinstance(runoff_adjusted_export, bool):
+        raise ValueError("runoff_adjusted_export must be boolean")
+    if runoff_adjusted_export:
+        if runoff_mm is None or reference_runoff_mm is None:
+            raise ValueError("Runoff adjustment requires runoff_mm and reference_runoff_mm")
+        runoff = _finite(runoff_mm, "runoff_mm")
+        reference = _finite(reference_runoff_mm, "reference_runoff_mm", low=1e-12)
+        factor = runoff / reference
+        n_fraction = min(1., n_fraction * factor)
+        p_fraction = min(1., p_fraction * factor)
+    return {"TN": n * n_fraction, "TP": p * p_fraction}
 
 
 def mass_afo_realization(
@@ -669,25 +790,23 @@ def mass_afo_realization(
     manure = np.zeros_like(feedlot)
     ledger: list[dict] = []
     management = {str(rec["afo_id"]): rec for rec in inputs["management"]}
+    excretion_cache: dict[tuple[str, str], float] = {}
     for op in sorted(ops, key=lambda row: str(row["afo_id"])):
         op_id = str(op["afo_id"])
         mgt = management[op_id]
-        produced = animal_production(ctx, realized_animals, op_id)
+        produced = animal_production(ctx, realized_animals, op_id, excretion_cache=excretion_cache)
         collection = _draw(ctx, mgt, "collection_fraction", default=1, fraction=True)
         export_fraction = _draw(ctx, mgt, "export_fraction", default=0, fraction=True)
         available = {
-            "manure": produced["manure"] * collection * (1 - export_fraction),
             "TN": produced["TN"] * collection * (1 - export_fraction)
             * _draw(ctx, mgt, "n_retention_fraction", default=1, fraction=True),
             "TP": produced["TP"] * collection * (1 - export_fraction)
             * _draw(ctx, mgt, "p_retention_fraction", default=1, fraction=True),
         }
-        available_n = _draw(ctx, mgt, "f_n", fraction=True)
-        exponent_n = _draw(ctx, mgt, "alpha_n", default=1.)
-        p_wep = _draw(ctx, mgt, "wep_fraction", fraction=True)
-        solids = _draw(ctx, mgt, "solids_pct")
-        incorporated = _draw(ctx, mgt, "incorporated_fraction", default=0, fraction=True)
-        season = str(mgt["season"]).strip().lower()
+        tn_export_fraction = _draw(ctx, mgt, "tn_surface_export_fraction", fraction=True)
+        tp_export_fraction = _draw(ctx, mgt, "tp_surface_export_fraction", fraction=True)
+        adjust_for_runoff = inputs.get("runoff_adjusted_export", False)
+        reference_runoff = inputs.get("reference_runoff_mm")
         chosen = by_op[op_id]
         custom_weights = [rec.get("weight") for rec in chosen]
         if any(weight is not None for weight in custom_weights):
@@ -703,18 +822,23 @@ def mass_afo_realization(
             idx = idx_map[pid]
             frac = weight / sum(weights)
             applied = {key: total * frac for key, total in available.items()}
-            runoff_mm, precip_mm, _ = _hydrology(inputs, pid, state, idx, ctx)
+            # For the default method, manure export needs no runoff input.
+            # No artificial zero-runoff constraint is imposed in that mode.
+            runoff_mm = None
+            if adjust_for_runoff:
+                runoff_mm, _, _ = _hydrology(inputs, pid, state, idx, ctx)
+            elif state is not None:
+                # Observed PLET runoff is used only for reporting and an
+                # equivalent concentration, never as a factor in Option A.
+                runoff_mm = plet_annual_surface_runoff_in(state.parameters[idx])[3] * 25.4
             exported = manure_surface_export_kg(
                 applied_n_kg=applied["TN"],
                 applied_p_kg=applied["TP"],
+                tn_surface_export_fraction=tn_export_fraction,
+                tp_surface_export_fraction=tp_export_fraction,
+                runoff_adjusted_export=adjust_for_runoff,
                 runoff_mm=runoff_mm,
-                precipitation_mm=precip_mm,
-                available_n_fraction=available_n,
-                n_exponent=exponent_n,
-                p_wep_fraction=p_wep,
-                solids_pct=solids,
-                incorporated_fraction=incorporated,
-                season=season,
+                reference_runoff_mm=reference_runoff,
             )
             for pol_idx, pol in enumerate(ctx.pollutants):
                 pol_upper = str(pol).upper()
@@ -725,26 +849,23 @@ def mass_afo_realization(
                     state.concentrations[idx][pol_upper] += 100 * add / runoff_mm
             ledger.append(dict(
                 **rec,
-                animal_manure_produced_kg=produced["manure"],
                 animal_n_produced_kg=produced["TN"],
                 animal_p_produced_kg=produced["TP"],
-                operation_available_manure_kg=available["manure"],
                 operation_available_tn_kg=available["TN"],
                 operation_available_tp_kg=available["TP"],
-                manure_applied_kg=applied["manure"],
                 tn_applied_kg=applied["TN"],
                 tp_applied_kg=applied["TP"],
                 tn_exported_kg=exported["TN"],
-                tp_dissolved_exported_kg=exported["TP"],
-                precipitation_mm=precip_mm,
+                tp_exported_kg=exported["TP"],
+                runoff_adjusted_export=adjust_for_runoff,
+                reference_runoff_mm=reference_runoff,
                 runoff_mm=runoff_mm,
                 tn_application_kg_ha=applied["TN"] / eligible[pid],
                 tp_application_kg_ha=applied["TP"] / eligible[pid],
-                f_n=available_n,
-                alpha_n=exponent_n,
-                wep_fraction=p_wep,
-                season=season,
-                incorporated_fraction=incorporated,
+                tn_surface_export_fraction=tn_export_fraction,
+                tp_surface_export_fraction=tp_export_fraction,
+                tn_effective_export_fraction=(exported["TN"] / applied["TN"] if applied["TN"] else 0.),
+                tp_effective_export_fraction=(exported["TP"] / applied["TP"] if applied["TP"] else 0.),
             ))
         # Feedlot source is separate from manure-field loading.
         host = str(op["pid"])
@@ -806,16 +927,18 @@ def _hydrology(
             ctx._afo_hydro_cache = cache
         key = id(supplied)
         if key not in cache:
-            cache[key] = (
-                _draw(ctx, supplied, "annual_runoff_mm"),
-                _draw(ctx, supplied, "annual_precip_mm"),
-                _draw(ctx, supplied, "feedlot_runoff_mm")
+            def optional_draw(field):
                 if any(
-                    column == "feedlot_runoff_mm"
-                    or column.startswith("feedlot_runoff_mm_")
-                    for column in supplied
-                )
-                else None,
+                    (column == field or column.startswith(field + "_"))
+                    and value is not None and not _nan(value)
+                    for column, value in supplied.items()
+                ):
+                    return _draw(ctx, supplied, field)
+                return None
+            cache[key] = (
+                optional_draw("annual_runoff_mm"),
+                optional_draw("annual_precip_mm"),
+                optional_draw("feedlot_runoff_mm"),
             )
         return cache[key]
     params = state.parameters[idx]

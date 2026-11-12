@@ -1,6 +1,7 @@
-# Demonstration only. AFO locations, animals, and manure concentrations are
+# Demonstration only. AFO locations, animals, and manure export fractions are
 # illustrative, NOT a verified East Fork inventory or calibrated coefficients.
-# Generate the GeoPackage first: python scripts/create_afo_mass_example.py
+# The lean PLET AFO GeoPackage is checked in; regenerate with:
+# python scripts/create_afo_example_packages.py
 verbose: True
 random_seed: 42
 outputs: ../../outputs/run_afo_mass_demo
@@ -11,7 +12,8 @@ outlets: ../outlets/outlets.gpkg
 animal_operations: ../afo/afo_mass_example_generated.gpkg
 manure_loading:
   method: mass_based
-  surface_pathway: surface
+  # runoff_adjusted_export defaults to false (annual mass x export fraction)
+  # To opt into runoff scaling set true and add reference_runoff_mm: <positive mm/year>
 bmp_efficiency: ../afo/bmp_efficiency_afo_demo.csv
 pollutants: [TN, TP, TSS]
 cps: [313, 590]
