@@ -8,7 +8,6 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any, Mapping, Sequence
 import sqlite3
-
 import numpy as np
 import pandas as pd
 
@@ -227,8 +226,9 @@ def load_afo_inputs(path: str | Path, parcels: pd.DataFrame, pollutants: Sequenc
     for pid, total in host_area.items():
         if total > area_by_pid[pid] + 1e-8:
             raise ValueError(f"Combined feedlot footprints exceed parcel area for pid {pid}")
+    animals["afo_id"] = animals["afo_id"].astype(str).str.strip()
     for op_id in op_ids:
-        if not animals["afo_id"].astype(str).str.strip().eq(op_id).any():
+        if not animals["afo_id"].eq(op_id).any():
             raise ValueError(f"Operation {op_id} has no animal inventory")
     for _, row in animals.iterrows():
         op_id = str(row["afo_id"]).strip()
