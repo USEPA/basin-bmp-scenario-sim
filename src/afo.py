@@ -205,7 +205,7 @@ def load_afo_inputs(path: str | Path, parcels: pd.DataFrame, pollutants: Sequenc
         if area > area_by_pid[pid] + 1e-8:
             raise ValueError(f"Operation {op_id} feedlot area exceeds host parcel area")
         _finite(row["paved_pct"], f"{op_id}.paved_pct", 0., 100.)
-        if method == "concentration_increment" and pd.notna(row["manure_months"]):
+        if method == "concentration_increment":
             _finite(row["manure_months"], f"{op_id}.manure_months", 0., 12.)
         allocation_mode = str(row["allocation"]).strip().lower()
         if allocation_mode not in {"explicit", "sampled"}:
