@@ -360,7 +360,7 @@ def load_afo_inputs(path: str | Path, parcels: pd.DataFrame, pollutants: Sequenc
                 raise ValueError(f"Unknown/duplicate AFO eligibility pid {pid}")
             if float(row["eligible"]) not in (0., 1.):
                 raise ValueError("AFO eligibility must be 0 or 1")
-            eligible_by_pid[pid] = bool(row["eligible"])
+            eligible_by_pid[pid] = bool(float(row["eligible"]))
         # Inheritance: parcel-specific -> HUC12 -> NULL-pid domain default.
         # HUC12 keys are resolved from the canonical parcel_huc12 table.
         mapping = {}
