@@ -30,6 +30,7 @@ from src.bmp import (
     _simulate_infield,
     _simulate_wetland,
 )
+from src.bmp_selection import BMPEligibilityPool
 from src.cost import _estimate_costs_for_probabilities, _get_bmp_cost, _select_cost_rate_median
 from src.io_utils import _write_parquet_atomic, _flatten_plot_records
 from src.input_distributions import sample_group_key
@@ -55,6 +56,7 @@ from src.constants import (
     CFG_BMP_COST,
     CFG_BMP_SEL,
     CFG_DETERMINISTIC_BMP_TYPE_ORDER,
+    CFG_DETERMINISTIC_PARCEL_ORDER,
     CFG_OUTPUTS,
     CFG_PARALLEL,
     CFG_VERBOSE,  # pass verbose to worker loggers
@@ -782,77 +784,40 @@ def _run_one_scenario(
         # Initialize summary collector once per scenario
         collector = BMPSummaryCollector(ctx.pollutants, scenario_id=sid)
 
-        # Track CPS applied per parcel ID to prevent duplicates
-        applied_by_pid: Dict[str, set] = defaultdict(set)
-        deterministic_bmp_types = (
-            sorted({int(cps) for cps in ctx.bmp_cps})
-            if cfg.get(CFG_DETERMINISTIC_BMP_TYPE_ORDER, False)
-            else []
+        # One eligibility mechanism serves both stochastic and deterministic selection.
+        # Only the parcel-selection universe is eligible for BMP placement;
+        # hydrologic calculations retain the full parcel universe.
+        selection_pool = BMPEligibilityPool(
+            selection_pids=ctx.parcel_selection_ids,
+            bmp_cps=ctx.bmp_cps,
+            bmp_probabilities=ctx.bmp_selection_probs,
+            feedlot_bmp_cps=ctx.feedlot_bmp_cps,
+            afo_host_pids=(op["pid"] for op in (ctx.afo_inputs or {}).get("operations", [])),
+            parcel_probabilities=ctx.parcel_selection_probs,
+            deterministic_parcels=bool(cfg.get(CFG_DETERMINISTIC_PARCEL_ORDER, False)),
+            deterministic_bmps=bool(cfg.get(CFG_DETERMINISTIC_BMP_TYPE_ORDER, False)),
         )
         deterministic_bmp_cursor = 0
 
-        # Main loop
-        idle_tries = 0
-        max_idle_tries = max(100, len(ctx.parcel_selection_ids) * len(ctx.bmp_cps))
+        # Main loop: a parcel is sampled only while at least one CPS is selectable.
         while True:
             if limit_usd is not None and total_cost >= limit_usd:
+                logger.info("BMP placement stopped: cost limit reached.")
                 break
             if limit_n is not None and total_bmp >= limit_n:
+                logger.info("BMP placement stopped: count limit reached.")
                 break
 
-            selection_idx = ctx._sample_parcel_index()
+            active_indices = selection_pool.active_selection_indices()
+            if not len(active_indices):
+                logger.info("BMP placement stopped: no selectable parcel/CPS combinations remain.")
+                break
+            selection_idx = ctx._sample_parcel_index(eligible_indices=active_indices)
             parcel_idx = int(ctx.selection_source_idxs[selection_idx])
             pid = ctx.parcel_ids[parcel_idx]
-
-            # Filter CPS by what has already been applied to this parcel
-            already = applied_by_pid[str(pid)]
-            host_pids = {str(op["pid"]) for op in (ctx.afo_inputs or {}).get("operations", [])}
-            allowed_idx = [
-                i for i, c in enumerate(ctx.bmp_cps)
-                if int(c) not in already and (
-                    int(c) not in ctx.feedlot_bmp_cps or str(pid) in host_pids
-                )
-            ]
-
-            # If no CPS remain for this parcel, try another parcel; if globally exhausted, stop
-            if not allowed_idx:
-                idle_tries += 1
-                if idle_tries >= max_idle_tries:
-                    logger.info("No remaining CPS options across parcels; stopping early to avoid infinite loop.")
-                    break
-                continue
-            idle_tries = 0  # reset on a viable placement
-
-            if deterministic_bmp_types:
-                selected_cps, deterministic_bmp_cursor = _next_deterministic_bmp_type(
-                    deterministic_bmp_types,
-                    already,
-                    deterministic_bmp_cursor,
-                )
-                if selected_cps is None:
-                    idle_tries += 1
-                    if idle_tries >= max_idle_tries:
-                        logger.info("No remaining CPS options across parcels; stopping early to avoid infinite loop.")
-                        break
-                    continue
-                cps = selected_cps
-            else:
-                # Renormalize probabilities over the allowed CPS subset
-                probs_sub = ctx.bmp_selection_probs[allowed_idx]
-                probs_sum = float(np.sum(probs_sub))
-                if not np.isfinite(probs_sum) or probs_sum <= 0.0:
-                    idle_tries += 1
-                    if idle_tries >= max_idle_tries:
-                        logger.info("No selectable CPS probabilities remain across parcels; stopping early.")
-                        break
-                    logger.warning(
-                        f"Skipping parcel pid={pid}: remaining BMP probabilities are non-finite or sum to zero."
-                    )
-                    continue
-                probs_sub = probs_sub / probs_sum
-                sel = ctx.rng.choice(len(allowed_idx), p=probs_sub)
-                cps = int(ctx.bmp_cps[allowed_idx[sel]])
-
+            cps, deterministic_bmp_cursor = selection_pool.select_bmp(
+                str(pid), ctx.rng, deterministic_bmp_cursor
+            )
             # Scope each BMP placement for deeper indentation
             with log_scope(label=f"apply bmp cps={cps} pid={pid}", logger=logger):
                 eff_maps = [
@@ -950,7 +915,7 @@ def _run_one_scenario(
                 total_bmp += 1
 
                 # Mark CPS as applied for this parcel
-                applied_by_pid[str(pid)].add(int(cps))
+                selection_pool.record_placement(str(pid), int(cps))
 
                 # Finalize the BMP record using explicit mass fields. The current
                 # one-year timestep converts annual mass rates to timestep mass.

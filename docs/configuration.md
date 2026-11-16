@@ -43,6 +43,33 @@ CPS-code order, cycling through the available types. Types already applied to
 the selected parcel are skipped, and selection resumes at the next type in
 the cycle.
 
+### BMP eligibility and selection
+
+All BMP placement modes use the same parcel/CPS eligibility rules. BMPs may
+only be placed on parcels present in the parcel-selection probability table;
+parcels outside that table still participate in hydrologic routing and load
+accounting. A CPS can be applied at most once per parcel. Feedlot-specific CPS
+codes may be placed only on AFO host parcels, while other configured practices
+are not restricted by AFO host status. These are the existing placement rules;
+this change introduces no additional land-use or physical suitability filters.
+
+For stochastic selection, first choose a parcel using its configured selection
+weight **renormalized over parcels with at least one remaining selectable BMP**.
+Then choose a CPS using its configured BMP-type weight **renormalized over the
+eligible CPS codes for that parcel**. A zero-probability CPS remains physically
+eligible but cannot be drawn stochastically; similarly, a zero-weight parcel
+cannot be sampled stochastically. Deterministic selection follows the configured
+ascending-PID / ascending-CPS order, skipping exhausted or ineligible options;
+it does not apply probability weights. Both deterministic flags can be enabled
+independently.
+
+The placement loop stops at the configured BMP count limit, the existing
+cumulative-cost threshold, or when there are no selectable placements left.
+It does not terminate on a fixed number of unsuccessful random retries.
+Existing cost accounting and BMP impact calculations are unchanged. Since
+exhausted parcels no longer consume random draws, exact same-seed results may
+differ from earlier versions, while a given version remains reproducible.
+
 Set `deterministic_bmp_design_parameters: true` to use fixed BMP geometry
 instead of the default sampled geometry: wetland area is 20% of the selected
 parcel's area with a 4:1 catchment-to-wetland ratio (the remaining 80% of that
