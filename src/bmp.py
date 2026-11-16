@@ -194,7 +194,12 @@ def _apply_pathway_reduction(
                 if source["pol_idx"] == pol_idx and source["path_idx"] == path_idx:
                     source["full_rate"] *= multiplier
                     source["current_rate"] *= multiplier
-        pathway_load_rates[parcel_idx, pol_idx, path_idx] = total_load_rate - (current_load_rate - new_value)
+        if direct_component is None:
+             pathway_load_rates[parcel_idx, pol_idx, path_idx] = new_value
+        elif getattr(self, "current_bmp_targets_feedlot", False):
+             pathway_load_rates[parcel_idx, pol_idx, path_idx] = (total_load_rate - current_load_rate) + new_value
+        else:
+             pathway_load_rates[parcel_idx, pol_idx, path_idx] = float(direct_component[parcel_idx, pol_idx, path_idx]) + new_value
     return float(removed_load_rate)
 
 
