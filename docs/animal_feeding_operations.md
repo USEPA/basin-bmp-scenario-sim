@@ -133,7 +133,10 @@ the model calculates using PID, not the point. Each table also has an optional
 Sampled field count is rounded to the nearest integer (`floor(x + .5)`), and
 must lie within `[1, number_of_eligible_parcels]`. Counts exceeding the parcel
 universe raise an error instead of silently being clipped. Multiple AFOs may
-share a host parcel, but their combined feedlot area cannot exceed it.
+share a host parcel, but their combined feedlot area cannot exceed it. Feedlot-only
+BMPs use the physical feedlot footprint (or optional practice-specific area)
+for USD/ha costs, not the entire host parcel. Per-meter components require an
+explicit length: see [AFO feedlot costing](afo_mass_based.md#feedlot-specific-bmp-costing-all-afo-methods).
 
 **`afo_animals`** (one or more rows per AFO):
 

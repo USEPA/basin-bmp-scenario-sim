@@ -65,8 +65,9 @@ independently.
 
 The placement loop stops at the configured BMP count limit, the existing
 cumulative-cost threshold, or when there are no selectable placements left.
-It does not terminate on a fixed number of unsuccessful random retries.
-Existing cost accounting and BMP impact calculations are unchanged. Since
+It does not terminate on a fixed number of unsuccessful random retries. 
+Feedlot-specific area/length cost quantities are based on the AFO footprint
+or explicitly supplied practice dimensions, rather than the entire host parcel. Since
 exhausted parcels no longer consume random draws, exact same-seed results may
 differ from earlier versions, while a given version remains reproducible.
 

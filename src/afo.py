@@ -18,8 +18,8 @@ from .constants import (
     AFO_SPECIES,
     INCH_OVER_HA_TO_LITERS,
 )
-from .input_distributions import sample_group_key, stats_from_row, statistic_columns
-from .input_validation import validate_stats_rows, validate_unique_rows
+from .input_distributions import sample_group_key, stats_from_row, statistic_columns, sample_stats_bounded
+from .input_validation import validate_named_parameter_stats, validate_stats_rows, validate_unique_rows
 from .io_utils import read_csv_table
 from .plet_rusle import plet_annual_surface_runoff_in, normalize_plet_land_cover
 from .utils import normalize_columns
@@ -84,6 +84,20 @@ def _finite(value: Any, name: str, low: float = 0., high: float = float("inf")) 
     return out
 
 
+def _require_fixed_parameter(
+    row: Mapping[str, Any], name: str, label: str,
+    *, low: float = 0., high: float | None = None, exclusive_low: bool = False,
+) -> float:
+    """Reject ambiguous/distribution columns for explicitly fixed AFO fields."""
+    stats = validate_named_parameter_stats(
+        row, name, label, required=True, low=low, high=high,
+        exclusive_low=exclusive_low,
+    )
+    if set(stats) != {"value"} or pd.isna(row.get(name)):
+        raise ValueError(f"{label}: {name} must be one fixed scalar, not a distribution")
+    return float(stats["value"])
+
+
 def _sample_stats(ctx: Any, row: Mapping[str, Any], *, prefix: str = "", kind: str = "nonnegative") -> float:
     if prefix:
         stats = {str(key)[len(prefix):]: value for key, value in row.items()
@@ -129,6 +143,7 @@ def load_afo_inputs(path: str | Path, parcels: pd.DataFrame, pollutants: Sequenc
         eligibility = _read_table(conn, "afo_field_eligibility", optional=mode != "statistical")
         hydrology = _read_table(conn, "afo_hydrology", optional=mode != "statistical")
         recovery = _read_table(conn, "afo_feedlot_manure_effects", optional=True)
+        cost_dimensions = _read_table(conn, "afo_feedlot_bmp_cost_dimensions", optional=True)
     operation_columns = ["afo_id", "pid", "feedlot_area_ha", "paved_pct", "allocation"]
     excretion_factors = {}
     if method == "concentration_increment":
@@ -136,7 +151,7 @@ def load_afo_inputs(path: str | Path, parcels: pd.DataFrame, pollutants: Sequenc
     _need_columns(operations, "afo_operations", operation_columns)
     if "manure_months" not in operations.columns:
         operations["manure_months"] = 12.0
-    _need_columns(animals, "afo_animals", ["afo_id", "species"] + (["count"] if method == "concentration_increment" else []))
+    _need_columns(animals, "afo_animals", ["afo_id", "species"])
     if method not in {"mass_based", "concentration_increment"}:
         raise ValueError("manure_loading.method must be mass_based or concentration_increment")
     if method == "concentration_increment":
@@ -174,24 +189,52 @@ def load_afo_inputs(path: str | Path, parcels: pd.DataFrame, pollutants: Sequenc
             if cps not in cps_allowed:
                 raise ValueError(f"afo_feedlot_manure_effects CPS {cps} must be in feedlot_bmp_cps")
             cps_normalized.append(cps)
-            key = "additional_collection_fraction"
-            fixed = row.get(key)
-            stats = {k[len(key)+1:]: v for k, v in row.items()
-                     if str(k).startswith(key + "_") and pd.notna(v)}
-            if pd.notna(fixed):
-                if stats:
-                    raise ValueError(f"{op_id}/CPS {cps}: cannot mix fixed and distributed {key}")
-                stats = {"value": fixed}
-            if not stats:
-                raise ValueError(f"{op_id}/CPS {cps}: requires {key} or {key}_* statistics")
-            validate_stats_rows(pd.DataFrame([{"parameter": key, **stats}]),
-                                f"afo_feedlot_manure_effects[{op_id}/{cps}]")
-            for name, value in stats.items():
-                _finite(value, f"afo_feedlot_manure_effects[{op_id}/{cps}].additional_collection_fraction_{name}",
-                        0, float('inf') if name == 'sd' else 1)
+            validate_named_parameter_stats(
+                row, "additional_collection_fraction",
+                f"afo_feedlot_manure_effects[{op_id}/{cps}]",
+                required=True, low=0., high=1.,
+            )
         recovery["cps"] = cps_normalized
         if recovery.duplicated(["afo_id", "cps"]).any():
             raise ValueError("Duplicate afo_feedlot_manure_effects operation/CPS pair")
+    # Optional operation/CPS-specific cost dimensions. A feedlot BMP acts on
+    # the host parcel but its cost area is the treated feedlot footprint, not
+    # the parcel's entire area. Length-based costs have no defensible default.
+    cost_dimensions_by_op_cps: dict[tuple[str, int], dict[str, float]] = {}
+    if not cost_dimensions.empty:
+        _need_columns(cost_dimensions, "afo_feedlot_bmp_cost_dimensions", ["afo_id", "cps"])
+        allowed = {int(c) for c in feedlot_bmp_cps}
+        for index, row in cost_dimensions.iterrows():
+            op_id = str(row["afo_id"]).strip()
+            if op_id not in op_ids:
+                raise ValueError(
+                    f"afo_feedlot_bmp_cost_dimensions row {index}: unknown AFO {op_id!r}"
+                )
+            cps = int(_integer_pid(row["cps"], "afo_feedlot_bmp_cost_dimensions.cps"))
+            if cps not in allowed:
+                raise ValueError(
+                    f"afo_feedlot_bmp_cost_dimensions[{op_id}/{cps}]: "
+                    "CPS must be configured in feedlot_bmp_cps"
+                )
+            key = (op_id, cps)
+            if key in cost_dimensions_by_op_cps:
+                raise ValueError(f"Duplicate AFO feedlot cost dimensions for {op_id}/CPS {cps}")
+            dims = {}
+            for field in ("cost_area_ha", "cost_length_m"):
+                label = f"afo_feedlot_bmp_cost_dimensions[{op_id}/{cps}]"
+                supplied = validate_named_parameter_stats(
+                    row, field, label, low=0., exclusive_low=True,
+                )
+                if supplied:
+                    if set(supplied) != {"value"} or pd.isna(row.get(field)):
+                        raise ValueError(f"{label}: {field} must be a fixed scalar")
+                    dims[field] = float(supplied["value"])
+            if not dims:
+                raise ValueError(
+                    f"afo_feedlot_bmp_cost_dimensions[{op_id}/{cps}] "
+                    "requires cost_area_ha and/or cost_length_m"
+                )
+            cost_dimensions_by_op_cps[key] = dims
     pid_set = set(parcels["pid"].astype(str))
     area_by_pid = dict(zip(parcels["pid"].astype(str), parcels["area_ha"].astype(float)))
     for k, row in operations.iterrows():
@@ -200,12 +243,15 @@ def load_afo_inputs(path: str | Path, parcels: pd.DataFrame, pollutants: Sequenc
         if pid not in pid_set:
             raise ValueError(f"Operation {op_id} refers to unknown host pid {pid}")
         operations.at[k, "pid"] = pid
+        _require_fixed_parameter(row, "feedlot_area_ha", f"afo_operations[{op_id}]",
+                                 exclusive_low=True)
         area = _finite(row["feedlot_area_ha"], f"{op_id}.feedlot_area_ha", low=1e-12)
         if area > area_by_pid[pid] + 1e-8:
             raise ValueError(f"Operation {op_id} feedlot area exceeds host parcel area")
-        _finite(row["paved_pct"], f"{op_id}.paved_pct", 0., 100.)
+        _require_fixed_parameter(row, "paved_pct", f"afo_operations[{op_id}]", high=100.)
         if method == "concentration_increment":
-            _finite(row["manure_months"], f"{op_id}.manure_months", 0., 12.)
+            _require_fixed_parameter(row, "manure_months", f"afo_operations[{op_id}]",
+                                     high=12.)
         allocation_mode = str(row["allocation"]).strip().lower()
         if allocation_mode not in {"explicit", "sampled"}:
             raise ValueError(f"Operation {op_id} allocation must be explicit or sampled")
@@ -215,11 +261,10 @@ def load_afo_inputs(path: str | Path, parcels: pd.DataFrame, pollutants: Sequenc
             if selection not in {"nearest", "random"}:
                 raise ValueError(f"Operation {op_id} selection must be nearest or random")
             operations.at[k, "selection"] = selection
-            if not any(str(c).startswith("n_fields_") and pd.notna(row[c]) for c in operations.columns):
-                raise ValueError(f"Operation {op_id} requires n_fields_value or n_fields_* distribution")
-            for col in operations.columns:
-                if str(col).startswith("n_fields_") and pd.notna(row[col]):
-                    _finite(row[col], f"{op_id}.{col}")
+            validate_named_parameter_stats(
+                row, "n_fields", f"afo_operations[{op_id}]",
+                required=True, low=1.,
+            )
     host_area = {}
     for _, row in operations.iterrows():
         host_area[row["pid"]] = host_area.get(row["pid"], 0.) + float(row["feedlot_area_ha"])
@@ -236,16 +281,19 @@ def load_afo_inputs(path: str | Path, parcels: pd.DataFrame, pollutants: Sequenc
             raise ValueError(f"afo_animals references unknown AFO {op_id}")
         if not str(row["species"]).strip():
             raise ValueError("afo_animals.species must not be blank")
-        if "count" not in row or pd.isna(row["count"]):
-            if method != "mass_based" or not any(k.startswith("count_") and pd.notna(row[k]) for k in animals.columns):
-                raise ValueError(f"{op_id} requires animal count or count_* distribution")
-        else:
-            _finite(row["count"], f"{op_id}.count")
+        validate_named_parameter_stats(
+            row, "count", f"afo_animals[{op_id}/{row['species']}]",
+            required=True, low=0.,
+        )
+        validate_named_parameter_stats(
+            row, "animal_days", f"afo_animals[{op_id}/{row['species']}]",
+            low=0., high=366.,
+        )
         for pol in set(p.upper() for p in pollutants).intersection(_FEEDLOT_MAX_CONC):
             factor = f"factor_{pol.lower()}"
             if factor not in animals or pd.isna(row[factor]):
                 raise ValueError(f"afo_animals requires {factor} for {op_id}; PLET equivalent animal factor")
-            _finite(row[factor], f"{op_id}.{factor}")
+            _require_fixed_parameter(row, factor, f"afo_animals[{op_id}/{row['species']}]")
     if fields.empty and "afo_id" not in fields:
         fields = pd.DataFrame(columns=["afo_id", "pid"])
     fields["afo_id"] = fields["afo_id"].astype(str).str.strip()
@@ -258,6 +306,12 @@ def load_afo_inputs(path: str | Path, parcels: pd.DataFrame, pollutants: Sequenc
         if op_id not in op_ids or pid not in pid_set:
             raise ValueError(f"Invalid manure field reference {op_id}/{pid}")
         fields.at[k, "pid"] = pid
+        if validate_named_parameter_stats(
+            row, "weight", f"afo_manure_fields[{op_id}/{pid}]",
+            low=0., exclusive_low=True,
+        ):
+            _require_fixed_parameter(row, "weight", f"afo_manure_fields[{op_id}/{pid}]",
+                                     exclusive_low=True)
     if fields["afo_id"].isin(set(operations.loc[operations.allocation == "sampled", "afo_id"])).any():
         raise ValueError("Sampled operations must not also specify explicit manure fields")
     for op_id in operations.loc[operations.allocation == "explicit", "afo_id"]:
@@ -272,12 +326,17 @@ def load_afo_inputs(path: str | Path, parcels: pd.DataFrame, pollutants: Sequenc
             raise ValueError("Manure concentration increments apply only to cropland/pastureland")
         if not set(increments["pollutant"]).issubset(set(map(str.upper, pollutants))):
             raise ValueError("Manure concentration increments reference unknown pollutants")
-        for _, row in increments.iterrows():
+        for index, row in increments.iterrows():
             stats = stats_from_row(row, {"land_cover", "pollutant", "sample_group", "units"})
             if not stats:
                 raise ValueError("Each manure concentration increment needs a value or distribution")
+            validate_stats_rows(
+                pd.DataFrame([{"parameter": "increment", **stats}]),
+                f"afo_manure_concentration_increments row {index}",
+            )
             for name, value in stats.items():
-                _finite(value, f"afo_manure_concentration_increments.{name}")
+                if name != "sd":
+                    _finite(value, f"afo_manure_concentration_increments.{name}")
     else:
         excretion_factors = reference_excretion_factors(excretion_factors_path)
         if management["afo_id"].astype(str).duplicated().any() or set(management["afo_id"].astype(str)) != op_ids:
@@ -301,30 +360,16 @@ def load_afo_inputs(path: str | Path, parcels: pd.DataFrame, pollutants: Sequenc
                     "(do not convert coefficients mechanically)"
                 )
             for name in ("tn_surface_export_fraction", "tp_surface_export_fraction"):
-                value = row.get(name)
-                stats = {
-                    key[len(name) + 1:]: val for key, val in row.items()
-                    if key.startswith(name + "_") and pd.notna(val)
-                }
-                if pd.notna(value):
-                    if stats:
-                        raise ValueError(f"{op_id}: {name} cannot mix fixed and distribution inputs")
-                    stats = {"value": value}
-                if not stats:
-                    raise ValueError(f"afo_manure_management[{op_id}] requires {name} or {name}_* distribution")
-                validate_stats_rows(
-                    pd.DataFrame([{"parameter": name, **stats}]),
-                    f"afo_manure_management[{op_id}].{name}",
+                validate_named_parameter_stats(
+                    row, name, f"afo_manure_management[{op_id}]",
+                    required=True, low=0., high=1.,
                 )
-                for stat, stat_value in stats.items():
-                    if stat == "sd":
-                        _finite(stat_value, f"{op_id}.{name}_sd")
-                    else:
-                        _finite(stat_value, f"{op_id}.{name}_{stat}", 0, 1)
             for name in ("collection_fraction", "export_fraction",
                          "n_retention_fraction", "p_retention_fraction"):
-                if name in row and pd.notna(row[name]):
-                    _finite(row[name], name, 0, 1)
+                validate_named_parameter_stats(
+                    row, name, f"afo_manure_management[{op_id}]",
+                    low=0., high=1.,
+                )
         for _, row in animals.iterrows():
             species = _animal_species(row["species"])
             unsupported = [
@@ -340,13 +385,11 @@ def load_afo_inputs(path: str | Path, parcels: pd.DataFrame, pollutants: Sequenc
                     f"supported parameters are {', '.join(_EXCRETION_PARAMETERS)}"
                 )
             for parameter in _EXCRETION_PARAMETERS:
-                stats = _excretion_override_stats(row, parameter)
-                if stats:
-                    validate_stats_rows(
-                        pd.DataFrame([{"parameter": parameter, **stats}]),
-                        f"afo_animals[{row['afo_id']}/{species}].{parameter}",
-                    )
-                elif parameter not in excretion_factors.get(species, {}):
+                stats = validate_named_parameter_stats(
+                    row, parameter, f"afo_animals[{row['afo_id']}/{species}]",
+                    low=0., exclusive_low=(parameter == "representative_mass_kg"),
+                )
+                if not stats and parameter not in excretion_factors.get(species, {}):
                     raise ValueError(
                         f"afo_animals[{row['afo_id']}/{species}] requires {parameter}; "
                         "supply an animal-row override or a species row in the excretion CSV"
@@ -396,8 +439,9 @@ def load_afo_inputs(path: str | Path, parcels: pd.DataFrame, pollutants: Sequenc
                     raise ValueError("Duplicate default AFO hydrology row")
                 default = rec
             for name in ("annual_runoff_mm", "annual_precip_mm", "feedlot_runoff_mm"):
-                if name in row and pd.notna(row[name]):
-                    _finite(row[name], name)
+                validate_named_parameter_stats(
+                    row, name, f"afo_hydrology row {row.name}", low=0.,
+                )
         for pid in pid_set:
             rec = by_pid.get(pid) or by_huc.get(mapping.get(pid, "")) or default
             if rec is not None:
@@ -426,12 +470,37 @@ def load_afo_inputs(path: str | Path, parcels: pd.DataFrame, pollutants: Sequenc
             "manure_concentration_increments": increments.to_dict("records") if not increments.empty else [],
             "management": management.to_dict("records") if not management.empty else [],
             "feedlot_manure_effects": recovery.to_dict("records") if not recovery.empty else [],
+            "feedlot_cost_dimensions": cost_dimensions_by_op_cps,
             "eligible": eligible_by_pid, "hydrology": hydrology_by_pid,
             "surface_pathway": surface_pathway, "method": method,
             "runoff_adjusted_export": runoff_adjusted_export,
             "reference_runoff_mm": reference_runoff_mm,
             "geometry": {str(r.pid): r.geometry for r in parcels.itertuples()},
             "area_ha": area_by_pid}
+
+
+def feedlot_bmp_cost_quantities(inputs: Mapping[str, Any], host_pid: str, cps: int) -> tuple[float, float | None]:
+    """Return treated feedlot area and optional configured length for one BMP.
+
+    Multiple AFOs sharing a host are treated by one parcel/BMP placement, so
+    their operation-level dimensions are added. A missing area override uses
+    the actual AFO footprint. Length is never inferred from parcel area.
+    """
+    operations = [op for op in inputs.get("operations", ()) if str(op["pid"]) == str(host_pid)]
+    if not operations:
+        raise ValueError(f"Feedlot BMP CPS {cps} host pid {host_pid} has no AFO operations")
+    dimensions = inputs.get("feedlot_cost_dimensions", {})
+    area = 0.
+    length = 0.
+    all_lengths = True
+    for op in operations:
+        dims = dimensions.get((str(op["afo_id"]), int(cps)), {})
+        area += float(dims.get("cost_area_ha", op["feedlot_area_ha"]))
+        if "cost_length_m" not in dims:
+            all_lengths = False
+        else:
+            length += float(dims["cost_length_m"])
+    return area, (length if all_lengths else None)
 
 
 def _select_manure_fields(ctx: Any, inputs: Mapping[str, Any], eligible_area: Mapping[str, float]) -> list[dict[str, Any]]:
@@ -450,7 +519,7 @@ def _select_manure_fields(ctx: Any, inputs: Mapping[str, Any], eligible_area: Ma
                 raise ValueError(f"Duplicate receiving parcel in {op_id}")
         else:
             candidates = sorted(eligible_area, key=lambda p: int(p))
-            n_draw = _sample_stats(ctx, op, prefix="n_fields_", kind="nonnegative")
+            n_draw = _draw(ctx, op, "n_fields", minimum=1.)
             if not np.isfinite(n_draw) or n_draw < 1:
                 raise ValueError(f"{op_id}: sampled n_fields must be at least 1")
             n_fields = int(np.floor(n_draw + 0.5))
@@ -522,7 +591,13 @@ def apply_afo_baseline(ctx: Any, state: Any) -> list[dict[str, Any]]:
         return []
     pid_to_index = {pid: k for k, pid in enumerate(state.parcel_ids)}
     operations = inputs["operations"]
-    animals = inputs["animals"]
+    # Legacy concentration mode uses each realized animal count for both
+    # feedlot concentration and runoff mass. Fixed counts remain deterministic.
+    animals = []
+    for animal in inputs["animals"]:
+        realized = dict(animal)
+        realized["count"] = _draw(ctx, animal, "count")
+        animals.append(realized)
     fields = inputs["fields"]
     areas = inputs["area_ha"]
     geometry = inputs["geometry"]
@@ -649,14 +724,11 @@ def reference_excretion_factors(
 
 
 def _excretion_override_stats(animal: Mapping[str, Any], parameter: str) -> dict[str, float]:
-    """Select a complete animal-row override without merging reference statistics."""
-    prefix = parameter + "_"
-    row = {key[len(prefix):]: value for key, value in animal.items() if key.startswith(prefix)}
-    if parameter in animal and pd.notna(animal[parameter]):
-        if "value" in row and pd.notna(row["value"]):
-            raise ValueError(f"afo_animals supplies both {parameter} and {parameter}_value")
-        row["value"] = animal[parameter]
-    return stats_from_row({"parameter": parameter, **row})
+    """Extract and validate an animal-row override without merging reference rates."""
+    return validate_named_parameter_stats(
+        animal, parameter, f"afo_animals[{animal.get('afo_id', '?')}/{animal.get('species', '?')}]",
+        low=0., exclusive_low=(parameter == "representative_mass_kg"),
+    )
 
 
 def _draw(
@@ -666,24 +738,28 @@ def _draw(
     *,
     default: float | None = None,
     fraction: bool = False,
+    minimum: float = 0.,
+    maximum: float | None = None,
 ) -> float:
-    """Use existing inline distribution syntax or a deterministic named value."""
-    stats = {
-        column[len(key) + 1:]: value
-        for column, value in row.items()
-        if column.startswith(key + "_") and value is not None and not _nan(value)
-    }
+    """Sample a named scalar or distribution with shared validation semantics."""
+    stats = validate_named_parameter_stats(
+        row, key, f"AFO sample {row.get('afo_id', '?')}",
+        required=default is None, low=minimum, high=(1. if fraction else maximum),
+    )
     if stats:
-        value = _sample_stats(
-            ctx, row, prefix=key + "_", kind="fraction" if fraction else "nonnegative"
-        )
-    elif key in row and row[key] is not None and not _nan(row[key]):
-        value = float(row[key])
-    elif default is not None:
-        value = default
+        if set(stats) == {"value"} and key in row and pd.notna(row[key]):
+            # Preserve the existing no-RNG path for deterministic named values.
+            value = float(stats["value"])
+        elif maximum is not None or minimum > 0.:
+            value = sample_stats_bounded(ctx, stats, low=minimum, high=maximum)
+        else:
+            value = ctx._sample_from_stats(
+                stats, kind="fraction" if fraction else "nonnegative"
+            )
     else:
-        raise ValueError(f"Missing required manure parameter {key}")
-    return _finite(value, key, 0, 1 if fraction else float("inf"))
+        value = default
+    return _finite(value, key, minimum, 1 if fraction else
+                   (maximum if maximum is not None else float("inf")))
 
 
 def _nan(value: Any) -> bool:
@@ -712,7 +788,7 @@ def animal_production(
         species = _animal_species(animal["species"])
         known = factors.get(species, {})
         number = _draw(ctx, animal, "count")
-        days = _draw(ctx, animal, "animal_days", default=365.)
+        days = _draw(ctx, animal, "animal_days", default=365., maximum=366.)
         if days > 366:
             raise ValueError(f"{op_id}: animal_days cannot exceed 366")
         realized = {}

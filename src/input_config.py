@@ -3101,6 +3101,23 @@ def load_and_validate_all(cfg: Dict[str, Any], logger: Any) -> Dict[str, Any]:
                 reference_runoff_mm=ci_get(manure_cfg, "reference_runoff_mm"),
                 feedlot_bmp_cps=feedlot_bmp_cps,
             )
+            # Reject incomplete feedlot length-based costing at input load time,
+            # before a Monte Carlo worker ever selects the practice.
+            if bmp_cost is not None and not bmp_cost.empty and feedlot_bmp_cps:
+                from .cost import _canonical_cost_unit
+                for c in feedlot_bmp_cps:
+                    cost_rows = bmp_cost[bmp_cost["cps"].astype(int) == c]
+                    if not any(_canonical_cost_unit(row.get("unit")) == "usd/m"
+                               for _, row in cost_rows.iterrows()):
+                        continue
+                    dims = afo_inputs.get("feedlot_cost_dimensions", {})
+                    for operation in afo_inputs["operations"]:
+                        if "cost_length_m" not in dims.get((str(operation["afo_id"]), c), {}):
+                            raise ValueError(
+                                f"Feedlot CPS {c} uses USD/m costs: "
+                                f"afo_feedlot_bmp_cost_dimensions requires cost_length_m "
+                                f"for operation {operation['afo_id']!r}"
+                            )
         elif ci_get(cfg, "feedlot_bmp_cps") or ci_get(cfg, "manure_loading"):
             raise ValueError("feedlot_bmp_cps and manure_loading require animal_operations")
 

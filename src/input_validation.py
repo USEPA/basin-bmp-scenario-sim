@@ -239,6 +239,70 @@ def _row_stats_raw(row: Mapping[str, Any]) -> Dict[str, float]:
     return stats_from_row(row)
 
 
+def validate_named_parameter_stats(
+    row: Mapping[str, Any],
+    parameter: str,
+    label: str,
+    *,
+    required: bool = False,
+    low: Optional[float] = None,
+    high: Optional[float] = None,
+    exclusive_low: bool = False,
+) -> Dict[str, float]:
+    """Validate one wide-format parameter using the standard model validator.
+
+    ``parameter`` may be supplied as a fixed column (e.g. ``count``) OR as
+    prefixed inline statistics (``count_value``, ``count_mean``, ...). Both
+    formats cannot be populated together. Standard long-format model inputs
+    and these named inputs share :func:`validate_numeric_distribution_rows`.
+
+    Only the *supplied* center, value, endpoints and percentiles are checked
+    against ``low``/``high``. A nonnegative ``sd`` is allowed for a normal
+    distribution because bounded sampling truncates to the physical domain.
+    """
+    name = str(parameter).strip().lower()
+    columns = {str(k).strip().lower(): v for k, v in row.items()}
+    base = columns.get(name)
+    prefix = name + "_"
+    supplied = {
+        key[len(prefix):]: value for key, value in columns.items()
+        if key.startswith(prefix) and _nonblank(value)
+    }
+    if _nonblank(base):
+        if supplied:
+            raise ValueError(
+                f"{label}: {name} mixes fixed value with distribution statistics "
+                f"({name} and {sorted(prefix + key for key in supplied)}); "
+                "provide exactly one representation"
+            )
+        supplied = {"value": base}
+    if not supplied:
+        if required:
+            raise ValueError(f"{label}: {name} requires a fixed value or distribution")
+        return {}
+    stats = stats_from_row({"parameter": name, **supplied})
+    if not stats:
+        raise ValueError(f"{label}: {name} has no supported distribution statistics")
+    validate_numeric_distribution_rows(
+        pd.DataFrame([{"parameter": name, **stats}]), label
+    )
+    for statistic, value in stats.items():
+        if statistic == "sd":
+            continue
+        if low is not None and (value <= low if exclusive_low else value < low):
+            relation = ">" if exclusive_low else ">="
+            raise ValueError(
+                f"{label}: {name}.{statistic}={value:g} is outside physical domain "
+                f"({relation} {low:g})"
+            )
+        if high is not None and value > high:
+            raise ValueError(
+                f"{label}: {name}.{statistic}={value:g} is outside physical domain "
+                f"(<= {high:g})"
+            )
+    return stats
+
+
 def validate_numeric_distribution_rows(df: pd.DataFrame, label: str) -> None:
     """Validate the standardized numeric value/distribution contract row-by-row.
 

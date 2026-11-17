@@ -32,6 +32,7 @@ from src.bmp import (
 )
 from src.bmp_selection import BMPEligibilityPool
 from src.cost import _estimate_costs_for_probabilities, _get_bmp_cost, _select_cost_rate_median
+from src.afo import feedlot_bmp_cost_quantities
 from src.io_utils import _write_parquet_atomic, _flatten_plot_records
 from src.input_distributions import sample_group_key
 from src.logging_utils import make_worker_logger, log_scope
@@ -909,8 +910,22 @@ def _run_one_scenario(
                         ch["added_export_kg"] for ch in manure_changes if ch["pol_idx"] == pol_idx
                     )
 
+                # Physical treatment extent remains defined by the BMP routines.
+                # For feedlot BMPs, however, cost quantities refer to the AFO
+                # footprint (or explicitly configured practice dimensions), not
+                # the full host parcel. Non-feedlot cost accounting is unchanged.
+                cost_area_ha = quantity
+                cost_length_m = None
+                if ctx.current_bmp_targets_feedlot:
+                    cost_area_ha, cost_length_m = feedlot_bmp_cost_quantities(
+                        ctx.afo_inputs, str(pid), cps
+                    )
                 # Costing and totals
-                cost_this = ctx._get_bmp_cost(cps, quantity)
+                cost_this = ctx._get_bmp_cost(
+                    cps, cost_area_ha,
+                    **({"feedlot": True, "cost_length_m": cost_length_m}
+                       if ctx.current_bmp_targets_feedlot else {}),
+                )
                 total_cost += cost_this
                 total_bmp += 1
 

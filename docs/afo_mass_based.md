@@ -256,6 +256,76 @@ or domain rows. At least one eligible agricultural parcel and valid hydrology
 for receivers and operation hosts are required. `feedlot_runoff_mm` must be
 provided for each operation host. User-supplied Q/P must satisfy 0 ≤ Q ≤ P.
 
+### Feedlot-specific BMP costing (all AFO methods)
+
+A feedlot-only CPS is eligible on an AFO host parcel, but the full parcel is
+**not** automatically its treated area for costing. The model computes BMP
+pollutant treatment exactly as before and separately computes its cost using:
+
+- **USD/ha components**: the sum of each hosted AFO's `feedlot_area_ha` by
+  default. If a practice covers a different documented extent, override the
+  corresponding operation/CPS row with `cost_area_ha`.
+- **USD/m components**: an explicitly supplied `cost_length_m` for **every**
+  operation hosted on a parcel that could receive this CPS. Length cannot be
+  inferred from feedlot area. If a feedlot CPS has a USD/m cost component but
+  an eligible operation is missing its length, input loading fails *before*
+  scenarios start.
+- **USD/project components**: one project charge per parcel/CPS placement,
+  regardless of the number of AFO operations sharing that parcel.
+- **Multiple cost components**: each component is sampled independently per
+  BMP placement, then added. The same cost basis is used when calculating
+  representative costs for optional inverse-cost BMP selection.
+
+You may add the optional nonspatial table `afo_feedlot_bmp_cost_dimensions`
+inside the configured AFO GeoPackage (works in both mass-based and legacy
+concentration-increment AFO modes). It contains one row per `(afo_id, cps)`:
+
+| Column | Description |
+|---|---|
+| `afo_id` | An existing operation ID |
+| `cps` | A CPS code listed in `feedlot_bmp_cps` |
+| `cost_area_ha` | Optional positive area to use **instead of** that operation's feedlot footprint for USD/ha costs |
+| `cost_length_m` | Optional positive physical length required for a USD/m cost component |
+| `notes` | Optional documentation, ignored by the loader |
+
+At least one dimension must be provided in each row. Omitting the entire table
+means footprint-based area costs and ordinary per-project charges still work,
+but a feedlot-specific USD/m component will require the table. Units are
+**hectares** and **meters**, respectively. Do not use a whole-parcel area for a
+feedlot facility unless it is actually the treated area. Multiple AFOs on a
+single host have their areas and lengths summed for one placement, and one
+USD/project charge per placement. No inferred length or fabricated cost rate is
+introduced by this change.
+
+Sample optional table creation:
+
+```sql
+CREATE TABLE afo_feedlot_bmp_cost_dimensions (
+  afo_id TEXT NOT NULL,
+  cps INTEGER NOT NULL,
+  cost_area_ha REAL,
+  cost_length_m REAL,
+  notes TEXT
+);
+INSERT INTO afo_feedlot_bmp_cost_dimensions
+VALUES ('AFO_DEMO_01', 313, 0.35, 80.0,
+        'Illustrative facility dimensions; replace with documented estimates');
+```
+
+### Unified input validation
+
+All numeric model input tables share the same fixed-versus-distribution
+validation rules. In wide AFO tables, for example, `count` cannot appear
+alongside populated `count_*` statistics, nor may `collection_fraction`
+coexist with `collection_fraction_mean` or `collection_fraction_value`.
+The same rule applies to animal days, excretion overrides, manure export and
+retention fractions, feedlot recovery inputs, statistical hydrology and sampled
+field counts. Negative animal counts, incomplete/invalid distributions, and
+animal-day means/endpoints outside **0–366 days** are rejected at input load.
+Normal distributions with valid means are truncated to that interval on
+sampling. An omitted `animal_days` defaults to 365 in mass-based mode.
+Validation errors identify the relevant table, operation and parameter.
+
 Fields representing uncertain scalar values may use existing inline
 `*_value`, `*_mean`, `*_sd`, `*_min`, `*_max`, `*_pXX` statistics in place of
 fixed values. Distributions are drawn independently within the existing

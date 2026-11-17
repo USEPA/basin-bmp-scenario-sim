@@ -203,6 +203,7 @@ def _scale_cost_rate_to_total(
     unit: str,
     quantity: float = 0.0,
     use_selection_heuristics: bool = False,
+    cost_length_m: Optional[float] = None,
 ) -> float:
     """Convert a unit cost rate into a total BMP cost.
 
@@ -240,7 +241,9 @@ def _scale_cost_rate_to_total(
         cost_total = rate_value * area_ha
 
     elif unit == "usd/m":
-        if use_selection_heuristics or not (quantity and quantity > 0):
+        if cost_length_m is not None and not use_selection_heuristics:
+            length_m = float(cost_length_m)
+        elif use_selection_heuristics or not (quantity and quantity > 0):
             length_m = float(PROB_EST_BUFFER_PERIM_FRACTION * self.data[DATA_AVG_PERIM_M])
         else:
             depth_ft = float(self.cfg.get(CFG_BUFFER_DEPTH_FT, DEFAULT_BUFFER_DEPTH_FT))
@@ -265,6 +268,9 @@ def _get_bmp_cost(
     self: "Model",
     cps: Union[int, str],
     quantity: float,
+    *,
+    feedlot: bool = False,
+    cost_length_m: Optional[float] = None,
 ) -> float:
     """Estimate the cost of one BMP placement.
 
@@ -301,6 +307,11 @@ def _get_bmp_cost(
         for _, row in bmp_cost_df.iterrows():
             component = str(row.get(COL_COST_COMPONENT, "total")).strip() or "total"
             unit = _canonical_cost_unit(row.get(COL_UNIT))
+            if feedlot and unit == "usd/m" and cost_length_m is None:
+                raise ValueError(
+                    f"Feedlot BMP CPS {cps} has a USD/m component but no "
+                    "explicit cost_length_m in afo_feedlot_bmp_cost_dimensions"
+                )
             rate_value = _sample_cost_rate(self, row, cps=cps)
 
             component_total = _scale_cost_rate_to_total(
@@ -310,6 +321,7 @@ def _get_bmp_cost(
                 unit=unit,
                 quantity=float(quantity),
                 use_selection_heuristics=False,
+                cost_length_m=cost_length_m,
             )
             cost_total += component_total
 
@@ -402,17 +414,39 @@ def _estimate_costs_for_probabilities(self: "Model") -> pd.DataFrame:
         rows: list[Dict[str, float]] = []
         for cps in configured_cps:
             sub = bmp_cost_df[bmp_cost_df[COL_CPS].astype(int) == int(cps)]
+            # Feedlot costs are based on the average feasible AFO host footprint,
+            # rather than the average *whole parcel* or an arbitrary buffer length.
+            # This only affects inverse-cost BMP-type selection heuristics;
+            # realized cost always uses the selected host's actual dimensions.
+            feedlot = (cps in set(self.data.get("feedlot_bmp_cps") or ()))
+            cost_area_ha = 0.
+            cost_length_m = None
+            if feedlot:
+                from .afo import feedlot_bmp_cost_quantities
+                inputs = self.data.get("afo_inputs") or {}
+                hosts = sorted({str(op["pid"]) for op in inputs.get("operations", ())})
+                if not hosts:
+                    raise ValueError(f"Feedlot CPS {cps} has no eligible AFO hosts")
+                quantity_pairs = [feedlot_bmp_cost_quantities(inputs, pid, cps) for pid in hosts]
+                cost_area_ha = sum(pair[0] for pair in quantity_pairs) / len(quantity_pairs)
+                if all(pair[1] is not None for pair in quantity_pairs):
+                    cost_length_m = sum(pair[1] for pair in quantity_pairs) / len(quantity_pairs)
             total = 0.0
             for _, row in sub.iterrows():
                 unit = _canonical_cost_unit(row.get(COL_UNIT))
                 rate_value = _representative_cost_rate(self, row, cps=cps)
+                if feedlot and unit == "usd/m" and cost_length_m is None:
+                    raise ValueError(
+                        f"Feedlot CPS {cps} requires cost_length_m for USD/m costs"
+                    )
                 total += _scale_cost_rate_to_total(
                     self=self,
                     cps=cps,
                     rate_value=rate_value,
                     unit=unit,
-                    quantity=0.0,
-                    use_selection_heuristics=True,
+                    quantity=cost_area_ha if feedlot else 0.0,
+                    use_selection_heuristics=not feedlot,
+                    cost_length_m=cost_length_m if feedlot else None,
                 )
 
             if not np.isfinite(total):
