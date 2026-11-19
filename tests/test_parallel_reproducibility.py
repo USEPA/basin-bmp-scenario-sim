@@ -20,7 +20,7 @@ from src.constants import (
     DATA_CPS,
     DATA_PARCELS,
     DATA_PARCEL_P,
-    DATA_PARCEL_UP_MAP,
+    DATA_PARCEL_DOWN_MAP,
     DATA_PARCEL_OUT_MAP,
     DATA_POLLUTANT_LOAD_RATE,
 )
@@ -118,7 +118,7 @@ def test_deterministic_design_produces_identical_scenario_trajectories(tmp_path)
     pid_map = {"P1": "1", "P2": "2", "P3": "3"}
     for key in (DATA_PARCELS, DATA_PARCEL_P, DATA_POLLUTANT_LOAD_RATE, "delivery_ratios"):
         data[key]["pid"] = data[key]["pid"].map(pid_map)
-    for key in (DATA_PARCEL_UP_MAP, DATA_PARCEL_OUT_MAP):
+    for key in (DATA_PARCEL_DOWN_MAP, DATA_PARCEL_OUT_MAP):
         data[key] = {pid_map[pid]: values for pid, values in data[key].items()}
     data[DATA_CPS] = [412, 656]
     data[DATA_BMP_EFFICIENCY]["cps"] = data[DATA_BMP_EFFICIENCY]["cps"].replace({340: 412, 345: 656})

@@ -83,7 +83,7 @@ from src.constants import (
     DATA_OUTLET_TARGET,
     DATA_PARCEL_OUT_MAP,
     DATA_PARCEL_P,
-    DATA_PARCEL_UP_MAP,
+    DATA_PARCEL_DOWN_MAP,
     DATA_PARCELS,
     DATA_POLLUTANT_LOAD_RATE,
     DATA_LOAD_GENERATION,
@@ -374,8 +374,15 @@ class Model:
             # Parcel outlet and up-gradient mappings
             po_map = self.data[DATA_PARCEL_OUT_MAP]
             self.parcel_out_oids = [[str(x) for x in po_map[pid]] for pid in self.parcel_ids]
-            pu_map = self.data[DATA_PARCEL_UP_MAP]
-            self.parcel_up_idxs = [[self.pid_to_index[u] for u in pu_map[pid] if u in self.pid_to_index] for pid in self.parcel_ids]
+            pd_map = self.data[DATA_PARCEL_DOWN_MAP]
+            # parcel_down stores source -> ONE downstream. Reverse the edges
+            # for wetland treatment, retaining multiple upstream contributors.
+            self.upstream_by_pid = {pid: [] for pid in self.parcel_ids}
+            for pid, downstream_pid in pd_map.items():
+                if downstream_pid is not None and pid in self.pid_to_index and downstream_pid in self.upstream_by_pid:
+                    self.upstream_by_pid[downstream_pid].append(pid)
+            self.parcel_up_idxs = [[self.pid_to_index[u] for u in self.upstream_by_pid[pid]]
+                                   for pid in self.parcel_ids]
 
             # Parcel selection probabilities
             sel = self.data[DATA_PARCEL_P]

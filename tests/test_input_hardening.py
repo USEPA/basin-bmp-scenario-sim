@@ -149,21 +149,21 @@ def test_hydrology_lookup_can_be_reusable_but_only_used_pairs_must_be_complete()
 def test_clipped_structural_relationships_are_filtered_but_true_unknown_ids_error() -> None:
     rows = pd.DataFrame(
         [
-            {"pid": "P2", "pid_up": "P1"},
-            {"pid": "P3", "pid_up": "P2"},  # P3 exists in source but is outside domain.
+            {"pid": "P2", "pid_down": "P1"},
+            {"pid": "P3", "pid_down": "P2"},  # P3 exists in source but is outside domain.
         ]
     )
-    result = input_config._build_parcel_up_map(
+    result = input_config._build_parcel_down_map(
         rows,
         ["P1", "P2"],
         source_parcel_ids=["P1", "P2", "P3"],
         logger=Logger(),
     )
-    assert result["P2"] == ["P1"]
+    assert result["P2"] == "P1"
 
-    bad = pd.DataFrame([{"pid": "P2", "pid_up": "TYPO"}])
-    with pytest.raises(ValueError, match="source parcels layer"):
-        input_config._build_parcel_up_map(
+    bad = pd.DataFrame([{"pid": "P2", "pid_down": "TYPO"}])
+    with pytest.raises(ValueError, match="source parcels"):
+        input_config._build_parcel_down_map(
             bad,
             ["P1", "P2"],
             source_parcel_ids=["P1", "P2", "P3"],

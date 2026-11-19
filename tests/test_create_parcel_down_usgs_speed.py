@@ -9,8 +9,8 @@ import urllib.error
 import pytest
 from shapely.geometry import box
 
-from utils import usgs_dem, create_parcel_up
-from test_create_parcel_up_usgs import study
+from utils import usgs_dem, create_parcel_down
+from test_create_parcel_down_usgs import study
 
 
 def test_coverage_checks_run_concurrently_and_preserve_resolution_order(monkeypatch):
@@ -138,9 +138,9 @@ def test_2_transient_failures_stop_and_use_short_timeout(monkeypatch):
 
 
 def test_coverage_cache_has_explicit_refresh_cli_flag(monkeypatch):
-    monkeypatch.setattr('sys.argv', ['create_parcel_up.py', 'parcels.gpkg',
+    monkeypatch.setattr('sys.argv', ['create_parcel_down.py', 'parcels.gpkg',
                                    '--refresh-usgs-availability', '--list-usgs-resolutions'])
-    args = create_parcel_up.parse_args()
+    args = create_parcel_down.parse_args()
     assert args.refresh_usgs_availability
 
 

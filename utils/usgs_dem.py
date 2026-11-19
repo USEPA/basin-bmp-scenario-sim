@@ -32,7 +32,7 @@ import rasterio
 
 try:
     from .rasterio_compat import read_band, read_mask
-except ImportError:  # Direct execution of utils/create_parcel_up.py
+except ImportError:  # Direct execution of utils/create_parcel_down.py
     from rasterio_compat import read_band, read_mask
 from rasterio import features
 from rasterio.enums import Resampling
@@ -89,7 +89,7 @@ def _json_get(url: str, params: dict, *, timeout: float = 12) -> dict:
     query = urllib.parse.urlencode(params)
     request = urllib.request.Request(
         url + "?" + query,
-        headers={"User-Agent": "basin-bmp-scenario-sim/create_parcel_up (USGS 3DEP)",
+        headers={"User-Agent": "basin-bmp-scenario-sim/create_parcel_down (USGS 3DEP)",
                  "Accept": "application/json"},
     )
     for attempt in range(2):
@@ -493,7 +493,7 @@ def _download_tile(url: str, destination: Path, *, timeout=90):
         return
     tmp = destination.with_name(destination.name + ".part")
     try:
-        request = urllib.request.Request(url, headers={"User-Agent": "basin-bmp-scenario-sim/create_parcel_up"})
+        request = urllib.request.Request(url, headers={"User-Agent": "basin-bmp-scenario-sim/create_parcel_down"})
         with urllib.request.urlopen(request, timeout=timeout) as response, open(tmp, "wb") as fd:
             shutil.copyfileobj(response, fd, 1024 * 1024)
         if tmp.stat().st_size == 0:

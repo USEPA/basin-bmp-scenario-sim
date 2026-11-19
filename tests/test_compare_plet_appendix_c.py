@@ -73,4 +73,4 @@ def test_single_cps_config_uses_supported_runtime_overrides(tmp_path: Path) -> N
     assert cfg["n_scenarios"] == 1
     assert cfg["bmp_limit_n"] == 1
     assert cfg["outputs"] == str(scenario_out)
-    assert not {"parcel_p", "parcel_up", "bmp_sel"}.intersection(cfg)
+    assert not {"parcel_p", "parcel_down", "bmp_sel"}.intersection(cfg)

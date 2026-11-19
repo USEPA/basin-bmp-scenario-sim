@@ -74,7 +74,7 @@ def inputs(tmp_path):
     )
     write_tables(
         paths["parcels"],
-        parcel_up=pd.DataFrame(columns=["pid", "pid_up"]),
+        parcel_down=pd.DataFrame(columns=["pid", "pid_down"]),
         parcel_outlets=[{"pid": pid, "oid": "A"} for pid in parcels.pid],
     )
     efficiency = tmp_path / "efficiency.csv"

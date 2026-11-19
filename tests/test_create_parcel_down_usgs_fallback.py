@@ -8,7 +8,7 @@ import pytest
 from shapely.geometry import box
 
 from utils import usgs_dem
-from test_create_parcel_up_usgs import product, study
+from test_create_parcel_down_usgs import product, study
 
 
 def test_index_http_500_falls_back_to_independent_catalog(monkeypatch, capsys):

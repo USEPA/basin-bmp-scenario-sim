@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Create parcel drainage connections using a local or USGS 3DEP DEM.
 
-Run ``python utils/create_parcel_up.py --help`` for examples. If the DEM
+Run ``python utils/create_parcel_down.py --help`` for examples. If the DEM
 positional argument is omitted, query USGS for full-area 3DEP availability,
 allow the user to choose the resolution, download tiles and build a metric DEM.
 The existing local-DEM path never makes network requests.
@@ -19,7 +19,7 @@ from rasterio import features
 
 def parse_args():
     parser = argparse.ArgumentParser(
-        description="Derive a representative, acyclic parcel_up network using "
+        description="Derive a representative, acyclic parcel_down network using "
                     "WhiteboxTools D8 hydrology and parcel-origin drainage shares."
     )
     parser.add_argument("parcels", help="Path to parcel boundaries (GeoPackage/GeoJSON/Shapefile). Must have an ID field.")
@@ -61,8 +61,8 @@ def parse_args():
     )
     parser.add_argument(
         "--out", default=None,
-        help="Optional CSV export of immediate (pid,pid_up) edges, one per row. "
-             "With a GeoPackage, the parcel_up table is written by default."
+        help="Optional CSV export of immediate (pid,pid_down) edges, one per row. "
+             "With a GeoPackage, the parcel_down table is written by default."
     )
     parser.add_argument(
         "--no-gpkg-update", action="store_true",
@@ -86,18 +86,13 @@ def parse_args():
     parser.add_argument("--whitebox-output-dir", default=None,
                         help="Directory for conditioned DEM and Whitebox D8 pointer "
                              "rasters. Default: <DEM_directory>/<DEM_stem>_whitebox_flow.")
-    parser.add_argument("--min-dominant-share", type=float, default=0.5,
-                        help="Minimum share of a parcel's OWN raster cells routed "
-                             "toward a candidate downstream parcel (default: 0.5). "
-                             "Parcel destinations with no unique qualifying dominant "
-                             "connection remain unresolved and are logged.")
+    parser.add_argument("--max-overlap-m2", type=float, default=0.01,
+                        help="Allowed polygon overlap in square meters (default 0.01).")
+    parser.add_argument("--manifest-out", default=None,
+                        help="Run manifest JSON; default <parcels_stem>_parcel_down_manifest.json.")
     parser.add_argument("--diagnostics-out", default=None,
                         help="CSV recording all parcel-local downstream destinations "
-                             "and selected/excluded edges. Default: <parcels_stem>_parcel_up_candidates.csv.")
-    parser.add_argument("--abort-on-ambiguity", action="store_true",
-                        help="Fail without updating parcel_up if any parcels have "
-                             "ambiguous downstream destinations. The diagnostics CSV "
-                             "is still written.")
+                             "and selected/excluded edges. Default: <parcels_stem>_parcel_down_candidates.csv.")
     return parser.parse_args()
 
 
@@ -247,8 +242,8 @@ def main():
     logging.info("Reading parcels: %s", args.parcels)
     gdf = read_parcels(args.parcels, args.id_field, layer=args.layer)
     if args.dem is None:
-        # Support both direct execution (`python utils/create_parcel_up.py`) and
-        # package import (`from utils import create_parcel_up`).
+        # Support both direct execution (`python utils/create_parcel_down.py`) and
+        # package import (`from utils import create_parcel_down`).
         if __package__:
             from .usgs_dem import get_dem_from_usgs
         else:
@@ -277,19 +272,24 @@ def main():
             compute_parcel_origin_destinations, score_candidate_connections,
             select_acyclic_connections, write_candidate_diagnostics,
         )
-        from .parcel_up_graph import (validate_direct_edges,
-                                      write_gpkg_parcel_up, write_normalized_csv)
+        from .parcel_down_graph import (validate_direct_edges,
+                                      write_gpkg_parcel_down, write_normalized_csv)
     else:
         from whitebox_parcel_routing import (
             run_whitebox_d8, read_whitebox_pointers, validate_cell_dag,
             compute_parcel_origin_destinations, score_candidate_connections,
             select_acyclic_connections, write_candidate_diagnostics,
         )
-        from parcel_up_graph import (validate_direct_edges,
-                                     write_gpkg_parcel_up, write_normalized_csv)
+        from parcel_down_graph import (validate_direct_edges,
+                                     write_gpkg_parcel_down, write_normalized_csv)
 
-    if not (0 < args.min_dominant_share <= 1) or not np.isfinite(args.min_dominant_share):
-        raise ValueError('--min-dominant-share must be a finite number in (0,1]')
+    if __package__:
+        from .drainage_validation import validate_dem_coverage, validate_parcel_overlaps
+        from .drainage_manifest import write_drainage_manifest
+    else:
+        from drainage_validation import validate_dem_coverage, validate_parcel_overlaps
+        from drainage_manifest import write_drainage_manifest
+
     conditioning = args.whitebox_conditioning
     if args.use_filled_dem:
         conditioning = 'fill'
@@ -298,6 +298,22 @@ def main():
     dem_path = Path(args.dem).resolve()
     wb_dir = (Path(args.whitebox_output_dir) if args.whitebox_output_dir else
               dem_path.parent / (dem_path.stem + '_whitebox_flow'))
+    with rasterio.open(dem_path) as dem_ds:
+        if dem_ds.crs is None or not dem_ds.crs.is_projected:
+            raise ValueError('DEM must have a projected coordinate system')
+        projected_parcels = reproject_to_match(gdf, dem_ds.crs)
+        unit_to_m = float(dem_ds.crs.linear_units_factor[1])
+        validate_parcel_overlaps(projected_parcels, args.id_field,
+                                 tolerance_m2=args.max_overlap_m2,
+                                 linear_units_to_m=unit_to_m)
+        try:
+            from .rasterio_compat import read_mask as _dem_read_mask
+        except ImportError:
+            from rasterio_compat import read_mask as _dem_read_mask
+        validate_dem_coverage(projected_parcels, dem_ds,
+                              _dem_read_mask(dem_ds) > 0,
+                              linear_units_to_m=unit_to_m)
+    logging.info('Parcel overlap and DEM extent/NoData checks passed.')
     logging.info('Conditioning DEM and calculating flow with WhiteboxTools...')
     pointer_path = run_whitebox_d8(
         dem_path, wb_dir, method=conditioning,
@@ -329,9 +345,7 @@ def main():
     candidates = score_candidate_connections(
         pid_raster, destinations, code_to_pid, cell_area_m2=cell_area_m2,
     )
-    edges, diagnostics, summary = select_acyclic_connections(
-        candidates, min_share=args.min_dominant_share,
-    )
+    edges, diagnostics, summary = select_acyclic_connections(candidates)
     # Sub-cell parcels cannot be evaluated at this raster resolution. Report
     # them instead of inventing flow directions or silently pretending they
     # have been represented.
@@ -351,25 +365,39 @@ def main():
                  summary['ambiguous_parcels'], len(missing), summary['outside_parcels'])
     if summary['ambiguous_parcels'] or missing or summary['rejected_cycle_candidates']:
         logging.warning('Some parcel connections were not inferred or were rejected. '
-                        'Inspect the candidate diagnostic CSV before using parcel_up.')
+                        'Inspect the candidate diagnostic CSV before using parcel_down.')
     diagnostic_path = (Path(args.diagnostics_out) if args.diagnostics_out else
                        Path(args.parcels).with_name(Path(args.parcels).stem +
-                       '_parcel_up_candidates.csv'))
+                       '_parcel_down_candidates.csv'))
     write_candidate_diagnostics(diagnostic_path, diagnostics)
     logging.info('Candidate drainage evidence written to %s', diagnostic_path)
-    if args.abort_on_ambiguity and (summary['ambiguous_parcels'] or missing):
-        raise ValueError('Ambiguous or unrasterized parcel outlets; see candidate '
-                         'diagnostic CSV. The GeoPackage was not modified.')
     edges = validate_direct_edges(edges, gdf[args.id_field].tolist())
-    logging.info('Computed %d acyclic, representative upstream connections', len(edges))
+    logging.info('Computed %d acyclic, representative downstream connections', len(edges))
 
     if is_gpkg and not args.no_gpkg_update:
-        count = write_gpkg_parcel_up(args.parcels, edges, gdf[args.id_field])
-        logging.info("Atomically replaced parcel_up in %s (%d rows)", args.parcels, count)
+        count = write_gpkg_parcel_down(args.parcels, edges, gdf[args.id_field])
+        logging.info("Atomically replaced parcel_down in %s (%d rows)", args.parcels, count)
     if args.out:
         write_normalized_csv(args.out, edges)
         logging.info("Wrote normalized immediate-edge CSV to %s", args.out)
 
+    manifest_path = (Path(args.manifest_out) if args.manifest_out else
+                     Path(args.parcels).with_name(Path(args.parcels).stem +
+                     '_parcel_down_manifest.json'))
+    write_drainage_manifest(
+        manifest_path, parcels=gdf, id_field=args.id_field,
+        dem_path=dem_path, pointer_path=pointer_path,
+        edges=edges,
+        parameters={'whitebox_conditioning': conditioning,
+                    'whitebox_breach_dist': args.whitebox_breach_dist,
+                    'max_overlap_m2': args.max_overlap_m2,
+                    'dem_resolution': args.usgs_resolution,
+                    'whole_parcel_drainage': True},
+        summary={**summary, 'unrasterized_parcels': len(missing),
+                 'unrasterized_pids': [int(code_to_pid[c]) for c in missing]},
+        diagnostics_path=diagnostic_path,
+    )
+    logging.info('Drainage provenance manifest written to %s', manifest_path)
     logging.info("Done.")
 
 if __name__ == "__main__":

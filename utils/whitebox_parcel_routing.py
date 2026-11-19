@@ -22,7 +22,7 @@ import rasterio
 
 try:
     from .rasterio_compat import read_band, read_mask
-except ImportError:  # Direct execution of utils/create_parcel_up.py
+except ImportError:  # Direct execution of utils/create_parcel_down.py
     from rasterio_compat import read_band, read_mask
 
 # Clockwise from NE, as documented for the default, non-ESRI Whitebox D8
@@ -320,74 +320,61 @@ def score_candidate_connections(
 
 
 def select_acyclic_connections(
-    candidates: list[dict], *, min_share: float = 0.5,
+    candidates: list[dict],
 ) -> tuple[list[tuple[int, int]], list[dict], dict]:
-    """Choose one representative downstream edge per parcel, without cycles.
+    """Choose the strongest available downstream destination for each parcel.
 
-    Any ambiguous share or exact tie is not forced into the graph. Candidate
-    ranking is based on *parcel-local originating cells*, not total upstream
-    flow accumulation. Process strong candidates first; if a proposed edge
-    would create a cycle, consider the next admissible candidate for that
-    source, otherwise leave it disconnected and expose the reason.
+    Each candidate is supported by cells originating inside its source parcel.
+    No minimum share is imposed: even a minority destination can represent the
+    parcel, but the selected edge is a WHOLE-parcel routing approximation.
+    Exact ties are broken by lower numeric pid; OUTSIDE follows numeric pids.
+    The globally strongest candidates are installed first. If a link would
+    form a directed cycle, try the next candidate for its source parcel.
     """
-    if not (0 < min_share <= 1):
-        raise ValueError('--min-dominant-share must be within (0,1]')
     by_source: dict[int, list[dict]] = {}
     for row in candidates:
         row['decision'] = 'not_selected'
         row['reason'] = ''
         by_source.setdefault(int(row['upstream_pid']), []).append(row)
-    allowed: list[dict] = []
-    ambiguous = 0
-    outlet = 0
-    for source, rows in sorted(by_source.items()):
-        ordered = sorted(rows, key=lambda row: (-row['origin_cells'],
-                                                -1 if row['downstream_pid'] is None
+    allowed = []
+    outside_sources: set[int] = set()
+    for source, rows in by_source.items():
+        ordered = sorted(rows, key=lambda row: (-int(row['origin_cells']),
+                                                float('inf') if row['downstream_pid'] is None
                                                 else int(row['downstream_pid'])))
-        highest = ordered[0]
-        tied = len(ordered) > 1 and ordered[1]['origin_cells'] == highest['origin_cells']
-        if highest['share'] < min_share or tied:
-            ambiguous += 1
-            reason = 'tied_majority' if tied else 'no_dominant_outlet'
-            for row in rows:
-                row['decision'] = 'unresolved_ambiguous'
-                row['reason'] = reason
-            continue
-        if highest['downstream_pid'] is None:
-            outlet += 1
-            highest['decision'] = 'outside_parcel_domain'
-            highest['reason'] = 'dominant_outlet_outside_parcel_domain'
-            for row in ordered[1:]:
-                row['decision'] = 'rejected_secondary'
-                row['reason'] = 'dominant_outlet_outside_parcel_domain'
+        if ordered[0]['downstream_pid'] is None:
+            outside_sources.add(source)
+            ordered[0]['decision'] = 'outside_parcel_domain'
+            ordered[0]['reason'] = 'largest_drainage_share_outside_domain'
+            for other in ordered[1:]:
+                other['decision'] = 'rejected_secondary'
+                other['reason'] = 'largest_drainage_share_outside_domain'
             continue
         for row in ordered:
-            if row['downstream_pid'] is None:
-                row['decision'] = 'rejected_secondary'
-                row['reason'] = 'below_primary_outlet'
-            elif row['share'] + 1e-12 >= min_share:
+            if row['downstream_pid'] is not None:
                 allowed.append(row)
             else:
                 row['decision'] = 'rejected_secondary'
-                row['reason'] = 'below_min_dominant_share'
-    # Descending evidence before topology; deterministic PID tie-breaking.
+                row['reason'] = 'outside_not_dominant'
     allowed.sort(key=lambda row: (-row['share'], -row['origin_cells'],
                                   row['upstream_pid'], row['downstream_pid']))
-    downstream_by_source: dict[int, int] = {}
+    down: dict[int, int] = {}
     rejected_cycle = 0
     for row in allowed:
-        source = int(row['upstream_pid'])
-        target = int(row['downstream_pid'])
-        if source in downstream_by_source:
+        source, target = int(row['upstream_pid']), int(row['downstream_pid'])
+        if source in down:
             row['decision'] = 'rejected_secondary'
             row['reason'] = 'stronger_connection_selected'
             continue
         if source == target:
-            raise ValueError('A raster candidate routes to its own parcel')
+            row['decision'] = 'rejected_cycle'
+            row['reason'] = 'self_link'
+            rejected_cycle += 1
+            continue
         at = target
         path = [source, target]
-        while at in downstream_by_source:
-            at = downstream_by_source[at]
+        while at in down:
+            at = down[at]
             path.append(at)
             if at == source:
                 break
@@ -396,15 +383,18 @@ def select_acyclic_connections(
             row['reason'] = 'would_form_cycle:' + '->'.join(map(str, path))
             rejected_cycle += 1
             continue
-        downstream_by_source[source] = target
+        down[source] = target
         row['decision'] = 'selected'
-        row['reason'] = 'dominant_noncyclic_connection'
-    edges = sorted((target, source) for source, target in downstream_by_source.items())
-    summary = {'ambiguous_parcels': ambiguous, 'outside_parcels': outlet,
+        row['reason'] = 'largest_noncyclic_connection'
+    unresolved_cycles = sorted({int(r['upstream_pid']) for r in allowed
+                                if r['decision'] == 'rejected_cycle'} - set(down))
+    edges = sorted(down.items())
+    summary = {'ambiguous_parcels': 0, 'outside_parcels': len(outside_sources),
                'rejected_cycle_candidates': rejected_cycle,
+               'cycle_unresolved_pids': unresolved_cycles,
                'selected_edges': len(edges)}
     return edges, sorted(candidates, key=lambda row: (row['upstream_pid'],
-                  -row['origin_cells'], -1 if row['downstream_pid'] is None
+                  -row['origin_cells'], float('inf') if row['downstream_pid'] is None
                   else row['downstream_pid'])), summary
 
 

@@ -54,7 +54,7 @@ selection deterministic.
 
 Relative filesystem paths are resolved relative to the YAML file, not the process working directory. The GeoPackage files themselves can therefore be renamed or moved by changing only the corresponding YAML path.
 
-Internal GeoPackage table names are schema names. Structural tables are `parcels`, `parcel_up`, and `parcel_outlets`; variable tables use the `input_*` prefix.
+Internal GeoPackage table names are schema names. Structural tables are `parcels`, `parcel_down`, and `parcel_outlets`; variable tables use the `input_*` prefix.
 
 ## Statistical mode
 

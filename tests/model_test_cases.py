@@ -36,7 +36,7 @@ from src.constants import (
     DATA_PARCELS,
     DATA_PARCEL_OUT_MAP,
     DATA_PARCEL_P,
-    DATA_PARCEL_UP_MAP,
+    DATA_PARCEL_DOWN_MAP,
     DATA_PATHWAYS,
     DATA_PLET_INPUTS,
     DATA_POLLUTANTS,
@@ -102,7 +102,7 @@ def _base_spatial_and_routing() -> dict[str, Any]:
                 "probability": [0.20, 0.35, 0.45],
             }
         ),
-        DATA_PARCEL_UP_MAP: {pid: [] for pid in parcel_ids},
+        DATA_PARCEL_DOWN_MAP: {pid: None for pid in parcel_ids},
         DATA_PARCEL_OUT_MAP: {pid: ["O1"] for pid in parcel_ids},
         DATA_OUTLET_LOC: pd.DataFrame({"oid": ["O1"]}),
         DATA_OUTLET_TARGET: None,

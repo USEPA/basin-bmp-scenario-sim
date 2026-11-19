@@ -156,7 +156,7 @@ PLET_PARAMETER_ALIASES = {
 # Structural tables have no ``input_`` prefix. Every user-supplied parcel-side
 # model variable is stored in its own ``input_*`` table.
 GPKG_PARCELS_LAYER = "parcels"
-GPKG_PARCEL_UP_TABLE = "parcel_up"
+GPKG_PARCEL_DOWN_TABLE = "parcel_down"
 GPKG_PARCEL_OUTLETS_TABLE = "parcel_outlets"
 GPKG_PARCEL_HUC12_TABLE = "parcel_huc12"
 GPKG_PLET_HUC12_LAYER = "huc12"
@@ -235,7 +235,7 @@ CFG_POLLUTANT_LOAD_RATE_PATHWAY_FRACTIONS = "pollutant_load_rate_pathway_fractio
 # Data payload keys (used in the validated data dict passed to Model)
 DATA_PARCELS = "parcels"
 DATA_PARCEL_P = "parcel_p"
-DATA_PARCEL_UP_MAP = "parcel_up_map"
+DATA_PARCEL_DOWN_MAP = "parcel_down_map"
 DATA_PARCEL_OUT_MAP = "parcel_out_map"
 DATA_POLLUTANTS = "pollutants"
 DATA_CPS = "cps"
@@ -270,7 +270,7 @@ COL_CPS = "cps"
 COL_COST_COMPONENT = "cost_component"
 COL_POLLUTANT = "pollutant"
 COL_OIDS = "oids"
-COL_PID_UP = "pid_up"
+COL_PID_DOWN = "pid_down"
 COL_PROBABILITY = "probability"
 COL_SELECTION_WEIGHT = "selection_weight"
 COL_UNIT = "unit"

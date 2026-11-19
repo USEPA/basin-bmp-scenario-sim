@@ -1,7 +1,7 @@
 """Graph helpers for normalized parcel-to-upstream drainage relationships.
 
-The ``parcel_up`` table records *immediate* links from each downstream parcel
-(``pid``) to an upstream parcel (``pid_up``). Its direction is intentionally
+The ``parcel_down`` table records each source parcel (`pid`) and its immediate
+downstream parcel (`pid_down`). The model reverses its direction in memory; it is
 preserved: watershed traversal follows those links away from a wetland host.
 """
 
@@ -46,13 +46,13 @@ def validate_acyclic_upstream_map(upstream_by_pid: Mapping[str, Sequence[str]]) 
                 continue
             if neighbor not in upstream_by_pid:
                 raise ValueError(
-                    f"parcel_up references unknown modeled upstream pid {neighbor!r}"
+                    f"parcel_down references unknown modeled upstream pid {neighbor!r}"
                 )
             kind = state.get(neighbor, 0)
             if kind == 1:
                 cycle = path[positions[neighbor]:] + [neighbor]
                 raise ValueError(
-                    "parcel_up contains a directed cycle: " + " -> ".join(cycle)
+                    "parcel_down contains a directed cycle: " + " -> ".join(cycle)
                 )
             if kind == 0:
                 state[neighbor] = 1
@@ -75,7 +75,7 @@ def iter_full_upstream_by_distance(
     universe, not the BMP-selection subset.
     """
     if len(immediate_upstream_indices) != len(parcel_ids):
-        raise ValueError("parcel_up indices and hydrologic parcel IDs must have equal lengths")
+        raise ValueError("upstream parcel indices and hydrologic parcel IDs must have equal lengths")
     if not (0 <= parcel_idx < len(parcel_ids)):
         raise IndexError(f"Wetland parcel index {parcel_idx} is outside the hydrologic universe")
     visited = {parcel_idx}
@@ -85,9 +85,30 @@ def iter_full_upstream_by_distance(
         for idx in frontier:
             for upstream_idx in immediate_upstream_indices[idx]:
                 if upstream_idx < 0 or upstream_idx >= len(parcel_ids):
-                    raise ValueError(f"parcel_up index {upstream_idx} is outside the hydrologic universe")
+                    raise ValueError(f"upstream parcel index {upstream_idx} is outside the hydrologic universe")
                 if upstream_idx not in visited:
                     next_layer.add(upstream_idx)
         frontier = sorted(next_layer, key=lambda i: (pid_sort_key(parcel_ids[i]), i))
         visited.update(frontier)
         yield from frontier
+
+
+def validate_acyclic_downstream_map(downstream: dict[str, str | None]) -> None:
+    """Validate a functional source→downstream drainage graph iteratively."""
+    complete: set[str] = set()
+    for source in downstream:
+        if source in complete:
+            continue
+        path: list[str] = []
+        positions: dict[str, int] = {}
+        at: str | None = source
+        while at is not None and at not in complete:
+            if at not in downstream:
+                raise ValueError(f"parcel_down references unknown downstream pid {at}")
+            if at in positions:
+                cycle = path[positions[at]:] + [at]
+                raise ValueError('parcel_down contains a directed cycle: ' + ' -> '.join(cycle))
+            positions[at] = len(path)
+            path.append(at)
+            at = downstream[at]
+        complete.update(path)

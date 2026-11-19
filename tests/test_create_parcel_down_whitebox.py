@@ -17,8 +17,8 @@ import rasterio
 from rasterio.transform import from_origin
 
 from utils import whitebox_parcel_routing as routing
-from utils import create_parcel_up
-from utils.parcel_up_graph import validate_direct_edges
+from utils import create_parcel_down
+from utils.parcel_down_graph import validate_direct_edges
 from whitebox_test_support import fake_whitebox_file_pipeline
 
 
@@ -63,7 +63,7 @@ def test_chain_has_only_immediate_links_and_no_transitive_edges():
     nxt = np.array([1, 2, 3, 4, 5, -1], dtype=np.int32)
     rows = candidates_for(labels, nxt)
     edges, result, summary = routing.select_acyclic_connections(rows)
-    assert edges == [(2,1), (3,2)]
+    assert edges == [(1,2), (2,3)]
     assert (3,1) not in edges
     assert validate_direct_edges(edges,[1,2,3]) == edges
     assert summary['ambiguous_parcels'] == 0
@@ -74,7 +74,7 @@ def test_gap_tracing_finds_next_parcel_and_does_not_skip_it():
     nxt = np.array([1, 2, 3, 4, 5, -1])
     rows = candidates_for(labels, nxt)
     edges, _, _ = routing.select_acyclic_connections(rows)
-    assert edges == [(2,1), (3,2)]
+    assert edges == [(1,2), (2,3)]
 
 
 def test_return_to_same_parcel_after_gap_continues_to_real_destination():
@@ -82,7 +82,7 @@ def test_return_to_same_parcel_after_gap_continues_to_real_destination():
     nxt = np.array([1, 2, 3, -1])
     rows = candidates_for(labels, nxt)
     edges, _, _ = routing.select_acyclic_connections(rows)
-    assert edges == [(2, 1)]
+    assert edges == [(1, 2)]
     assert sum(r['origin_cells'] for r in rows if r['upstream_pid']==1) == 2
 
 
@@ -102,7 +102,7 @@ def test_aggregation_uses_own_cells_not_upstream_throughflow():
     assert sum(r['parcel_cells'] for r in source1)==6
     assert next(r['share'] for r in source1 if r['downstream_pid']==2) == pytest.approx(2/3)
     edges, *_ = routing.select_acyclic_connections(rows)
-    assert (2,1) in edges and (3,1) not in edges
+    assert (1,2) in edges and (3,1) not in edges
 
 
 def test_acyclic_cell_paths_can_aggregate_to_cycle_but_selection_cannot():
@@ -110,14 +110,12 @@ def test_acyclic_cell_paths_can_aggregate_to_cycle_but_selection_cannot():
     labels = np.array([[1,2,0,2,1,0]], dtype=np.int32)
     nxt = np.array([1,-1,-1,4,-1,-1], dtype=np.int32)
     rows = candidates_for(labels, nxt)
-    assert (2,1) in {(r['downstream_pid'],r['upstream_pid']) for r in rows
-                       if r['downstream_pid'] is not None}
-    assert (1,2) in {(r['downstream_pid'],r['upstream_pid']) for r in rows
-                       if r['downstream_pid'] is not None}
-    # Both split their area 50/50 between the other parcel and outside.
+    assert {(r['upstream_pid'],r['downstream_pid']) for r in rows
+            if r['downstream_pid'] is not None} == {(1,2),(2,1)}
+    # Tied with OUTSIDE: numerical parcel PID wins. A cycle is then rejected.
     edges, result, summary = routing.select_acyclic_connections(rows)
-    assert not edges
-    assert summary['ambiguous_parcels']==2
+    assert len(edges) == 1
+    assert summary['rejected_cycle_candidates'] == 1
 
 
 def test_greedy_cycle_rejection_retains_stronger_connection_and_reports_weak():
@@ -128,7 +126,7 @@ def test_greedy_cycle_rejection_retains_stronger_connection_and_reports_weak():
       {'upstream_pid':14, 'downstream_pid':20,'origin_cells':35,'parcel_cells':100,'share':.35,'origin_area_m2':35.},
     ]
     edges, diag, summary = routing.select_acyclic_connections(evidence)
-    assert edges == [(14,6)]
+    assert edges == [(6,14),(14,20)]
     assert summary['rejected_cycle_candidates']==1
     assert next(r for r in diag if r['upstream_pid']==14 and r['downstream_pid']==6)['decision']=='rejected_cycle'
     assert validate_direct_edges(edges,[6,14,20])==edges
@@ -151,8 +149,8 @@ def test_substantial_multioutlet_split_is_unresolved_not_arbitrarily_connected()
       {'upstream_pid':6, 'downstream_pid':None,'origin_cells':15,'parcel_cells':100,'share':.15,'origin_area_m2':15.},
     ]
     edges, diag, summary = routing.select_acyclic_connections(rows)
-    assert edges == [] and summary['ambiguous_parcels']==1
-    assert all(r['decision']=='unresolved_ambiguous' for r in diag)
+    assert edges == [(6,14)] and summary['ambiguous_parcels']==0
+    assert next(r for r in diag if r['downstream_pid']==14)['decision']=='selected'
 
 
 def test_selection_is_independent_of_candidate_row_order():
@@ -214,7 +212,7 @@ def test_whitebox_run_propagates_tool_failure_and_preserves_gpkg(tmp_path, monke
 
 def test_cli_writes_diagnostics_and_normalized_gpkg_after_fake_whitebox(tmp_path, monkeypatch):
     import sqlite3
-    from test_create_parcel_up_table import write_gpkg
+    from test_create_parcel_down_table import write_gpkg
     gpkg=write_gpkg(tmp_path/'parcels.gpkg')
     dem=tmp_path/'dem.tif'
     with rasterio.open(dem,'w',driver='GTiff',width=6,height=3,count=1,
@@ -222,40 +220,31 @@ def test_cli_writes_diagnostics_and_normalized_gpkg_after_fake_whitebox(tmp_path
                        crs='EPSG:3857') as ds:
         ds.write(np.tile(np.arange(6,0,-1,dtype='float32'),(3,1)),1)
     fake_whitebox_file_pipeline(monkeypatch)
-    monkeypatch.setattr(sys,'argv',['create_parcel_up.py',str(gpkg),str(dem)])
-    create_parcel_up.main()
+    monkeypatch.setattr(sys,'argv',['create_parcel_down.py',str(gpkg),str(dem)])
+    create_parcel_down.main()
     with sqlite3.connect(gpkg) as conn:
-        edges=conn.execute('SELECT pid,pid_up FROM parcel_up ORDER BY pid').fetchall()
-    assert edges==[(22,11),(33,22)]
-    diagnostics=tmp_path/'parcels_parcel_up_candidates.csv'
+        edges=conn.execute('SELECT pid,pid_down FROM parcel_down ORDER BY pid').fetchall()
+    assert edges==[(11,22),(22,33)]
+    diagnostics=tmp_path/'parcels_parcel_down_candidates.csv'
     assert diagnostics.is_file()
     with diagnostics.open(newline='') as f:
         rows=list(csv.DictReader(f))
     assert any(r['decision']=='selected' for r in rows)
 
 
-def test_abort_on_ambiguity_leaves_existing_gpkg_unchanged(tmp_path, monkeypatch):
-    from test_create_parcel_up_table import write_gpkg
-    gpkg = write_gpkg(tmp_path/'parcels.gpkg')
-    original = gpkg.read_bytes()
-    dem = tmp_path/'dem.tif'
-    with rasterio.open(dem,'w',driver='GTiff',width=6,height=3,count=1,
-                       dtype='float32',transform=from_origin(0,3,1,1),
-                       crs='EPSG:3857') as ds:
-        ds.write(np.ones((3,6),dtype='float32'),1)
-    fake_whitebox_file_pipeline(monkeypatch)
-    original_select = routing.select_acyclic_connections
-    def forced_ambiguity(candidates, **kwargs):
-        edges, rows, summary = original_select(candidates, **kwargs)
-        summary['ambiguous_parcels'] += 1
-        return edges, rows, summary
-    monkeypatch.setattr(routing,'select_acyclic_connections',forced_ambiguity)
-    monkeypatch.setattr(sys,'argv',['create_parcel_up.py',str(gpkg),str(dem),
-                                   '--abort-on-ambiguity'])
-    with pytest.raises(ValueError,match='GeoPackage was not modified'):
-        create_parcel_up.main()
-    assert gpkg.read_bytes() == original
-    assert (tmp_path/'parcels_parcel_up_candidates.csv').exists()
+def test_no_majority_threshold_is_required():
+    rows = [
+        {'upstream_pid': 6, 'downstream_pid': 14, 'origin_cells': 40,
+         'parcel_cells': 100, 'share': .4, 'origin_area_m2': 40.},
+        {'upstream_pid': 6, 'downstream_pid': 20, 'origin_cells': 35,
+         'parcel_cells': 100, 'share': .35, 'origin_area_m2': 35.},
+        {'upstream_pid': 6, 'downstream_pid': None, 'origin_cells': 25,
+         'parcel_cells': 100, 'share': .25, 'origin_area_m2': 25.},
+    ]
+    edges, _, summary = routing.select_acyclic_connections(rows)
+    assert edges == [(6, 14)]
+    assert summary['ambiguous_parcels'] == 0
+
 
 
 def test_whitebox_pointer_reader_rejects_misaligned_georeferencing(tmp_path):

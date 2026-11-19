@@ -9,27 +9,20 @@ import pandas as pd
 import pytest
 
 from src.constants import OUTPUT_IMPACTED_PIDS
-from src.input_config import _build_parcel_up_map
+from src.input_config import _build_parcel_down_map
 from src.input_validation import validate_plet_runtime_inputs
 from src.model import _bmp_impacted_parcel_indices
 
 
-def test_normalized_upstream_edges_are_all_resolved() -> None:
-    """Each parcel-to-upstream relationship is represented by one row."""
-    upstream = pd.DataFrame(
-        [
-            {"pid": "10", "pid_up": "1"},
-            {"pid": "10", "pid_up": "2"},
-            {"pid": "10", "pid_up": "3"},
-        ]
-    )
-
-    parcel_up_map = _build_parcel_up_map(upstream, ["1", "2", "3", "10"])
-
-    assert parcel_up_map["10"] == ["1", "2", "3"]
-    assert parcel_up_map["1"] == []
-    assert parcel_up_map["2"] == []
-    assert parcel_up_map["3"] == []
+def test_normalized_downstream_edges_are_all_resolved() -> None:
+    """Three upstream sources may converge on one receiving parcel."""
+    edges = pd.DataFrame([
+        {'pid': '1', 'pid_down': '10'},
+        {'pid': '2', 'pid_down': '10'},
+        {'pid': '3', 'pid_down': '10'},
+    ])
+    mapping = _build_parcel_down_map(edges, ['1', '2', '3', '10'])
+    assert mapping == {'1':'10', '2':'10', '3':'10', '10': None}
 
 
 def test_wetland_impacted_parcels_use_full_hydrologic_universe() -> None:
@@ -80,7 +73,7 @@ def _patch_loader_preamble(monkeypatch) -> None:
     monkeypatch.setattr(
         input_config,
         "_load_parcel_graph",
-        lambda cfg, logger: pd.DataFrame(columns=["pid", "pid_up"]),
+        lambda cfg, logger: pd.DataFrame(columns=["pid", "pid_down"]),
     )
     monkeypatch.setattr(
         input_config,

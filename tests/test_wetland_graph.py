@@ -14,7 +14,7 @@ from src.constants import (
     OUTPUT_REMOVED,
     OUTPUT_TREATED,
 )
-from src.input_config import _build_parcel_up_map
+from src.input_config import _build_parcel_down_map
 from src.model import _ScenarioContext
 from src.parcel_graph import iter_full_upstream_by_distance
 from test_hydrologic_parcel_universe import _model_with_nonselectable_upstream_parcels
@@ -124,35 +124,41 @@ def test_no_upstream_returns_no_impacted_ancestors():
     ],
 )
 def test_cycle_detection_prevents_simulation(edges, expected_cycle):
-    rows = pd.DataFrame(edges, columns=["pid", "pid_up"])
+    rows = pd.DataFrame(edges, columns=["pid", "pid_down"])
     modeled = sorted({pid for edge in edges for pid in edge})
-    with pytest.raises(ValueError, match="parcel_up.*directed cycle") as exc:
-        _build_parcel_up_map(rows, modeled)
+    with pytest.raises(ValueError, match="parcel_down.*directed cycle") as exc:
+        _build_parcel_down_map(rows, modeled)
     assert expected_cycle in str(exc.value)
 
 
-def test_valid_diverging_and_merging_network_is_not_rejected():
-    edges = pd.DataFrame([
-        {"pid": "100", "pid_up": "10"},
-        {"pid": "100", "pid_up": "20"},
-        {"pid": "10", "pid_up": "1"},
-        {"pid": "20", "pid_up": "1"},
-        {"pid": "20", "pid_up": "1"},  # duplicate allowed and deduplicated
+def test_valid_many_upstream_one_downstream_network():
+    rows = pd.DataFrame([
+        {'pid': '100', 'pid_down': '10'},
+        {'pid': '20', 'pid_down': '10'},
+        {'pid': '10', 'pid_down': '1'},
     ])
-    upstream = _build_parcel_up_map(edges, ["1", "10", "20", "100"])
-    assert upstream["100"] == ["10", "20"]
-    assert upstream["20"] == ["1"]
+    downstream = _build_parcel_down_map(rows, ['1', '10', '20', '100'])
+    assert downstream == {'1': None, '10': '1', '20': '10', '100': '10'}
+
+
+def test_multiple_downstream_rows_are_rejected():
+    rows = pd.DataFrame([
+        {'pid': '100', 'pid_down': '10'},
+        {'pid': '100', 'pid_down': '20'},
+    ])
+    with pytest.raises(ValueError, match='more than one downstream'):
+        _build_parcel_down_map(rows, ['10', '20', '100'])
 
 
 def test_long_chain_is_validated_iteratively_without_recursion_error():
     size = 1500
     rows = pd.DataFrame({
         "pid": [str(i) for i in range(1, size)],
-        "pid_up": [str(i-1) for i in range(1, size)],
+        "pid_down": [str(i-1) for i in range(1, size)],
     })
-    upstream = _build_parcel_up_map(rows, [str(i) for i in range(size)])
+    upstream = _build_parcel_down_map(rows, [str(i) for i in range(size)])
     assert len(upstream) == size
-    assert upstream[str(size-1)] == [str(size-2)]
+    assert upstream[str(size-1)] == str(size-2)
     ids = [str(i) for i in range(size)]
     indices = [[]] + [[i-1] for i in range(1, size)]
     ordered = list(iter_full_upstream_by_distance(size-1, indices, ids))
@@ -163,10 +169,10 @@ def test_long_chain_is_validated_iteratively_without_recursion_error():
 
 def test_domain_clipping_preserves_modeled_valid_subgraph():
     rows = pd.DataFrame([
-        {"pid": "1", "pid_up": "2"},
-        {"pid": "2", "pid_up": "3"},
-        {"pid": "3", "pid_up": "4"},  # 4 is outside modeled domain
+        {"pid": "1", "pid_down": "2"},
+        {"pid": "2", "pid_down": "3"},
+        {"pid": "3", "pid_down": "4"},  # 4 is outside modeled domain
     ])
-    result = _build_parcel_up_map(rows, ["1", "2", "3"],
+    result = _build_parcel_down_map(rows, ["1", "2", "3"],
                                   source_parcel_ids=["1", "2", "3", "4"])
-    assert result == {"1": ["2"], "2": ["3"], "3": []}
+    assert result == {"1": "2", "2": "3", "3": None}

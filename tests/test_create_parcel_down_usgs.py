@@ -12,7 +12,7 @@ import rasterio
 from rasterio.transform import from_origin
 from shapely.geometry import box, mapping
 
-from utils import usgs_dem, create_parcel_up
+from utils import usgs_dem, create_parcel_down
 from utils.rasterio_compat import read_band
 
 
@@ -181,11 +181,11 @@ def test_local_dem_cli_path_skips_online_api(tmp_path, monkeypatch):
     raster = tmp_path / "local.tif"
     tif(raster)
     target = tmp_path / "out.csv"
-    monkeypatch.setattr(sys, "argv", ["create_parcel_up.py", str(tmp_path / "parcels.gpkg"),
+    monkeypatch.setattr(sys, "argv", ["create_parcel_down.py", str(tmp_path / "parcels.gpkg"),
                                       str(raster), "--out", str(target)])
     monkeypatch.setattr(usgs_dem, "get_dem_from_usgs", lambda *a, **k: pytest.fail("network not allowed"))
-    create_parcel_up.main()
-    assert target.read_text().startswith("pid,pid_up")
+    create_parcel_down.main()
+    assert target.read_text().startswith("pid,pid_down")
     # Normalized model schema: zero or more direct edges; no placeholder rows.
     assert target.read_text().count("\n") >= 1
 
@@ -203,9 +203,9 @@ def test_missing_dem_cli_routes_to_usgs(monkeypatch, tmp_path):
         assert len(parcels) == 2
         return raster
     monkeypatch.setattr(usgs_dem, "get_dem_from_usgs", get_dem)
-    monkeypatch.setattr(sys, "argv", ["create_parcel_up.py", str(tmp_path / "parcels.gpkg"),
+    monkeypatch.setattr(sys, "argv", ["create_parcel_down.py", str(tmp_path / "parcels.gpkg"),
                                       "--usgs-resolution", "10m", "--out", str(tmp_path / "out.csv")])
-    create_parcel_up.main()
+    create_parcel_down.main()
     assert called["resolution"] == "10m"
     assert (tmp_path / "out.csv").exists()
 
@@ -272,9 +272,9 @@ def test_missing_dem_list_only_does_not_create_csv(monkeypatch, tmp_path):
         assert len(gdf) == 2
         return None
     monkeypatch.setattr(usgs_dem, "get_dem_from_usgs", check)
-    monkeypatch.setattr(sys, "argv", ["create_parcel_up.py", str(parcels),
+    monkeypatch.setattr(sys, "argv", ["create_parcel_down.py", str(parcels),
                                       "--list-usgs-resolutions", "--out", str(out)])
-    create_parcel_up.main()
+    create_parcel_down.main()
     assert observed[0]["list_only"] is True
     assert not out.exists()
 

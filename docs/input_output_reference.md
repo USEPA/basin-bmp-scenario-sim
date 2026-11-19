@@ -28,26 +28,36 @@ Model variables may be stored at parcel, HUC, or domain scale. GeoPackage files 
 - `pid` — unique integer parcel identifier and the GeoPackage feature/primary key (`INTEGER PRIMARY KEY`). There is no separate `fid` parcel identifier.
 - geometry — polygon/multipolygon geometry.
 
-All parcel references in other GeoPackage tables (`pid`, `pid_up`) are integers. Non-spatial attribute tables use a technical integer `id` primary key where QGIS needs a stable editable row identifier; the model ignores that `id`.
+All parcel references in other GeoPackage tables (`pid`, `pid_down`) are integers. Non-spatial attribute tables use a technical integer `id` primary key where QGIS needs a stable editable row identifier; the model ignores that `id`.
 
 Parcel area and perimeter are derived from geometry after clipping to the domain.
 
-`parcel_up` is an optional attribute table with one upstream edge per row:
+**`parcel_down` is required**, even when it contains zero rows. Each row
+contains one source parcel PID and its **immediate downstream** parcel PID:
 
 ```text
-pid | pid_up
-3   | 1
-3   | 2
+pid | pid_down
+1   | 3
+2   | 3
+3   | 4
 ```
 
-These are **immediate** upstream connections, not the full ancestor list.
-The modeled graph must be a directed acyclic graph: self-links and directed
-cycles are rejected during input validation. Wetland catchments are formed by
-traversing all reachable upstream parcels by increasing shortest graph distance,
-with ascending PID as the tie-breaker. Multiple immediate upstream parcels
-and converging branches are supported; a shared ancestor is counted once.
-Relationships clipped out of the modeled domain are excluded before the
-modeled graph is validated.
+Every `pid` appears **at most once**; a parcel with no downstream neighbor,
+including a watershed outlet, has **no row**. Multiple sources may flow to one
+recipient. Every referenced PID must exist in the parcel geometry layer and
+self-links or directed cycles are invalid. The source-to-downstream graph is
+reversed **in memory** to find the complete upstream catchment of a wetland.
+The model cannot read the old `parcel_up` table and provides no runtime
+conversion or fallback. Convert old datasets using the explicit migration tool
+`python utils/migrate_parcel_down.py --help`, or regenerate links with Whitebox.
+
+The representative link uses the largest share of runoff originating in the
+source parcel, even when less than half of that parcel drains to the recipient.
+Exactly tied shares use the lower numerical downstream PID. The simplification
+routes the **entire modeled parcel** through the chosen link. It does not split
+parcel pollutant mass among downstream branches. Some parcels will have no
+selected connection because water leaves the parcel study area or a link would
+form a cycle. Those cases are logged and do not prohibit automatic update.
 
 `parcel_outlets` is required and contains one parcel-to-outlet relationship per row:
 

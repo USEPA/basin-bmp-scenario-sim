@@ -8,7 +8,7 @@ import pytest
 from src.bmp import _get_bmp_selection_probs
 from src.constants import DATA_CPS, DATA_PARCELS
 import src.input_config as input_config
-from src.input_config import _build_parcel_up_map
+from src.input_config import _build_parcel_down_map
 from src.model import Model
 
 
@@ -46,41 +46,34 @@ def test_load_parcel_selection_rejects_negative_weight(monkeypatch) -> None:
     with pytest.raises(ValueError, match="finite and >= 0"):
         input_config._load_parcel_selection({}, parcels, DummyLogger())
 
-def test_build_parcel_up_map_uses_normalized_edge_rows() -> None:
-    upstream_rows = pd.DataFrame(
-        {"pid": ["9", "9"], "pid_up": ["4", "5"]}
-    )
-    parcel_up_map = _build_parcel_up_map(
-        upstream_rows, parcel_ids=["4", "5", "9", "10"]
-    )
-    assert parcel_up_map == {"4": [], "5": [], "9": ["4", "5"], "10": []}
+def test_downstream_single_destination_and_reverse_in_memory():
+    edges = pd.DataFrame({'pid':['4','5','9'], 'pid_down':['9','9','10']})
+    mapping = _build_parcel_down_map(edges, ['4','5','9','10'])
+    assert mapping == {'4':'9', '5':'9', '9':'10', '10':None}
 
 
-def test_build_parcel_up_map_rejects_wildcards_and_compound_ids() -> None:
-    upstream_rows = pd.DataFrame({"pid": ["9"], "pid_up": ["4,5"]})
-    with pytest.raises(ValueError, match="one-edge-per-row"):
-        _build_parcel_up_map(upstream_rows, parcel_ids=["4", "5", "9"])
-
-def test_build_parcel_up_map_deduplicates_normalized_edges() -> None:
-    upstream_rows = pd.DataFrame(
-        {"pid": ["9", "9", "9"], "pid_up": ["4", "5", "5"]}
-    )
-    parcel_up_map = _build_parcel_up_map(
-        upstream_rows, parcel_ids=["4", "5", "9", "10"]
-    )
-    assert parcel_up_map == {"4": [], "5": [], "9": ["4", "5"], "10": []}
+def test_downstream_rejects_compound_ids():
+    rows = pd.DataFrame({'pid':['9'], 'pid_down':['4,5']})
+    with pytest.raises(ValueError, match='comma-separated'):
+        _build_parcel_down_map(rows, ['4','5','9'])
 
 
-def test_build_parcel_up_map_rejects_unknown_upstream_ids() -> None:
-    upstream_rows = pd.DataFrame({"pid": ["9"], "pid_up": ["missing"]})
-    with pytest.raises(ValueError, match="missing"):
-        _build_parcel_up_map(upstream_rows, parcel_ids=["4", "9"])
+def test_downstream_rejects_two_targets_even_when_duplicated():
+    rows = pd.DataFrame({'pid':['9','9'], 'pid_down':['4','5']})
+    with pytest.raises(ValueError, match='more than one downstream'):
+        _build_parcel_down_map(rows, ['4','5','9'])
 
 
-def test_build_parcel_up_map_handles_numeric_ids() -> None:
-    upstream_rows = pd.DataFrame({"pid": [1], "pid_up": [2]})
-    parcel_up_map = _build_parcel_up_map(upstream_rows, parcel_ids=["1", "2"])
-    assert parcel_up_map == {"1": ["2"], "2": []}
+def test_downstream_unknown_ids_rejected():
+    rows = pd.DataFrame({'pid':['9'], 'pid_down':['missing']})
+    with pytest.raises(ValueError, match='missing'):
+        _build_parcel_down_map(rows, ['4','9'])
+
+
+def test_downstream_integer_ids():
+    rows = pd.DataFrame({'pid':[1], 'pid_down':[2]})
+    assert _build_parcel_down_map(rows, ['1','2']) == {'1':'2','2':None}
+
 
 def test_get_bmp_selection_probs_rejects_invalid_probabilities(tmp_path) -> None:
     bmp_sel = tmp_path / "bmp_sel.csv"

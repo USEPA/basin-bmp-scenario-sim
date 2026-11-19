@@ -8,14 +8,14 @@ from src.constants import (
     COL_NDR_S_TO_O,
     COL_OID,
     COL_PID,
-    COL_PID_UP,
+    COL_PID_DOWN,
     COL_PROBABILITY,
     COL_SDR_F_TO_S,
     COL_SDR_S_TO_O,
 )
 import src.input_config as input_config
 from src.input_config import (
-    _build_parcel_up_map,
+    _build_parcel_down_map,
     _complete_delivery_ratio_defaults,
 )
 
@@ -47,26 +47,21 @@ def test_missing_selection_weight_means_equal_weights(monkeypatch) -> None:
     assert loaded[COL_PROBABILITY].tolist() == pytest.approx([1 / 3, 1 / 3, 1 / 3])
 
 
-def test_parcel_up_uses_one_edge_per_row() -> None:
-    edges = pd.DataFrame(
-        [
-            {COL_PID: 2, COL_PID_UP: 1},
-            {COL_PID: 3, COL_PID_UP: 1},
-            {COL_PID: 3, COL_PID_UP: 2},
-        ]
-    )
-    assert _build_parcel_up_map(edges, [1, 2, 3, 4]) == {
-        "1": [],
-        "2": ["1"],
-        "3": ["1", "2"],
-        "4": [],
+def test_parcel_down_has_one_downstream_per_source():
+    edges = pd.DataFrame([
+        {COL_PID: 1, COL_PID_DOWN: 3},
+        {COL_PID: 2, COL_PID_DOWN: 3},
+        {COL_PID: 3, COL_PID_DOWN: 4},
+    ])
+    assert _build_parcel_down_map(edges, [1, 2, 3, 4]) == {
+        "1": "3", "2": "3", "3": "4", "4": None,
     }
 
 
-def test_parcel_up_rejects_legacy_compound_relationships() -> None:
-    edges = pd.DataFrame([{COL_PID: 3, COL_PID_UP: "1,2"}])
-    with pytest.raises(ValueError, match="one-edge-per-row"):
-        _build_parcel_up_map(edges, [1, 2, 3])
+def test_parcel_down_rejects_legacy_compound_relationships():
+    edges = pd.DataFrame([{COL_PID: 3, COL_PID_DOWN: "1,2"}])
+    with pytest.raises(ValueError, match="comma-separated"):
+        _build_parcel_down_map(edges, [1, 2, 3])
 
 
 def test_missing_delivery_ratio_columns_receive_neutral_defaults() -> None:
