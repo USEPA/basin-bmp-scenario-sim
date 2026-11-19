@@ -18,6 +18,7 @@ from utils.drainage_validation import validate_dem_coverage, validate_parcel_ove
 from utils.drainage_manifest import write_drainage_manifest, parcel_geometry_sha256
 from utils.migrate_parcel_down import migrate
 from utils.whitebox_parcel_routing import select_acyclic_connections
+from utils.rasterio_compat import read_mask
 from test_create_parcel_down_table import write_gpkg
 
 
@@ -92,7 +93,7 @@ def test_dem_coverage_rejects_parcel_99_percent_outside(tmp_path):
     parcels=_parcels(box(0,0,100,100))
     with rasterio.open(path) as ds:
         with pytest.raises(ValueError,match='does not cover full parcel area'):
-            validate_dem_coverage(parcels,ds,ds.read_masks(1)>0)
+            validate_dem_coverage(parcels,ds,read_mask(ds)>0)
 
 
 def test_dem_coverage_rejects_nodata_inside(tmp_path):
@@ -100,7 +101,7 @@ def test_dem_coverage_rejects_nodata_inside(tmp_path):
     parcels=_parcels(box(0,0,10,10))
     with rasterio.open(path) as ds:
         with pytest.raises(ValueError,match='NoData'):
-            validate_dem_coverage(parcels,ds,ds.read_masks(1)>0)
+            validate_dem_coverage(parcels,ds,read_mask(ds)>0)
 
 
 def test_overlap_detection_is_independent_of_feature_order():
