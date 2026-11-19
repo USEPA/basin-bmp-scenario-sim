@@ -40,6 +40,15 @@ pid | pid_up
 3   | 2
 ```
 
+These are **immediate** upstream connections, not the full ancestor list.
+The modeled graph must be a directed acyclic graph: self-links and directed
+cycles are rejected during input validation. Wetland catchments are formed by
+traversing all reachable upstream parcels by increasing shortest graph distance,
+with ascending PID as the tie-breaker. Multiple immediate upstream parcels
+and converging branches are supported; a shared ancestor is counted once.
+Relationships clipped out of the modeled domain are excluded before the
+modeled graph is validated.
+
 `parcel_outlets` is required and contains one parcel-to-outlet relationship per row:
 
 ```text

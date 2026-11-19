@@ -1,0 +1,33 @@
+{
+  "source": "USGS 3DEP / TNMAccess",
+  "resolution": "30m",
+  "availability_source": "catalog",
+  "availability_provisional": true,
+  "dataset": "National Elevation Dataset (NED) 1 arc-second",
+  "nominal_cell_size_m": 30,
+  "projected_crs": "EPSG:32617",
+  "buffer_m": 100.0,
+  "dem": "..\\examples\\east_fork\\inputs\\parcels\\parcels_ex1dot1_lit_based_load_gen_deterministic_usgs_dem\\usgs_3dep_30m_study_dem.tif",
+  "products": [
+    {
+      "sourceId": "68ca1880d4be0274ff4eab2c",
+      "publicationDate": "2025-09-15",
+      "downloadURL": "https://prd-tnm.s3.amazonaws.com/StagedProducts/Elevation/1/TIFF/historical/n40w084/USGS_1_n40w084_20250915.tif"
+    },
+    {
+      "sourceId": "5df04ee3e4b02caea0f4fa5f",
+      "publicationDate": "2019-07-23",
+      "downloadURL": "https://prd-tnm.s3.amazonaws.com/StagedProducts/Elevation/1/TIFF/historical/n40w085/USGS_1_n40w085_20190723.tif"
+    },
+    {
+      "sourceId": "5df04ed3e4b02caea0f4f9fb",
+      "publicationDate": "2016-05-11",
+      "downloadURL": "https://prd-tnm.s3.amazonaws.com/StagedProducts/Elevation/1/TIFF/historical/n39w085/USGS_1_n39w085_20160511.tif"
+    },
+    {
+      "sourceId": "69a25cd0b66b01752dcb5d91",
+      "publicationDate": "2026-02-27",
+      "downloadURL": "https://prd-tnm.s3.amazonaws.com/StagedProducts/Elevation/1/TIFF/historical/n39w084/USGS_1_n39w084_20260227.tif"
+    }
+  ]
+}

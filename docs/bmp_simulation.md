@@ -69,6 +69,29 @@ This is an important structural assumption. It is most natural where later pract
 
 Where applicable, the `parcel_up` table inside the parcel GeoPackage supplies upstream parcel relationships used by BMP logic that depends on contributing drainage area. The table is normalized: each row is one `pid` → `pid_up` relationship; comma-separated relationship lists are not supported.
 
+The table records **immediate** upstream connections, not a list of every
+upstream ancestor. During input loading, the modeled (domain-clipped) network
+is checked for directed cycles, including self-links; errors identify the
+cycle before any Monte Carlo simulations begin. A downstream parcel can have
+multiple immediate upstream parcels, and a parcel can occur upstream of
+multiple branches, but closed directed loops are invalid.
+
+For sampled wetland designs, the simulation traverses the **full transitive
+upstream network** from the wetland host, starting with the host itself and
+adding upstream parcels by shortest graph distance (number of immediate
+connections). Parcels tied in distance are considered in ascending PID order
+(numerically for numeric IDs and lexicographically otherwise). Each upstream
+parcel can contribute only once, even if reachable by multiple routes.
+Traversal stops as soon as the wetland's sampled treatment area is covered or
+the upstream network is exhausted; partial treatment of the last selected
+parcel is preserved. Parcels are considered from the complete hydrologic
+universe, including those excluded from random BMP placement.
+
+The existing deterministic-design assumption is intentionally unchanged:
+`deterministic_bmp_design_parameters: true` treats only the wetland-host parcel.
+No wetland efficiency, delivery, cost, or cumulative-cost stopping assumptions
+are changed by the graph-traversal fix.
+
 ## Cost and stopping conditions
 
 BMP costs may be sampled from `bmp_cost` when configured. A CPS may have one

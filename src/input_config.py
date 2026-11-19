@@ -17,6 +17,7 @@ import geopandas as gpd
 import numpy as np
 import pandas as pd
 
+from .parcel_graph import validate_acyclic_upstream_map
 from .constants import (
     CFG_BMP_COST,
     CFG_BMP_SEL,
@@ -2027,6 +2028,10 @@ def _build_parcel_up_map(
         logger.verbose(
             f"Filtered {clipped_edges} parcel_up relationship(s) involving parcels outside the modeled domain"
         )
+    # parcel_up encodes immediate upstream connections. It must be a DAG for
+    # transitive wetland catchment traversal to represent physical drainage.
+    # Validate only modeled edges, after legitimate domain clipping.
+    validate_acyclic_upstream_map(parcel_up_map)
     return parcel_up_map
 
 def _load_parcel_outlets(cfg: Dict[str, Any], logger: Any) -> pd.DataFrame:

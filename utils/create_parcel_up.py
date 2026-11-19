@@ -1,9 +1,15 @@
 #!/usr/bin/env python3
+"""Create parcel drainage connections using a local or USGS 3DEP DEM.
+
+Run ``python utils/create_parcel_up.py --help`` for examples. If the DEM
+positional argument is omitted, query USGS for full-area 3DEP availability,
+allow the user to choose the resolution, download tiles and build a metric DEM.
+The existing local-DEM path never makes network requests.
+"""
 import argparse
 import logging
-import os
 import sys
-from typing import Dict, List, Tuple
+from typing import Dict, Tuple
 
 import numpy as np
 import geopandas as gpd
@@ -13,16 +19,85 @@ from rasterio import features
 
 def parse_args():
     parser = argparse.ArgumentParser(
-        description="Determine upgradient parcels from a DEM using a D8 flow network. "
-                    "Outputs a CSV with columns: pid, pid_up (comma-separated)."
+        description="Derive a representative, acyclic parcel_up network using "
+                    "WhiteboxTools D8 hydrology and parcel-origin drainage shares."
     )
     parser.add_argument("parcels", help="Path to parcel boundaries (GeoPackage/GeoJSON/Shapefile). Must have an ID field.")
-    parser.add_argument("dem", help="Path to DEM raster (GeoTIFF).")
+    parser.add_argument(
+        "dem", nargs="?", default=None,
+        help="Local DEM raster (GeoTIFF). Omit to discover and download a USGS 3DEP DEM.",
+    )
+    parser.add_argument(
+        "--usgs-resolution", choices=("1m", "s1m", "3m", "5m", "10m", "30m", "60m"),
+        help="USGS 3DEP resolution; still verifies full parcel-area availability. "
+             "Skips interactive selection and download confirmation.",
+    )
+    parser.add_argument(
+        "--list-usgs-resolutions", action="store_true",
+        help="Query and display USGS 3DEP full-area coverage, then exit without downloading.",
+    )
+    parser.add_argument(
+        "--refresh-usgs-availability", action="store_true",
+        help="Ignore saved USGS availability checks and query all resolution indexes again.",
+    )
+    parser.add_argument(
+        "--usgs-cache-dir", default=None,
+        help="Directory for USGS source tiles and the projected DEM. "
+             "Default: <parcels_basename>_usgs_dem beside the parcel file.",
+    )
+    parser.add_argument(
+        "--dem-buffer-m", type=float, default=100.,
+        help="Buffer in meters outside all parcel geometries for the USGS DEM (default: 100).",
+    )
+    parser.add_argument(
+        "--max-dem-cells", type=int, default=20_000_000,
+        help="Safety limit on output DEM cells before downloading (default: 20 million).",
+    )
     parser.add_argument("--id-field", default="pid", help="Name of the parcel ID field (default: pid).")
-    parser.add_argument("--out", default=None, help="Path to CSV output. Default: <parcels_basename>_upgradient.csv")
+    parser.add_argument(
+        "--layer", default=None,
+        help="Parcel geometry layer in a GeoPackage. Defaults to 'parcels' when present, "
+             "otherwise the only geometry layer if there is just one.",
+    )
+    parser.add_argument(
+        "--out", default=None,
+        help="Optional CSV export of immediate (pid,pid_up) edges, one per row. "
+             "With a GeoPackage, the parcel_up table is written by default."
+    )
+    parser.add_argument(
+        "--no-gpkg-update", action="store_true",
+        help="Do not modify the input GeoPackage; requires --out for CSV-only output."
+    )
     parser.add_argument("--log-level", default="INFO", choices=["DEBUG", "INFO", "WARNING", "ERROR"])
     parser.add_argument("--use-filled-dem", action="store_true",
-                        help="If richdem is installed, fill depressions before computing flow directions.")
+                        help="Deprecated compatibility alias for --whitebox-conditioning fill; "
+                             "does not use richdem.")
+    parser.add_argument(
+        "--whitebox-conditioning", choices=("breach", "fill"), default="breach",
+        help="WhiteboxTools depression conditioning. Default: least-cost breach "
+             "with filling of unbreached depressions."
+    )
+    parser.add_argument("--whitebox-breach-dist", type=int, default=100,
+                        help="Maximum least-cost breaching path search distance in "
+                             "cells (default: 100).")
+    parser.add_argument("--whitebox-exe", default=None,
+                        help="Path to whitebox_tools executable; otherwise requires "
+                             "the Python 'whitebox' package.")
+    parser.add_argument("--whitebox-output-dir", default=None,
+                        help="Directory for conditioned DEM and Whitebox D8 pointer "
+                             "rasters. Default: <DEM_directory>/<DEM_stem>_whitebox_flow.")
+    parser.add_argument("--min-dominant-share", type=float, default=0.5,
+                        help="Minimum share of a parcel's OWN raster cells routed "
+                             "toward a candidate downstream parcel (default: 0.5). "
+                             "Parcel destinations with no unique qualifying dominant "
+                             "connection remain unresolved and are logged.")
+    parser.add_argument("--diagnostics-out", default=None,
+                        help="CSV recording all parcel-local downstream destinations "
+                             "and selected/excluded edges. Default: <parcels_stem>_parcel_up_candidates.csv.")
+    parser.add_argument("--abort-on-ambiguity", action="store_true",
+                        help="Fail without updating parcel_up if any parcels have "
+                             "ambiguous downstream destinations. The diagnostics CSV "
+                             "is still written.")
     return parser.parse_args()
 
 
@@ -34,10 +109,65 @@ def setup_logging(level: str):
     )
 
 
-def read_parcels(parcels_path: str, id_field: str) -> gpd.GeoDataFrame:
-    gdf = gpd.read_file(parcels_path)
+def read_parcels(parcels_path: str, id_field: str, layer: str | None = None) -> gpd.GeoDataFrame:
+    """Read parcel geometries, including GeoPackage feature-ID primary keys.
+
+    GDAL's GeoPackage driver treats the primary key as a special feature ID;
+    Pyogrio does not expose it as a normal attribute. Recover the real FIDs,
+    never a synthetic zero-based row index, when the requested field is the
+    GeoPackage feature-ID column (e.g., ``pid``).
+    """
+    from pathlib import Path
+
+    if Path(parcels_path).suffix.lower() == ".gpkg":
+        import pyogrio
+
+        layers = [str(name) for name, geometry_type in pyogrio.list_layers(parcels_path)
+                  if geometry_type is not None]
+        if layer is None:
+            if "parcels" in layers:
+                layer = "parcels"
+            elif len(layers) == 1:
+                layer = layers[0]
+            else:
+                raise ValueError(
+                    f"GeoPackage {parcels_path} has multiple or no geometry layers "
+                    f"({layers}); specify the parcel layer with --layer."
+                )
+        if layer not in layers:
+            raise ValueError(
+                f"Parcel geometry layer {layer!r} not found in {parcels_path}. "
+                f"Available geometry layers: {layers}"
+            )
+        info = pyogrio.read_info(parcels_path, layer=layer)
+        fid_column = info.get("fid_column")
+        # fid_as_index preserves the real GeoPackage primary key values.
+        gdf = gpd.read_file(
+            parcels_path, layer=layer, engine="pyogrio", fid_as_index=True,
+        )
+        if id_field not in gdf.columns and id_field == fid_column:
+            gdf[id_field] = gdf.index.to_numpy()
+            logging.info(
+                "Recovered parcel ID %r from GeoPackage feature IDs in "
+                "layer %r (%d parcels).",
+                id_field, layer, len(gdf),
+            )
+    else:
+        # Preserve existing Shapefile / GeoJSON attribute handling.
+        kwargs = {"layer": layer} if layer is not None else {}
+        gdf = gpd.read_file(parcels_path, **kwargs)
+
     if id_field not in gdf.columns:
-        raise ValueError(f"Parcel ID field '{id_field}' not found in {parcels_path}. Columns: {list(gdf.columns)}")
+        raise ValueError(
+            f"Parcel ID field {id_field!r} not found in {parcels_path}. "
+            f"Columns: {list(gdf.columns)}. For a GeoPackage primary key, "
+            "specify its name with --id-field."
+        )
+    # Input IDs must be unique to preserve one raster code per parcel.
+    if gdf[id_field].isna().any():
+        raise ValueError(f"Parcel ID field {id_field!r} contains null values")
+    if gdf[id_field].astype(str).duplicated().any():
+        raise ValueError(f"Parcel ID field {id_field!r} contains duplicate values")
     # Drop null/empty geometries
     gdf = gdf[~gdf.geometry.is_empty & gdf.geometry.notnull()].copy()
     if gdf.empty:
@@ -89,235 +219,158 @@ def rasterize_parcels(
     return pid_raster, code_to_pid, pid_to_code
 
 
-def maybe_fill_depressions(dem_arr: np.ndarray, use_fill: bool) -> np.ndarray:
-    """
-    If use_fill and richdem is available, fill depressions.
-    Otherwise, return the input DEM unchanged.
-    """
-    if not use_fill:
-        return dem_arr
-    try:
-        import richdem as rd
-    except ImportError:
-        logging.warning("richdem not installed; proceeding without depression filling.")
-        return dem_arr
-
-    logging.info("Filling depressions in DEM (richdem)...")
-    dem_rd = rd.rdarray(dem_arr.copy(), no_data=np.nan)
-    rd.FillDepressions(dem_rd, in_place=True)
-    return np.asarray(dem_rd, dtype=np.float32)
-
-
-def compute_d8_pointers(dem: np.ndarray, transform) -> Tuple[np.ndarray, np.ndarray]:
-    """
-    Compute D8 flow pointers (steepest descent) for each cell.
-    Returns (next_row, next_col) arrays of shape dem.shape. Cells with no valid downslope neighbor
-    will point to the lowest neighbor (to break flats). Nodata cells have next_row/next_col = -1.
-    """
-    nrows, ncols = dem.shape
-    next_r = np.full(dem.shape, -1, dtype=np.int32)
-    next_c = np.full(dem.shape, -1, dtype=np.int32)
-
-    # Pixel sizes (assumes north-up affine)
-    dx = abs(transform.a)
-    dy = abs(transform.e)
-    diag = (dx**2 + dy**2) ** 0.5
-
-    # Neighbor offsets and their distances
-    neighbors = [
-        (-1, -1, diag), (-1, 0, dy), (-1, 1, diag),
-        (0, -1, dx),               (0, 1, dx),
-        (1, -1, diag),  (1, 0, dy), (1, 1, diag),
-    ]
-
-    # Precompute nodata mask (NaN indicates nodata)
-    nodata = np.isnan(dem)
-
-    logging.info("Computing D8 flow pointers (steepest descent)...")
-    for r in range(nrows):
-        for c in range(ncols):
-            if nodata[r, c]:
-                continue
-            z0 = dem[r, c]
-            best_drop = -np.inf
-            best_rc = None
-
-            # Track minimal neighbor elevation to break flats if no descent found
-            min_z = np.inf
-            min_rc = None
-
-            for dr, dc, dist in neighbors:
-                rr = r + dr
-                cc = c + dc
-                if rr < 0 or rr >= nrows or cc < 0 or cc >= ncols:
-                    continue
-                if nodata[rr, cc]:
-                    continue
-                zn = dem[rr, cc]
-                # Track minimal neighbor
-                if zn < min_z:
-                    min_z = zn
-                    min_rc = (rr, cc)
-                # Steepest descent
-                drop = (z0 - zn) / dist
-                if drop > best_drop:
-                    best_drop = drop
-                    best_rc = (rr, cc)
-
-            if best_rc is not None and best_drop > 0:
-                next_r[r, c], next_c[r, c] = best_rc
-            elif min_rc is not None:
-                # No lower neighbor; move toward the lowest neighbor (flat resolution heuristic)
-                next_r[r, c], next_c[r, c] = min_rc
-            # else remain -1 for isolated cells surrounded by nodata
-
-    return next_r, next_c
-
-
-def pick_pour_point(dem_arr: np.ndarray, mask: np.ndarray) -> Tuple[int, int]:
-    """
-    Pick the pour point as the lowest-elevation cell within the parcel's cells.
-    Returns (row, col). Raises if no valid cell is found.
-    """
-    candidate_mask = mask & (~np.isnan(dem_arr))
-    if not np.any(candidate_mask):
-        raise ValueError("Parcel has no valid DEM cells after masking/nodata.")
-    rows, cols = np.where(candidate_mask)
-    vals = dem_arr[rows, cols]
-    min_idx = np.argmin(vals)
-    return int(rows[min_idx]), int(cols[min_idx])
-
-
-def delineate_upgradient_from_pointers(
-    pour_row: int,
-    pour_col: int,
-    next_r: np.ndarray,
-    next_c: np.ndarray,
-    valid_mask: np.ndarray
-) -> np.ndarray:
-    """
-    Delineate upstream catchment using D8 pointers:
-    Include all cells whose next pointer leads to the pour point.
-    """
-    nrows, ncols = next_r.shape
-    visited = np.zeros(next_r.shape, dtype=bool)
-    # Queue for BFS
-    from collections import deque
-    q = deque()
-    q.append((pour_row, pour_col))
-    visited[pour_row, pour_col] = True
-
-    # Neighbor offsets for scanning "who flows into me"
-    neighbors = [
-        (-1, -1), (-1, 0), (-1, 1),
-        (0, -1),           (0, 1),
-        (1, -1),  (1, 0),  (1, 1),
-    ]
-
-    while q:
-        r, c = q.popleft()
-        for dr, dc in neighbors:
-            rr = r + dr
-            cc = c + dc
-            if rr < 0 or rr >= nrows or cc < 0 or cc >= ncols:
-                continue
-            if not valid_mask[rr, cc] or visited[rr, cc]:
-                continue
-            # Does neighbor flow into (r, c)?
-            if next_r[rr, cc] == r and next_c[rr, cc] == c:
-                visited[rr, cc] = True
-                q.append((rr, cc))
-
-    return visited
-
-
 def main():
     args = parse_args()
     setup_logging(args.log_level)
 
-    if args.out is None:
-        base = os.path.splitext(os.path.basename(args.parcels))[0]
-        args.out = f"{base}_upgradient.csv"
+    from pathlib import Path
+    is_gpkg = Path(args.parcels).suffix.lower() == ".gpkg"
+    if args.no_gpkg_update and not args.out:
+        raise ValueError("--no-gpkg-update requires --out for a CSV-only result")
+    if not is_gpkg and not args.out:
+        raise ValueError("A non-GeoPackage parcel input requires --out CSV")
+    if is_gpkg and not args.no_gpkg_update:
+        if args.id_field != "pid" or (args.layer is not None and args.layer != "parcels"):
+            raise ValueError(
+                "The model's GeoPackage schema requires layer 'parcels' and ID 'pid'; "
+                "use --no-gpkg-update --out FILE for a different schema"
+            )
 
-    # Read DEM
-    logging.info(f"Reading DEM: {args.dem}")
+    if args.dem is not None and (args.usgs_resolution or args.list_usgs_resolutions
+                                 or args.refresh_usgs_availability):
+        raise ValueError("USGS availability options cannot be used with a local DEM.")
+    if args.dem_buffer_m < 0 or not np.isfinite(args.dem_buffer_m):
+        raise ValueError("--dem-buffer-m must be a finite nonnegative number.")
+    if args.max_dem_cells < 1:
+        raise ValueError("--max-dem-cells must be positive.")
+
+    logging.info("Reading parcels: %s", args.parcels)
+    gdf = read_parcels(args.parcels, args.id_field, layer=args.layer)
+    if args.dem is None:
+        # Support both direct execution (`python utils/create_parcel_up.py`) and
+        # package import (`from utils import create_parcel_up`).
+        if __package__:
+            from .usgs_dem import get_dem_from_usgs
+        else:
+            from usgs_dem import get_dem_from_usgs
+        from pathlib import Path
+        parcels_path = Path(args.parcels)
+        cache_dir = (Path(args.usgs_cache_dir) if args.usgs_cache_dir else
+                     parcels_path.with_name(parcels_path.stem + "_usgs_dem"))
+        dem_path = get_dem_from_usgs(
+            gdf, resolution=args.usgs_resolution, buffer_m=args.dem_buffer_m,
+            cache_dir=cache_dir, max_cells=args.max_dem_cells,
+            list_only=args.list_usgs_resolutions,
+            refresh_availability=args.refresh_usgs_availability,
+        )
+        if dem_path is None:  # --list-usgs-resolutions
+            return
+        args.dem = str(dem_path)
+
+    # WhiteboxTools, not a custom steepest-descent / uphill fallback,
+    # supplies a depression-conditioned D8 pointer raster. Keep its outputs so
+    # apparent cycles or drainage choices can be inspected in GIS afterward.
+    from pathlib import Path
+    if __package__:
+        from .whitebox_parcel_routing import (
+            run_whitebox_d8, read_whitebox_pointers, validate_cell_dag,
+            compute_parcel_origin_destinations, score_candidate_connections,
+            select_acyclic_connections, write_candidate_diagnostics,
+        )
+        from .parcel_up_graph import (validate_direct_edges,
+                                      write_gpkg_parcel_up, write_normalized_csv)
+    else:
+        from whitebox_parcel_routing import (
+            run_whitebox_d8, read_whitebox_pointers, validate_cell_dag,
+            compute_parcel_origin_destinations, score_candidate_connections,
+            select_acyclic_connections, write_candidate_diagnostics,
+        )
+        from parcel_up_graph import (validate_direct_edges,
+                                     write_gpkg_parcel_up, write_normalized_csv)
+
+    if not (0 < args.min_dominant_share <= 1) or not np.isfinite(args.min_dominant_share):
+        raise ValueError('--min-dominant-share must be a finite number in (0,1]')
+    conditioning = args.whitebox_conditioning
+    if args.use_filled_dem:
+        conditioning = 'fill'
+        logging.warning('--use-filled-dem is deprecated; using WhiteboxTools FillDepressions')
+
+    dem_path = Path(args.dem).resolve()
+    wb_dir = (Path(args.whitebox_output_dir) if args.whitebox_output_dir else
+              dem_path.parent / (dem_path.stem + '_whitebox_flow'))
+    logging.info('Conditioning DEM and calculating flow with WhiteboxTools...')
+    pointer_path = run_whitebox_d8(
+        dem_path, wb_dir, method=conditioning,
+        breach_dist=args.whitebox_breach_dist, exe=args.whitebox_exe,
+    )
     with rasterio.open(args.dem) as src:
-        dem = src.read(1).astype(np.float32)
-        transform = src.transform
         dem_crs = src.crs
-        dem_nodata = src.nodata
-        dem_shape = (src.height, src.width)
+        transform = src.transform
+        dem_shape = src.shape
+        if dem_crs is None or not dem_crs.is_projected:
+            raise ValueError('DEM must have a projected CRS for D8 and parcel area calculations')
+        unit_factor = float(dem_crs.linear_units_factor[1])
+        if unit_factor <= 0 or not np.isfinite(unit_factor):
+            raise ValueError('Could not determine projected DEM linear units')
+        cell_area_m2 = abs(transform.a * transform.e - transform.b * transform.d) * unit_factor**2
+    next_flat, valid_mask = read_whitebox_pointers(pointer_path, dem_path)
+    logging.info('Validating all Whitebox D8 flow directions for cycles...')
+    validate_cell_dag(next_flat)
 
-    # Normalize nodata -> NaN
-    if dem_nodata is not None:
-        dem = np.where(dem == dem_nodata, np.nan, dem)
-
-    # Optional depression filling
-    dem_for_flow = maybe_fill_depressions(dem, args.use_filled_dem)
-
-    # Compute D8 pointers
-    next_r, next_c = compute_d8_pointers(dem_for_flow, transform)
-
-    # Valid cell mask (not NaN)
-    valid_mask = ~np.isnan(dem_for_flow)
-
-    # Read parcels and reproject
-    logging.info(f"Reading parcels: {args.parcels}")
-    gdf = read_parcels(args.parcels, args.id_field)
     gdf = reproject_to_match(gdf, dem_crs)
-
-    # Rasterize parcels to DEM grid
-    logging.info("Rasterizing parcels to DEM grid...")
+    logging.info('Rasterizing parcels to Whitebox D8 grid...')
     pid_raster, code_to_pid, pid_to_code = rasterize_parcels(
         gdf, args.id_field, out_shape=dem_shape, transform=transform
     )
+    if np.any((pid_raster != 0) & ~valid_mask):
+        raise ValueError('The DEM has NoData in parcel raster cells; cannot infer drainage')
+    logging.info('Tracing drainage originating inside every parcel cell...')
+    destinations = compute_parcel_origin_destinations(pid_raster, next_flat)
+    candidates = score_candidate_connections(
+        pid_raster, destinations, code_to_pid, cell_area_m2=cell_area_m2,
+    )
+    edges, diagnostics, summary = select_acyclic_connections(
+        candidates, min_share=args.min_dominant_share,
+    )
+    # Sub-cell parcels cannot be evaluated at this raster resolution. Report
+    # them instead of inventing flow directions or silently pretending they
+    # have been represented.
+    represented = set(np.unique(pid_raster[pid_raster > 0]))
+    missing = sorted(set(code_to_pid) - represented)
+    for code in missing:
+        diagnostics.append({
+            'upstream_pid': int(code_to_pid[code]), 'downstream_pid': None,
+            'origin_cells': 0, 'origin_area_m2': 0., 'parcel_cells': 0,
+            'share': 0., 'decision': 'unresolved_not_rasterized',
+            'reason': 'parcel_smaller_than_dem_cell_or_not_rasterized',
+        })
+    logging.info('Whitebox parcel routing: %d selected links; %d cycle-causing '
+                 'candidates excluded; %d ambiguous parcels; %d unrasterized '
+                 'parcels; %d outlets to unmodeled terrain',
+                 len(edges), summary['rejected_cycle_candidates'],
+                 summary['ambiguous_parcels'], len(missing), summary['outside_parcels'])
+    if summary['ambiguous_parcels'] or missing or summary['rejected_cycle_candidates']:
+        logging.warning('Some parcel connections were not inferred or were rejected. '
+                        'Inspect the candidate diagnostic CSV before using parcel_up.')
+    diagnostic_path = (Path(args.diagnostics_out) if args.diagnostics_out else
+                       Path(args.parcels).with_name(Path(args.parcels).stem +
+                       '_parcel_up_candidates.csv'))
+    write_candidate_diagnostics(diagnostic_path, diagnostics)
+    logging.info('Candidate drainage evidence written to %s', diagnostic_path)
+    if args.abort_on_ambiguity and (summary['ambiguous_parcels'] or missing):
+        raise ValueError('Ambiguous or unrasterized parcel outlets; see candidate '
+                         'diagnostic CSV. The GeoPackage was not modified.')
+    edges = validate_direct_edges(edges, gdf[args.id_field].tolist())
+    logging.info('Computed %d acyclic, representative upstream connections', len(edges))
 
-    ordered_codes = [pid_to_code[str(pid)] for pid in gdf[args.id_field].astype(str)]
-
-    results: List[Tuple[str, List[str]]] = []
-    total = len(ordered_codes)
-    logging.info(f"Processing {total} parcels to determine upstream parcels...")
-
-    for idx, code in enumerate(ordered_codes, start=1):
-        parcel_mask = (pid_raster == code)
-        if not np.any(parcel_mask):
-            logging.warning(f"Parcel {code_to_pid[code]} has no DEM-covered cells; recording empty upstream.")
-            results.append((code_to_pid[code], []))
-            continue
-
-        # Pick pour point (lowest cell within parcel)
-        try:
-            pr, pc = pick_pour_point(dem_for_flow, parcel_mask)
-        except ValueError as e:
-            logging.warning(f"Parcel {code_to_pid[code]}: {e}; recording empty upstream.")
-            results.append((code_to_pid[code], []))
-            continue
-
-        # Delineate upstream catchment via BFS on D8 pointers
-        catch_mask = delineate_upgradient_from_pointers(pr, pc, next_r, next_c, valid_mask)
-
-        # Find upstream parcels intersecting the catchment
-        upstream_codes = np.unique(pid_raster[catch_mask])
-        upstream_codes = upstream_codes[(upstream_codes != 0) & (upstream_codes != code)]
-        upstream_pids = [code_to_pid[c] for c in upstream_codes]
-
-        results.append((code_to_pid[code], upstream_pids))
-
-        if idx % 10 == 0 or idx == total:
-            logging.info(f"Processed {idx}/{total} parcels.")
-
-    # Write CSV output: pid, pid_up (comma-separated string, empty if none)
-    logging.info(f"Writing results to {args.out}")
-    import csv
-    with open(args.out, 'w', newline='', encoding='utf-8') as f:
-        writer = csv.writer(f)
-        writer.writerow(['pid', 'pid_up'])
-        for pid, upstream_list in results:
-            pid_up_str = ",".join(map(str, upstream_list)) if upstream_list else ""
-            writer.writerow([pid, pid_up_str])
+    if is_gpkg and not args.no_gpkg_update:
+        count = write_gpkg_parcel_up(args.parcels, edges, gdf[args.id_field])
+        logging.info("Atomically replaced parcel_up in %s (%d rows)", args.parcels, count)
+    if args.out:
+        write_normalized_csv(args.out, edges)
+        logging.info("Wrote normalized immediate-edge CSV to %s", args.out)
 
     logging.info("Done.")
-
 
 if __name__ == "__main__":
     try:

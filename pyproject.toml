@@ -30,6 +30,10 @@ dependencies = [
   "fiona",
 ]
 
+[project.optional-dependencies]
+# For the WhiteboxTools D8 parcel-connectivity builder.
+hydrology = ["whitebox>=2.3"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-q"
