@@ -248,7 +248,15 @@ factors and feedlot animal-equivalence factors are **not interchangeable**.
 **`animal_days` scales annual excreted nutrient mass but does not scale direct
 feedlot loading**: the latter uses the realized `count`, feedlot area, and
 annual runoff. A seasonal or short-duration animal inventory therefore needs
-special care when interpreting year-round direct feedlot loading.
+special care when interpreting year-round direct feedlot loading. **This is an
+explicit PLET-style annual occupancy assumption, not a physical prediction of
+seasonal loading.** `count` represents the inventory driving feedlot manure-pack
+concentrations throughout the modeled precipitation year, while `animal_days`
+controls only annual excretion and field-applied manure mass. For example, an
+inventory present 30 versus 365 days yields the same direct feedlot loading
+when count, area, and rainfall are unchanged, but different manure production.
+Do **not** infer that the model accounts for seasonal correlations between
+occupancy and rainfall. A mechanistic occupancy/rainfall treatment is deferred.
 
 ## GeoPackage tables
 
@@ -267,6 +275,18 @@ when `method: mass_based`. New/extended fields:
 | `afo_manure_fields` | `weight` | Optional positive allocation weight: specify for **all** receivers of an operation or none |
 | `afo_field_eligibility` | `pid`, `eligible` (0/1) | **Statistical only**, receiver eligibility for a parcel; no PLET land-cover input required |
 | `afo_hydrology` | `pid`, optional `huc12`, required host `annual_precip_mm`, optional `rain_days`, `annual_runoff_mm` | **Statistical only**: feedlot runoff is computed from precipitation using PLET CN and documented climate assumptions; receiving fields need `annual_runoff_mm` only when Option B is enabled |
+
+Explicit `afo_manure_fields.weight` values must be supplied for **every**
+receiver of an AFO or for **none**; partial weighting is rejected at input
+loading (before Monte Carlo execution). In statistical mode, sampled
+`afo_operations.n_fields` values and supplied distribution bounds are checked
+against the number of eligible parcels with **positive area remaining after
+all feedlot footprints are subtracted**. Unbounded count distributions are
+truncated to that maximum during sampling. In PLET/RUSLE mode eligibility
+can vary by realization, so exceeding its realized field count remains a
+runtime error. Optional statistical `rain_days` distributions are physically
+truncated to the inclusive range 1–366 days/year even without explicit
+`_min`/`_max` statistics.
 
 When in statistical mode, `afo_hydrology` rows may use an exact integer
 `pid`, a `huc12` (with NULL pid), or NULL `pid`/`huc12` as the domain default;
@@ -481,9 +501,22 @@ The final exported values reflect feedlot recovery and agricultural BMPs.
 If a matching recovery effect is applied, `afo_manure_bmp_effects/sN.parquet`
 records the operation, CPS, effective recovery fraction, before/after collection,
 additional nutrient availability and induced field surface TN/TP exports.
-The normal `bmps` output includes `induced_manure_tn/tp_kg_yr` and incorporates
-the signed added loads into net removal and delivery calculations. **Operation-wide masses in the per-field
-ledger repeat on every receiver row; do not sum them across receivers.**
+The normal `bmps` output includes `induced_manure_tn/tp_kg_yr`,
+`direct_bmp_removed_{pollutant}_kg_yr`, and the existing net
+`removed_mass_{pollutant}_kg` (direct mass removed minus induced manure export).
+For AFO BMPs that increase manure-field loading, `baseline_mass_{pollutant}_kg`
+now includes the current pre-BMP loading of the host **and every receiving parcel
+with nonzero induced export**, counted only once; `mass_accounting_pids` lists
+this accounting boundary. Thus `overall_reduction_fraction_{pollutant}` uses a
+spatially consistent net-removal denominator instead of host-only loading.
+`treated_baseline_mass_{pollutant}_kg` still measures the directly treated source,
+so `realized_efficiency_{pollutant}` may be negative or exceed familiar practice
+ranges when it incorporates off-site induced manure; consult direct and induced
+masses when interpreting feedlot BMP performance. These are placement-level
+mass ratios, not deduplicated watershed-wide percentages; overlapping BMP
+placements can contribute the same parcel baseline to multiple records.
+**Operation-wide masses in the per-field ledger repeat on every receiver row;
+do not sum them across receivers.**
 `afo_load_components/sN.parquet` records before/after loads separated by
 feedlot/manure-field source and transport pathway. Receivers are sampled once
 per realization and unchanged along that realization's BMP trajectory.

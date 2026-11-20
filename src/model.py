@@ -198,6 +198,8 @@ def _baseline_mass_before_bmp_kg(
     pre_bmp_load_rates: np.ndarray,
     parcel_idx: int,
     bmp_rec: Dict[str, Any],
+    *,
+    extra_parcel_indices: Tuple[int, ...] = (),
 ) -> np.ndarray:
     """Calculate pre-BMP pollutant mass for the parcels represented by a BMP.
 
@@ -205,6 +207,8 @@ def _baseline_mass_before_bmp_kg(
         BMP is applied. For the present annual model, rate × area × 1 year gives kg.
         Wetland denominators include all hydrologically impacted parcels identified
         by the wetland routine, including parcels that are not BMP-selectable.
+        For manure-capturing AFO BMPs, also include receiving parcels where
+        the BMP induces additional nutrient loading. Each parcel is counted once.
 
         Parameters
         ----------
@@ -225,7 +229,9 @@ def _baseline_mass_before_bmp_kg(
     """
     n_pol = int(pre_bmp_load_rates.shape[1])
     mass = np.zeros(n_pol, dtype=float)
-    for idx in _bmp_impacted_parcel_indices(ctx, parcel_idx, bmp_rec):
+    accounted_indices = set(_bmp_impacted_parcel_indices(ctx, parcel_idx, bmp_rec))
+    accounted_indices.update(int(idx) for idx in extra_parcel_indices)
+    for idx in sorted(accounted_indices):
         area_ha = float(ctx.parcel_area_ha[idx])
         mass += np.asarray(pre_bmp_load_rates[idx, :], dtype=float) * area_ha * _CURRENT_TIMESTEP_YEARS
     return mass
@@ -937,9 +943,27 @@ def _run_one_scenario(
                 bmp_rec[OUTPUT_COST_USD] = cost_this
                 treated_mass_kg = np.asarray(bmp_mass_rate_outputs[OUTPUT_TREATED], dtype=float) * _CURRENT_TIMESTEP_YEARS
                 removed_mass_kg = np.asarray(bmp_mass_rate_outputs[OUTPUT_REMOVED], dtype=float) * _CURRENT_TIMESTEP_YEARS
-                baseline_mass_kg = _baseline_mass_before_bmp_kg(
-                    ctx, pre_bmp_load_rates, parcel_idx, bmp_rec
+                induced_receiver_indices = tuple(sorted({
+                    int(ch["parcel_idx"]) for ch in manure_changes
+                    if float(ch["added_export_kg"]) != 0.
+                }))
+                accounting_indices = sorted(
+                    set(_bmp_impacted_parcel_indices(ctx, parcel_idx, bmp_rec))
+                    | set(induced_receiver_indices)
                 )
+                # Distinguish the physically treated parcels from the wider
+                # accounting boundary used for net mass and its percentage.
+                bmp_rec["mass_accounting_pids"] = ",".join(
+                    str(ctx.parcel_ids[idx]) for idx in accounting_indices
+                )
+                baseline_mass_kg = _baseline_mass_before_bmp_kg(
+                    ctx, pre_bmp_load_rates, parcel_idx, bmp_rec,
+                    extra_parcel_indices=induced_receiver_indices,
+                )
+                for pol_idx, pol in enumerate(ctx.pollutants):
+                    bmp_rec[f"direct_bmp_removed_{pol}_kg_yr"] = float(
+                        direct_bmp_removed[pol_idx]
+                    )
                 _add_mass_metrics_to_bmp_record(
                     bmp_rec,
                     list(ctx.pollutants),

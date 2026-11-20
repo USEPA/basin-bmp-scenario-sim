@@ -345,8 +345,18 @@ def load_afo_inputs(path: str | Path, parcels: pd.DataFrame, pollutants: Sequenc
     if fields["afo_id"].isin(set(operations.loc[operations.allocation == "sampled", "afo_id"])).any():
         raise ValueError("Sampled operations must not also specify explicit manure fields")
     for op_id in operations.loc[operations.allocation == "explicit", "afo_id"]:
-        if not fields["afo_id"].eq(op_id).any():
+        op_fields = fields.loc[fields["afo_id"].eq(op_id)]
+        if op_fields.empty:
             raise ValueError(f"Explicit operation {op_id} has no manure-receiving fields")
+        # Custom weights are an all-or-none choice for each mass-based AFO.
+        # Reject incomplete assignments before any Monte Carlo workers start.
+        if method == "mass_based" and "weight" in op_fields:
+            has_weight = op_fields["weight"].notna()
+            if has_weight.any() and not has_weight.all():
+                raise ValueError(
+                    f"afo_manure_fields[{op_id}]: all explicit receiving fields "
+                    "must provide a positive weight if any field has a weight"
+                )
     if method == "concentration_increment":
         increments["land_cover"] = increments["land_cover"].map(normalize_plet_land_cover)
         increments["pollutant"] = increments["pollutant"].astype(str).str.upper().str.strip()
@@ -518,8 +528,19 @@ def load_afo_inputs(path: str | Path, parcels: pd.DataFrame, pollutants: Sequenc
                     k.startswith(name + "_") and pd.notna(v) for k,v in row.items()
                 ):
                     raise ValueError(f"Statistical AFO pid {pid} missing {name} or distribution")
-        if not any(eligible_by_pid.values()):
-            raise ValueError("Statistical AFO requires at least one eligible field")
+        # Eligibility and feedlot footprints are fixed in statistical mode,
+        # so the number of usable receiving parcels is known before sampling.
+        available_receivers = sum(
+            1 for pid, permitted in eligible_by_pid.items()
+            if permitted and area_by_pid[pid] - host_area.get(pid, 0.) > 1e-12
+        )
+        if available_receivers == 0:
+            raise ValueError("Statistical AFO requires at least one eligible field with positive available area")
+        for _, op in operations.loc[operations.allocation == "sampled"].iterrows():
+            validate_named_parameter_stats(
+                op, "n_fields", f"afo_operations[{op['afo_id']}]",
+                required=True, low=1., high=float(available_receivers),
+            )
     return {"operations": operations.to_dict("records"), "animals": animals.to_dict("records"),
             "excretion_factors": excretion_factors,
             "fields": fields.to_dict("records"),
@@ -528,7 +549,7 @@ def load_afo_inputs(path: str | Path, parcels: pd.DataFrame, pollutants: Sequenc
             "feedlot_manure_effects": recovery.to_dict("records") if not recovery.empty else [],
             "feedlot_cost_dimensions": cost_dimensions_by_op_cps,
             "eligible": eligible_by_pid, "hydrology": hydrology_by_pid,
-            "surface_pathway": surface_pathway, "method": method,
+            "surface_pathway": surface_pathway, "method": method, "mode": mode,
             "runoff_adjusted_export": runoff_adjusted_export,
             "reference_runoff_mm": reference_runoff_mm,
             "geometry": {str(r.pid): r.geometry for r in parcels.itertuples()},
@@ -575,7 +596,12 @@ def _select_manure_fields(ctx: Any, inputs: Mapping[str, Any], eligible_area: Ma
                 raise ValueError(f"Duplicate receiving parcel in {op_id}")
         else:
             candidates = sorted(eligible_area, key=lambda p: int(p))
-            n_draw = _draw(ctx, op, "n_fields", minimum=1.)
+            # In statistical mode the field universe is fixed and prevalidated;
+            # truncate unbounded distributions to its physical capacity.
+            n_draw = _draw(
+                ctx, op, "n_fields", minimum=1.,
+                maximum=len(candidates) if inputs.get("mode") == "statistical" else None,
+            )
             if not np.isfinite(n_draw) or n_draw < 1:
                 raise ValueError(f"{op_id}: sampled n_fields must be at least 1")
             n_fields = int(np.floor(n_draw + 0.5))
@@ -1122,18 +1148,20 @@ def _hydrology(
             ctx._afo_hydro_cache = cache
         key = id(supplied)
         if key not in cache:
-            def optional_draw(field):
-                if any(
+            def optional_parameter_present(field):
+                return any(
                     (column == field or column.startswith(field + "_"))
                     and value is not None and not _nan(value)
                     for column, value in supplied.items()
-                ):
-                    return _draw(ctx, supplied, field)
-                return None
+                )
+
+            def optional_draw(field):
+                return _draw(ctx, supplied, field) if optional_parameter_present(field) else None
             cache[key] = (
                 optional_draw("annual_runoff_mm"),
                 optional_draw("annual_precip_mm"),
-                optional_draw("rain_days"),
+                _draw(ctx, supplied, "rain_days", minimum=1., maximum=366.)
+                if optional_parameter_present("rain_days") else None,
             )
         return cache[key]
     params = state.parameters[idx]

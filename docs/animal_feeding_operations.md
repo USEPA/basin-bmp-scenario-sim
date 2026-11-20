@@ -61,6 +61,11 @@ animal units per **feedlot acre**; manure-pack fraction is
 uses concentrations TN=1500, TP=300, BOD=2000 mg/L. Annual feedlot mass is
 
 `annual_runoff_depth_in * 254000 L/(ha in) * feedlot_area_ha * C_mg_L / 1e6`.
+In mass-based mode, `animal_days` changes annual nutrient excretion and manure-field
+loading but does **not** change the animal-density-based direct feedlot concentration
+or annual direct feedlot load. This PLET-style approach implicitly treats the
+reported animal inventory as representative throughout the precipitation year;
+seasonal occupancy/rainfall timing is not modeled.
 
 `factor_tn`, `factor_tp` (and, for future BOD support, `factor_bod`) are **pollutant-specific PLET animal
 nutrient equivalence factors**, **not** animal live-weight animal units or
