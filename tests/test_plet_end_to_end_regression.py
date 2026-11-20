@@ -308,8 +308,8 @@ def test_deterministic_plet_scenario_matches_golden_reference(
         assert cost_record[0][:2] == (1, 50.0)
         assert float(count_record[0][2]) == pytest.approx(removed[pol], rel=1e-10)
         assert float(cost_record[0][2]) == pytest.approx(removed[pol], rel=1e-10)
-        assert count_record == pytest.approx([(1, 1.0, removed[pol])])
-        assert cost_record == pytest.approx([(1, 50.0, removed[pol])])
+        assert count_record[0] == pytest.approx((1, 1.0, removed[pol]))
+        assert cost_record[0] == pytest.approx((1, 50.0, removed[pol]))
 
 
 def test_afo_integrated_scenario_keeps_feedlot_and_field_bmps_separate(

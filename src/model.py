@@ -1069,31 +1069,6 @@ def _run_one_scenario(
                     extra_parcel_indices=induced_receiver_indices,
                 )
                 _accumulate_delivered_bmp_reductions(ctx, changes, cumul)
-                # Delivered reductions for plots
-                oids = ctx._get_parcel_out_oids(parcel_idx)
-                for pol_idx, pol in enumerate(ctx.pollutants):
-                    # Host direct-feedlot reduction; redirected manure is
-                    # delivered from its actual receiving parcel below.
-                    removed_mass_rate_kg_per_yr = float(direct_bmp_removed[pol_idx])
-                    for oid in oids:
-                        dr = ctx._delivery_coeffs(pid, oid)
-                        deliver = (
-                            removed_mass_rate_kg_per_yr * dr[COL_SDR_F_TO_S] * dr[COL_SDR_S_TO_O]
-                            if pol == "TSS"
-                            else removed_mass_rate_kg_per_yr * dr[COL_NDR_F_TO_S] * dr[COL_NDR_S_TO_O]
-                        )
-                        cumul[pol][oid] += deliver
-                for change in manure_changes:
-                    rec_pid = change["receiving_pid"]
-                    pol = ctx.pollutants[change["pol_idx"]]
-                    for oid in ctx._get_parcel_out_oids(change["parcel_idx"]):
-                        dr = ctx._delivery_coeffs(rec_pid, oid)
-                        deliver = -change["added_export_kg"] * (
-                            dr[COL_SDR_F_TO_S] * dr[COL_SDR_S_TO_O] if pol == "TSS"
-                            else dr[COL_NDR_F_TO_S] * dr[COL_NDR_S_TO_O]
-                        )
-                        cumul[pol][oid] += deliver
-
                 # Record current cumulative for each axis choice
                 for pol in ctx.pollutants:
                     for oid in ctx.outlet_oids:
