@@ -6,7 +6,7 @@
 
 Numeric model inputs use one common **inline** row-level convention. A row contains either a fixed value or all statistics needed to define its distribution directly. There is no separate distribution catalog and no named distribution reference.
 
-The convention is used by statistical parcel load rates, PLET/RUSLE numeric parameters, curve number and infiltration fraction, pollutant concentrations, BMP efficiencies, and BMP costs.
+The convention is used by statistical parcel load rates, PLET/RUSLE numeric parameters, curve number and infiltration fraction, pollutant concentrations, BMP efficiencies, BMP costs, and the [AFO manure excretion reference CSV](afo_mass_based.md#starting-animal-excretion-distributions).
 
 ## Canonical distribution columns
 
@@ -39,6 +39,12 @@ Examples:
     Legacy bounded normal: mean=8.5, min=5, max=12
     Uniform:               min=5, max=12
     Percentile:            min=5, p10=6, p50=8.5, p90=11, max=12
+
+The common validation helper is also used for AFO wide-format parameters. For
+example, `count` must **not** be populated in the same row as `count_value`,
+`count_mean`, `count_sd`, or other `count_*` statistics; likewise for
+`animal_days`, manure handling fractions, excretion overrides, hydrology and
+feedlot recovery fractions. These checks apply before Monte Carlo simulation.
 
 The loader rejects ambiguous rows: do not mix `value` with distribution statistics; provide both `min` and `max`; do not combine percentile statistics with `mean` or `sd`; and give percentile distributions both endpoints. It also checks finite values, nonnegative `sd`, ordered bounds, and monotonic percentiles.
 

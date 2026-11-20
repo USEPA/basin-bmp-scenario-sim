@@ -43,6 +43,34 @@ CPS-code order, cycling through the available types. Types already applied to
 the selected parcel are skipped, and selection resumes at the next type in
 the cycle.
 
+### BMP eligibility and selection
+
+All BMP placement modes use the same parcel/CPS eligibility rules. BMPs may
+only be placed on parcels present in the parcel-selection probability table;
+parcels outside that table still participate in hydrologic routing and load
+accounting. A CPS can be applied at most once per parcel. Feedlot-specific CPS
+codes may be placed only on AFO host parcels, while other configured practices
+are not restricted by AFO host status. These are the existing placement rules;
+this change introduces no additional land-use or physical suitability filters.
+
+For stochastic selection, first choose a parcel using its configured selection
+weight **renormalized over parcels with at least one remaining selectable BMP**.
+Then choose a CPS using its configured BMP-type weight **renormalized over the
+eligible CPS codes for that parcel**. A zero-probability CPS remains physically
+eligible but cannot be drawn stochastically; similarly, a zero-weight parcel
+cannot be sampled stochastically. Deterministic selection follows the configured
+ascending-PID / ascending-CPS order, skipping exhausted or ineligible options;
+it does not apply probability weights. Both deterministic flags can be enabled
+independently.
+
+The placement loop stops at the configured BMP count limit, the existing
+cumulative-cost threshold, or when there are no selectable placements left.
+It does not terminate on a fixed number of unsuccessful random retries. 
+Feedlot-specific area/length cost quantities are based on the AFO footprint
+or explicitly supplied practice dimensions, rather than the entire host parcel. Since
+exhausted parcels no longer consume random draws, exact same-seed results may
+differ from earlier versions, while a given version remains reproducible.
+
 Set `deterministic_bmp_design_parameters: true` to use fixed BMP geometry
 instead of the default sampled geometry: wetland area is 20% of the selected
 parcel's area with a 4:1 catchment-to-wetland ratio (the remaining 80% of that
@@ -101,6 +129,38 @@ sample_group, units, notes
 ```
 
 
+## Optional mass-based AFO inputs
+
+```yaml
+animal_operations: ../afo/afo_mass_example_generated.gpkg
+manure_loading:
+  method: mass_based
+  excretion_factors: ../afo/my_excretion_factors.csv # optional
+  runoff_adjusted_export: false # default (annual mass * export fraction)
+  # When true, also specify reference_runoff_mm: <positive annual mm>
+```
+
+Omit `excretion_factors` to use the bundled
+`src/data/afo/manure_excretion_reference.csv`. A custom CSV replaces this
+reference and its path is relative to the YAML file. Both use long-form
+`species, parameter, value/mean/sd/...` rows for TN and TP production
+rates in kg per 1,000 kg live animal mass per day, plus a required
+`representative_mass_kg` row per species. Mass uses the PDF's fixed value by
+default and may instead use a distribution. Standard species names are
+Dairy, Beef, Veal, Swine, Sheep, Goat, Horse, Layer, Broiler, Turkey, and Duck.
+Wet-manure production rates are not inputs; only nutrient masses are calculated.
+Supply `tn_surface_export_fraction` and `tp_surface_export_fraction` (0–1,
+fixed or sampled) per AFO in the GeoPackage `afo_manure_management` table.
+If `runoff_adjusted_export: true`, both fractions are multiplied by annual
+surface runoff divided by `reference_runoff_mm`, with the result capped at 1.
+The default requires no receiving-field runoff data for manure export.
+APLE `season`, `solids_pct`, `wep_fraction`, `f_n`, `alpha_n` and
+`incorporated_fraction` are not supported in the mass-based method.
+The option applies only to `mass_based` loading;
+animal-row rate overrides retain precedence. See
+[mass-based AFO loading](afo_mass_based.md) for all required GeoPackage
+tables, distribution semantics, and D384.1 source assumptions.
+
 ## Parallel configuration
 
 ```yaml
@@ -111,3 +171,8 @@ parallel:
 ```
 
 All input paths are resolved and all input tables are loaded before parallel scenario workers are launched.
+
+The AFO examples use mode-specific GeoPackages: legacy
+`afo_example.gpkg`, PLET mass-based `afo_mass_example_generated.gpkg`, and
+statistical mass-based `afo_mass_statistical_example.gpkg`. See the
+[GeoPackage reference](afo_example_geopackage_reference.md) for table/column inventories.

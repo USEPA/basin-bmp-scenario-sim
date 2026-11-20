@@ -1,0 +1,13 @@
+cps,BMP Name,pathway,Pollutant,Value,References/Notes
+590,Nutrient Management 2 (Determined Rate Plus Additional Considerations),Surface,TN,0.22,"Christianson et al. 2016; Lam et al. 2011; Shepard 2005; Evans, Lehning and Corradini 2003; USEPA 1993"
+590,Nutrient Management 2 (Determined Rate Plus Additional Considerations),Subsurface,TN,0.0,**** BMP impacts on subsurface pollutants is not simulated in PLET mode ****
+590,Nutrient Management 2 (Determined Rate Plus Additional Considerations),Surface,TP,0.56,Determined based on input from Tetra Tech and CBP 2016b
+590,Nutrient Management 2 (Determined Rate Plus Additional Considerations),Subsurface,TP,0.0,**** BMP impacts on subsurface pollutants is not simulated in PLET mode ****
+590,Nutrient Management 2 (Determined Rate Plus Additional Considerations),Surface,TSS,0.0,
+590,Nutrient Management 2 (Determined Rate Plus Additional Considerations),Subsurface,TSS,0.0,**** BMP impacts on subsurface pollutants is not simulated in PLET mode ****
+313,Waste Storage Facility (feedlot),Surface,TN,0.65,"EPA PLET feedlot waste storage TN 65%, TP 60%; TSS not specified (0 placeholder)"
+313,Waste Storage Facility (feedlot),Subsurface,TN,0.0,"EPA PLET feedlot waste storage TN 65%, TP 60%; TSS not specified (0 placeholder)"
+313,Waste Storage Facility (feedlot),Surface,TP,0.6,"EPA PLET feedlot waste storage TN 65%, TP 60%; TSS not specified (0 placeholder)"
+313,Waste Storage Facility (feedlot),Subsurface,TP,0.0,"EPA PLET feedlot waste storage TN 65%, TP 60%; TSS not specified (0 placeholder)"
+313,Waste Storage Facility (feedlot),Surface,TSS,0.0,"EPA PLET feedlot waste storage TN 65%, TP 60%; TSS not specified (0 placeholder)"
+313,Waste Storage Facility (feedlot),Subsurface,TSS,0.0,"EPA PLET feedlot waste storage TN 65%, TP 60%; TSS not specified (0 placeholder)"

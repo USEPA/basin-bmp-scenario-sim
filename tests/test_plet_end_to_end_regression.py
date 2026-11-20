@@ -305,3 +305,127 @@ def test_deterministic_plet_scenario_matches_golden_reference(
         cost_record = records[(pol, "O1", "cost", "total")]
         assert count_record == pytest.approx([(1, 1.0, removed[pol])])
         assert cost_record == pytest.approx([(1, 50.0, removed[pol])])
+
+
+def test_afo_integrated_scenario_keeps_feedlot_and_field_bmps_separate(
+    tmp_path: Path, monkeypatch,
+) -> None:
+    """End-to-end scenario with PLET, manure assignment, source-specific BMP, outputs."""
+    from shapely.geometry import box
+
+    base = _shared_payload()
+    base["afo_inputs"] = {
+        "operations": [{"afo_id": "TEST", "pid": "P1", "feedlot_area_ha": 0.2,
+                        "paved_pct": 25., "allocation": "explicit", "manure_months": 6.}],
+        "animals": [{"afo_id": "TEST", "species": "beef_steer", "count": 20,
+                     "factor_tn": 1., "factor_tp": 1.}],
+        "fields": [{"afo_id": "TEST", "pid": "P1"}],
+        "manure_concentration_increments": [
+            {"land_cover": "cropland", "pollutant": "TN", "value": 3.},
+            {"land_cover": "cropland", "pollutant": "TP", "value": 0.3},
+        ],
+        "geometry": {"P1": box(0, 0, 100, 100)},
+        "area_ha": {"P1": 1.0},
+    }
+    base["feedlot_bmp_cps"] = {340}
+    written: dict[tuple[str, str], pd.DataFrame] = {}
+
+    def capture(frame: pd.DataFrame, path: Path, *, logger):
+        written[(path.parent.name, path.name)] = frame.copy()
+
+    monkeypatch.setattr("src.model._write_parquet_atomic", capture)
+    _run_one_scenario(base, _config(tmp_path / "afo"), sidx=0, seed=123, outputs_dir=tmp_path / "afo")
+
+    allocations = written[("afo_manure_assignments", "s1.parquet")]
+    components = written[("afo_load_components", "s1.parquet")]
+    assert allocations["receiving_pid"].tolist() == ["P1"]
+    tn = components[components.pollutant == "TN"].iloc[0]
+    assert tn["baseline_direct_feedlot_surface_kg_yr"] > 0
+    assert tn["final_direct_feedlot_surface_kg_yr"] == pytest.approx(
+        tn["baseline_direct_feedlot_surface_kg_yr"] * 0.5
+    )
+    assert tn["baseline_manure_field_surface_kg_yr"] > 0
+    assert tn["final_manure_field_surface_kg_yr"] == pytest.approx(
+        tn["baseline_manure_field_surface_kg_yr"]
+    )
+    assert tn["baseline_manure_field_subsurface_kg_yr"] == 0
+    assert tn["baseline_direct_feedlot_subsurface_kg_yr"] == 0
+
+    # The very same BMP efficiency can instead be applied to the field source
+    # without altering feedlot loads when CPS is not flagged as feedlot-only.
+    base["feedlot_bmp_cps"] = set()
+    written.clear()
+    _run_one_scenario(base, _config(tmp_path / "field"), sidx=0, seed=123, outputs_dir=tmp_path / "field")
+    tn = written[("afo_load_components", "s1.parquet")]
+    tn = tn[tn.pollutant == "TN"].iloc[0]
+    assert tn["final_direct_feedlot_surface_kg_yr"] == pytest.approx(tn["baseline_direct_feedlot_surface_kg_yr"])
+    assert tn["final_manure_field_surface_kg_yr"] == pytest.approx(tn["baseline_manure_field_surface_kg_yr"] * .5)
+
+
+def _single_mass_afo_payload(*, statistical: bool) -> dict:
+    from shapely.geometry import box
+    from src.afo import reference_excretion_factors
+    payload = _shared_payload()
+    payload["afo_inputs"] = {
+        "method": "mass_based",
+        "excretion_factors": reference_excretion_factors(),
+        "operations": [{"afo_id": "demo", "pid": "P1", "feedlot_area_ha": .2,
+                        "paved_pct": 30., "allocation": "explicit", "manure_months": 12.}],
+        "animals": [{"afo_id": "demo", "species": "beef_finishing", "count": 10.,
+                     "factor_tn": 1., "factor_tp": 1.}],
+        "fields": [{"afo_id": "demo", "pid": "P1"}],
+        "management": [{"afo_id": "demo", "tn_surface_export_fraction": .2,
+                         "tp_surface_export_fraction": .04}],
+        "eligible": {"P1": True},
+        "hydrology": {"P1": {"annual_precip_mm": 1000., "annual_runoff_mm": 200.,
+                              "rain_days": 120.}},
+        "surface_pathway": "surface",
+        "geometry": {"P1": box(0,0,100,100)}, "area_ha": {"P1": 1.},
+    }
+    payload["feedlot_bmp_cps"] = {340}
+    if statistical:
+        payload["load_generation_mode"] = "statistical"
+        payload["load_generation"] = {"mode": "statistical"}
+        payload["pollutant_load_rate_is_aggregate"] = False
+        payload["pollutant_load_rate_stats"] = [[
+            {"surface": {"value": 3.}, "subsurface": {"value": 2.}},
+            {"surface": {"value": 1.}, "subsurface": {"value": .5}},
+            {"surface": {"value": .8}, "subsurface": {"value": 0.}},
+        ]]
+    return payload
+
+
+@pytest.mark.parametrize("statistical", [False, True])
+def test_mass_based_integrated_baseline_bmp_and_outputs(tmp_path, monkeypatch, statistical):
+    """Both modes conserve nutrient masses and omit wet-manure accounting."""
+    written = {}
+    monkeypatch.setattr("src.model._write_parquet_atomic",
+                        lambda df, path, logger: written.setdefault((path.parent.name, path.name), df.copy()))
+    payload = _single_mass_afo_payload(statistical=statistical)
+    _run_one_scenario(payload, _config(tmp_path), sidx=0, seed=1234, outputs_dir=tmp_path)
+    ledger = written[("afo_mass_ledger", "s1.parquet")]
+    budget = written[("afo_operation_budgets", "s1.parquet")]
+    assert not {
+        "animal_manure_produced_kg", "operation_available_manure_kg", "manure_applied_kg",
+    }.intersection(ledger.columns)
+    assert set(budget.columns) == {
+        "scenario", "afo_id", "receiver_count",
+        "tn_produced_kg", "tp_produced_kg", "tn_available_kg", "tp_available_kg",
+        "tn_applied_kg", "tp_applied_kg", "tn_exported_kg", "tp_exported_kg",
+        "final_tn_available_kg", "final_tp_available_kg",
+        "final_tn_applied_kg", "final_tp_applied_kg",
+        "final_tn_exported_kg", "final_tp_exported_kg",
+    }
+    assert len(budget) == 1
+    assert budget.iloc[0].tn_available_kg == pytest.approx(budget.iloc[0].tn_applied_kg)
+    assert budget.iloc[0].tp_available_kg == pytest.approx(budget.iloc[0].tp_applied_kg)
+    assert len(ledger)==1
+    assert ledger.iloc[0].tn_applied_kg>ledger.iloc[0].tn_exported_kg>0
+    assert ledger.iloc[0].tp_applied_kg>ledger.iloc[0].tp_exported_kg>0
+    source = written[("afo_load_components", "s1.parquet")]
+    tn = source[source.pollutant=="TN"].iloc[0]
+    assert tn.baseline_manure_field_surface_kg_yr>0
+    assert tn.baseline_manure_field_subsurface_kg_yr==0
+    assert tn.final_manure_field_surface_kg_yr==pytest.approx(tn.baseline_manure_field_surface_kg_yr)
+    assert tn.final_direct_feedlot_surface_kg_yr==pytest.approx(.5*tn.baseline_direct_feedlot_surface_kg_yr)
+    assert ("parcels", "s1.parquet") in written

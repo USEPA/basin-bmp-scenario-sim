@@ -1,0 +1,32 @@
+# Demonstration only. AFO inventories, excretion rates, and hydrology are illustrative.
+# Assume the synthetic statistical background rates exclude the AFO sources added here.
+verbose: True
+random_seed: 42
+outputs: ../../outputs/run_afo_mass_statistical_demo
+domain: ../domain/east_fork_domain.gpkg
+parcels: ../parcels/parcels_ex1dot1_lit_based_load_gen_deterministic.gpkg
+outlets: ../outlets/outlets.gpkg
+animal_operations: ../afo/afo_mass_statistical_example.gpkg
+manure_loading:
+  method: mass_based
+  # runoff_adjusted_export defaults to false (annual mass x export fraction)
+  # To opt into runoff scaling set true and add reference_runoff_mm: <positive mm/year>
+  # Also add annual_runoff_mm to the statistical AFO GeoPackage hydrology table.
+  # Must match the statistical pathway receiving manure and direct-feedlot loads.
+  surface_pathway: surface
+bmp_efficiency: ../afo/bmp_efficiency_afo_demo.csv
+pollutants: [TN, TP, TSS]
+cps: [313, 590]
+feedlot_bmp_cps: [313]
+load_generation:
+  mode: statistical
+# Illustrative partition of aggregate background loads; matches the efficiency table.
+pollutant_load_rate_pathway_fractions:
+  surface: 0.30
+  subsurface: 0.70
+n_scenarios: 2
+bmp_limit_n: 5
+parallel:
+  n_jobs: 1
+bmp_sel_prob_via_costs: False
+bmp_fail_rate: 0.0

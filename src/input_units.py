@@ -1,294 +1,42 @@
 """Unit validation and conversion for model numeric inputs.
 
-The model uses canonical internal units.  When a numeric input row supplies a
+The model uses canonical internal units. When a numeric input row supplies a
 ``unit`` or ``units`` value, this module validates that unit and converts all
-statistics for the row to the canonical internal unit before sampling.  Rows
+statistics for the row to the canonical internal unit before sampling. Rows
 that omit unit metadata retain the historical contract and are assumed to
 already use canonical units.
 
-Only unambiguous multiplicative conversions are supported.  In particular,
+Only unambiguous multiplicative conversions are supported. In particular,
 RUSLE R and K factors are not independently converted between empirical unit
 systems because those factors are coupled in the RUSLE equation.
 """
 
 from __future__ import annotations
 
-from dataclasses import dataclass
-import re
 from typing import Any, Dict, Mapping, Optional, Sequence, Tuple
 
 import pandas as pd
 
-
-@dataclass(frozen=True)
-class UnitSpec:
-    """Describe one canonical unit and accepted conversion aliases.
-
-    Parameters
-    ----------
-    canonical : str
-        Canonical unit label used internally.
-    aliases : Mapping[str, float]
-        Normalized input-unit labels mapped to multiplicative conversion
-        factors that yield the canonical unit.
-    """
-
-    canonical: str
-    aliases: Mapping[str, float]
-
-
-def _unit_key(value: Any) -> str:
-    """Normalize a human-authored unit label for comparison."""
-    text = str(value).strip().lower()
-    text = text.replace("µ", "u").replace("μ", "u")
-    text = text.replace("²", "2").replace("^2", "2")
-    text = text.replace("·", "*").replace("×", "*")
-    text = text.replace("$", "usd")
-    text = text.replace("_", " ")
-    text = re.sub(r"\bper\b", "/", text)
-    text = re.sub(r"\s+", "", text)
-    return text
-
-
-def _spec(canonical: str, aliases: Mapping[str, float]) -> UnitSpec:
-    normalized = {_unit_key(canonical): 1.0}
-    normalized.update({_unit_key(label): float(factor) for label, factor in aliases.items()})
-    return UnitSpec(canonical=canonical, aliases=normalized)
-
-
-FRACTION_SPEC = _spec(
-    "fraction",
-    {
-        "ratio": 1.0,
-        "decimal": 1.0,
-        "dimensionless": 1.0,
-        "unitless": 1.0,
-        "1": 1.0,
-        "percent": 0.01,
-        "pct": 0.01,
-        "%": 0.01,
-    },
+from .constants import (
+    COST_AREA_SPEC,
+    COST_LENGTH_SPEC,
+    COST_PROJECT_SPEC,
+    DIMENSIONLESS_SPEC,
+    FRACTION_SPEC,
+    PERCENT_SPEC,
+    PRECIP_SPEC,
+    EVENT_PRECIP_SPEC,
+    DAYS_PER_YEAR_SPEC,
+    CONCENTRATION_SPEC,
+    LOAD_RATE_SPEC,
+    MASS_RATE_SPEC,
+    RUSLE_R_SPEC,
+    RUSLE_K_SPEC,
+    UnitSpec,
+    _KIND_SPECS,
+    _PARAMETER_KINDS,
+    _unit_key,
 )
-PERCENT_SPEC = _spec(
-    "percent",
-    {
-        "pct": 1.0,
-        "%": 1.0,
-        "fraction": 100.0,
-        "ratio": 100.0,
-        "decimal": 100.0,
-        "dimensionless": 100.0,
-        "unitless": 100.0,
-        "1": 100.0,
-    },
-)
-DIMENSIONLESS_SPEC = _spec(
-    "dimensionless",
-    {
-        "unitless": 1.0,
-        "1": 1.0,
-        "ratio": 1.0,
-        "index": 1.0,
-    },
-)
-PRECIP_SPEC = _spec(
-    "in/year",
-    {
-        "in/yr": 1.0,
-        "inch/year": 1.0,
-        "inches/year": 1.0,
-        "inch/yr": 1.0,
-        "inches/yr": 1.0,
-        "mm/year": 1.0 / 25.4,
-        "mm/yr": 1.0 / 25.4,
-        "cm/year": 1.0 / 2.54,
-        "cm/yr": 1.0 / 2.54,
-        "m/year": 100.0 / 2.54,
-        "m/yr": 100.0 / 2.54,
-    },
-)
-EVENT_PRECIP_SPEC = _spec(
-    "in/event",
-    {
-        "in": 1.0,
-        "inch": 1.0,
-        "inches": 1.0,
-        "inch/event": 1.0,
-        "inches/event": 1.0,
-        "in/storm": 1.0,
-        "inch/storm": 1.0,
-        "inches/storm": 1.0,
-        "mm": 1.0 / 25.4,
-        "mm/event": 1.0 / 25.4,
-        "mm/storm": 1.0 / 25.4,
-        "cm": 1.0 / 2.54,
-        "cm/event": 1.0 / 2.54,
-        "cm/storm": 1.0 / 2.54,
-    },
-)
-DAYS_PER_YEAR_SPEC = _spec(
-    "days/year",
-    {
-        "day/year": 1.0,
-        "days/yr": 1.0,
-        "day/yr": 1.0,
-        "d/year": 1.0,
-        "d/yr": 1.0,
-    },
-)
-CONCENTRATION_SPEC = _spec(
-    "mg/L",
-    {
-        "mg/liter": 1.0,
-        "mg/litre": 1.0,
-        "ug/L": 1.0e-3,
-        "ug/liter": 1.0e-3,
-        "ug/litre": 1.0e-3,
-        "g/L": 1.0e3,
-        "g/liter": 1.0e3,
-        "g/litre": 1.0e3,
-        "mg/m3": 1.0e-3,
-        "g/m3": 1.0,
-        "kg/m3": 1.0e3,
-    },
-)
-LOAD_RATE_SPEC = _spec(
-    "kg/ha/yr",
-    {
-        "kg/ha/year": 1.0,
-        "kg/hectare/yr": 1.0,
-        "kg/hectare/year": 1.0,
-        "kg/ac/yr": 1.0 / 0.40468564224,
-        "kg/acre/yr": 1.0 / 0.40468564224,
-        "lb/ha/yr": 0.45359237,
-        "lb/hectare/yr": 0.45359237,
-        "lb/ac/yr": 0.45359237 / 0.40468564224,
-        "lb/acre/yr": 0.45359237 / 0.40468564224,
-        "lb/ac/year": 0.45359237 / 0.40468564224,
-        "lb/acre/year": 0.45359237 / 0.40468564224,
-        "g/m2/yr": 10.0,
-        "g/m2/year": 10.0,
-        "mg/m2/yr": 0.01,
-        "mg/m2/year": 0.01,
-        "kg/km2/yr": 0.01,
-        "kg/km2/year": 0.01,
-    },
-)
-MASS_RATE_SPEC = _spec(
-    "kg/yr",
-    {
-        "kg/year": 1.0,
-        "g/yr": 1.0e-3,
-        "g/year": 1.0e-3,
-        "mg/yr": 1.0e-6,
-        "mg/year": 1.0e-6,
-        "lb/yr": 0.45359237,
-        "lb/year": 0.45359237,
-        "ton/yr": 907.18474,
-        "ton/year": 907.18474,
-        "tons/yr": 907.18474,
-        "tons/year": 907.18474,
-        "metric ton/yr": 1000.0,
-        "metric ton/year": 1000.0,
-        "tonne/yr": 1000.0,
-        "tonne/year": 1000.0,
-    },
-)
-COST_AREA_SPEC = _spec(
-    "usd/ha",
-    {
-        "usd/hectare": 1.0,
-        "usd/ac": 1.0 / 0.40468564224,
-        "usd/acre": 1.0 / 0.40468564224,
-        "usd/m2": 10000.0,
-        "usd per unit area": 1.0,
-    },
-)
-COST_LENGTH_SPEC = _spec(
-    "usd/m",
-    {
-        "usd/meter": 1.0,
-        "usd/metre": 1.0,
-        "usd/ft": 1.0 / 0.3048,
-        "usd/foot": 1.0 / 0.3048,
-        "usd/km": 0.001,
-        "usd per unit length": 1.0,
-    },
-)
-COST_PROJECT_SPEC = _spec(
-    "usd/project",
-    {
-        "usd/bmp": 1.0,
-        "usd/practice": 1.0,
-        "usd/each": 1.0,
-        "usd/unit": 1.0,
-    },
-)
-# RUSLE R and K are empirical factors whose numerical units are coupled.  The
-# conversion layer intentionally accepts only the canonical formulation rather
-# than pretending that either factor can be converted independently.
-RUSLE_R_SPEC = _spec(
-    "rusle-r-us-customary",
-    {
-        "us customary rusle r": 1.0,
-        "us-customary-rusle-r": 1.0,
-        "plet-r": 1.0,
-        # Current PLET/RUSLE example inputs use ``index`` for the R factor.
-        # It is accepted as the model's established customary R convention;
-        # no cross-system numerical conversion is attempted.
-        "index": 1.0,
-    },
-)
-RUSLE_K_SPEC = _spec(
-    "rusle-k-us-customary",
-    {
-        "us customary rusle k": 1.0,
-        "us-customary-rusle-k": 1.0,
-        "plet-k": 1.0,
-        # Established PLET customary K-factor label used by the example data.
-        "ton acre hour/(acre foot ton inch)": 1.0,
-    },
-)
-
-_KIND_SPECS: Dict[str, Tuple[UnitSpec, ...]] = {
-    "fraction": (FRACTION_SPEC,),
-    "percent": (PERCENT_SPEC,),
-    "dimensionless": (DIMENSIONLESS_SPEC,),
-    "precip": (PRECIP_SPEC,),
-    "event_precip": (EVENT_PRECIP_SPEC,),
-    "days_per_year": (DAYS_PER_YEAR_SPEC,),
-    "concentration": (CONCENTRATION_SPEC,),
-    "load_rate": (LOAD_RATE_SPEC,),
-    "mass_rate": (MASS_RATE_SPEC,),
-    "cost": (COST_AREA_SPEC, COST_LENGTH_SPEC, COST_PROJECT_SPEC),
-    "rusle_r": (RUSLE_R_SPEC,),
-    "rusle_k": (RUSLE_K_SPEC,),
-}
-
-_PARAMETER_KINDS: Dict[str, str] = {
-    "annual_precip_in": "precip",
-    "avg_rain_in": "event_precip",
-    "rain_days": "days_per_year",
-    "rain_correction_fraction": "fraction",
-    "runoff_day_fraction": "fraction",
-    "cn": "dimensionless",
-    "ia_ratio": "fraction",
-    "infiltration_fraction": "fraction",
-    "runoff_multiplier": "dimensionless",
-    "groundwater_multiplier": "dimensionless",
-    "r": "rusle_r",
-    "k": "rusle_k",
-    "ls": "dimensionless",
-    "c": "dimensionless",
-    "p": "dimensionless",
-    "sdr": "fraction",
-    "sediment_multiplier": "dimensionless",
-    "sediment_delivery_multiplier": "dimensionless",
-    "sediment_n_pct": "percent",
-    "sediment_p_pct": "percent",
-    "enrichment_ratio": "dimensionless",
-    "fraction_subsurface_shallow": "fraction",
-}
 
 
 def _nonblank(value: Any) -> bool:
@@ -320,14 +68,15 @@ def _find_spec(unit: Any, specs: Sequence[UnitSpec]) -> Tuple[UnitSpec, float]:
             f"Unsupported or dimensionally incompatible unit {unit!r}; "
             f"expected a unit convertible to {allowed}"
         )
-    # Overlapping aliases are safe only when they imply the same conversion.
     first_spec, first_factor = matches[0]
     if any(abs(factor - first_factor) > 0.0 for _, factor in matches[1:]):
         raise ValueError(f"Ambiguous unit label {unit!r}; provide a more explicit unit")
     return first_spec, float(first_factor)
 
 
-def infer_unit_kind(row: Mapping[str, Any], *, expected_kind: Optional[str] = None) -> Optional[str]:
+def infer_unit_kind(
+    row: Mapping[str, Any], *, expected_kind: Optional[str] = None
+) -> Optional[str]:
     """Infer an expected unit kind from model-row metadata when possible."""
     if expected_kind is not None:
         return expected_kind
@@ -357,7 +106,6 @@ def convert_statistics(
             raise ValueError(f"Unknown expected unit kind {expected_kind!r}")
         spec, factor = _find_spec(unit, _KIND_SPECS[expected_kind])
     else:
-        # With no table/parameter context, recognize only a unique unit family.
         candidates = []
         for kind, specs in _KIND_SPECS.items():
             try:
@@ -402,7 +150,10 @@ def convert_sampling_mapping(
         label = str(key).strip().lower()
         if label in metadata or pd.isna(value):
             continue
-        if label in {"value", "mean", "average", "avg", "sd", "std", "min", "minimum", "max", "maximum"}:
+        if label in {
+            "value", "mean", "average", "avg", "sd", "std",
+            "min", "minimum", "max", "maximum",
+        }:
             numeric[label] = float(value)
         elif label.startswith("p") and label[1:].isdigit():
             numeric[label] = float(value)

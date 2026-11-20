@@ -15,8 +15,9 @@ from contextlib import contextmanager
 from pathlib import Path
 from typing import Optional, Tuple
 
+from .constants import VERBOSE_LEVEL_NUM
+
 # Define a VERBOSE level between INFO (20) and DEBUG (10)
-VERBOSE_LEVEL_NUM = 15
 logging.addLevelName(VERBOSE_LEVEL_NUM, "VERBOSE")
 
 

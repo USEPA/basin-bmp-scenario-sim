@@ -30,11 +30,15 @@ from src.bmp import (
     _simulate_infield,
     _simulate_wetland,
 )
+from src.bmp_selection import BMPEligibilityPool
 from src.cost import _estimate_costs_for_probabilities, _get_bmp_cost, _select_cost_rate_median
+from src.afo import feedlot_bmp_cost_quantities
 from src.io_utils import _write_parquet_atomic, _flatten_plot_records
 from src.input_distributions import sample_group_key
 from src.logging_utils import make_worker_logger, log_scope
+from src.afo import apply_afo_baseline, mass_afo_realization, apply_afo_feedlot_manure_effect
 from src.plet_rusle import (
+    plet_annual_surface_runoff_in,
     calculate_load_diagnostics,
     initialize_plet_rusle_state,
 )
@@ -49,9 +53,11 @@ from src.parcel import (
 from src.sampling import _piecewise_quantile_sample, _sample_from_stats, _trunc_normal
 from src.summaries import BMPSummaryCollector
 from src.constants import (
+    CURRENT_TIMESTEP_YEARS as _CURRENT_TIMESTEP_YEARS,
     CFG_BMP_COST,
     CFG_BMP_SEL,
     CFG_DETERMINISTIC_BMP_TYPE_ORDER,
+    CFG_DETERMINISTIC_PARCEL_ORDER,
     CFG_OUTPUTS,
     CFG_PARALLEL,
     CFG_VERBOSE,  # pass verbose to worker loggers
@@ -115,13 +121,6 @@ from src.constants import (
     YAXIS_TARGET,
     YAXIS_TOTAL,
 )
-
-
-# Current production runs use an annual timestep. Multiplying annual load rates
-# (kg/yr) by one year converts them to mass (kg) without changing the numeric
-# value. Future dynamic implementations should replace this constant with the
-# actual timestep duration in years before aggregating mass.
-_CURRENT_TIMESTEP_YEARS = 1.0
 
 
 def _safe_mass_ratio(numerator: float, denominator: float) -> Optional[float]:
@@ -199,6 +198,8 @@ def _baseline_mass_before_bmp_kg(
     pre_bmp_load_rates: np.ndarray,
     parcel_idx: int,
     bmp_rec: Dict[str, Any],
+    *,
+    extra_parcel_indices: Tuple[int, ...] = (),
 ) -> np.ndarray:
     """Calculate pre-BMP pollutant mass for the parcels represented by a BMP.
 
@@ -206,6 +207,8 @@ def _baseline_mass_before_bmp_kg(
         BMP is applied. For the present annual model, rate × area × 1 year gives kg.
         Wetland denominators include all hydrologically impacted parcels identified
         by the wetland routine, including parcels that are not BMP-selectable.
+        For manure-capturing AFO BMPs, also include receiving parcels where
+        the BMP induces additional nutrient loading. Each parcel is counted once.
 
         Parameters
         ----------
@@ -226,7 +229,9 @@ def _baseline_mass_before_bmp_kg(
     """
     n_pol = int(pre_bmp_load_rates.shape[1])
     mass = np.zeros(n_pol, dtype=float)
-    for idx in _bmp_impacted_parcel_indices(ctx, parcel_idx, bmp_rec):
+    accounted_indices = set(_bmp_impacted_parcel_indices(ctx, parcel_idx, bmp_rec))
+    accounted_indices.update(int(idx) for idx in extra_parcel_indices)
+    for idx in sorted(accounted_indices):
         area_ha = float(ctx.parcel_area_ha[idx])
         mass += np.asarray(pre_bmp_load_rates[idx, :], dtype=float) * area_ha * _CURRENT_TIMESTEP_YEARS
     return mass
@@ -447,6 +452,8 @@ class Model:
             self.pollutant_concentrations = self.data.get(DATA_POLLUTANT_CONCENTRATIONS)
             self.groundwater_concentrations = self.data.get(DATA_GROUNDWATER_CONCENTRATIONS)
             self.groundwater_loads = self.load_generation_mode == LOAD_MODE_PLET_RUSLE
+            self.afo_inputs = self.data.get("afo_inputs")
+            self.feedlot_bmp_cps = set(int(c) for c in (self.data.get("feedlot_bmp_cps") or []))
 
             # Statistical mode supports either explicit pathway-specific load rates
             # distributions or one aggregate_load_rate distribution split by validated
@@ -533,6 +540,12 @@ class Model:
             pollutant_load_rate_pathway_fractions=pollutant_load_rate_pathway_fractions,
             pollutant_load_rate_is_aggregate=pollutant_load_rate_is_aggregate,
             groundwater_loads=self.groundwater_loads,
+            # AFO support is optional.  Some lightweight Model objects (including
+            # hydrologic-universe test fixtures) are constructed with __new__ and
+            # intentionally omit optional attributes.  Match _ScenarioContext's
+            # defaults instead of requiring an AFO input when none is configured.
+            afo_inputs=getattr(self, "afo_inputs", None),
+            feedlot_bmp_cps=set(getattr(self, "feedlot_bmp_cps", None) or ()),
             bmp_cps=self.bmp_cps,
             bmp_selection_probs=self.bmp_selection_probs,
             avg_area_ha=self.data[DATA_AVG_AREA_HA],
@@ -620,6 +633,10 @@ class _ScenarioContext:
         for k, v in shared.items():
             setattr(self, k, v)
 
+        # Direct scenario callers/tests may omit optional AFO keys.
+        self.afo_inputs = getattr(self, "afo_inputs", None)
+        self.feedlot_bmp_cps = set(getattr(self, "feedlot_bmp_cps", set()) or set())
+
         # Keep the full hydrologic PID->parcel-index map normalized for repeated lookups.
         self.pid_to_index = {str(pid): int(idx) for pid, idx in self.pid_to_index.items()}
 
@@ -688,11 +705,19 @@ def _run_one_scenario(
 
         n_pol = len(ctx.pollutants)
         load_state = None
+        afo_assignments = []
+        manure_mass_ledger = []
 
         if ctx.load_generation_mode == LOAD_MODE_PLET_RUSLE:
             baseline_load_rates, load_state = initialize_plet_rusle_state(ctx)
-            load_rates = baseline_load_rates.copy()
             ctx.current_pathway_load_rates = load_state.pathway_load_rates
+            if (ctx.afo_inputs or {}).get("method") == "mass_based":
+                afo_assignments, manure_mass_ledger = mass_afo_realization(ctx, state=load_state)
+            else:
+                afo_assignments = apply_afo_baseline(ctx, load_state)
+            if afo_assignments:
+                baseline_load_rates = load_state.pathway_load_rates.sum(axis=2)
+            load_rates = baseline_load_rates.copy()
             ctx.current_untreated_groundwater_load_rates = load_state.untreated_groundwater_load_rates
             ctx.pathway_names = ["surface", "subsurface"]
             logger.info("Generated baseline_load_rates PLET/RUSLE load_rates for surface and subsurface pathways")
@@ -729,6 +754,10 @@ def _run_one_scenario(
                     baseline_load_rates[i, pol_idx] = float(np.sum(pathway_load_rates[i, pol_idx, :]))
                     load_rates[i, pol_idx] = baseline_load_rates[i, pol_idx]
             ctx.current_pathway_load_rates = pathway_load_rates
+            if (ctx.afo_inputs or {}).get("method") == "mass_based":
+                afo_assignments, manure_mass_ledger = mass_afo_realization(ctx)
+                baseline_load_rates[:, :] = pathway_load_rates.sum(axis=2)
+                load_rates[:, :] = baseline_load_rates
             logger.info(
                 "Generated statistical baseline_load_rates parcel load_rates across pathways: "
                 + ", ".join(ctx.pathway_names)
@@ -762,71 +791,40 @@ def _run_one_scenario(
         # Initialize summary collector once per scenario
         collector = BMPSummaryCollector(ctx.pollutants, scenario_id=sid)
 
-        # Track CPS applied per parcel ID to prevent duplicates
-        applied_by_pid: Dict[str, set] = defaultdict(set)
-        deterministic_bmp_types = (
-            sorted({int(cps) for cps in ctx.bmp_cps})
-            if cfg.get(CFG_DETERMINISTIC_BMP_TYPE_ORDER, False)
-            else []
+        # One eligibility mechanism serves both stochastic and deterministic selection.
+        # Only the parcel-selection universe is eligible for BMP placement;
+        # hydrologic calculations retain the full parcel universe.
+        selection_pool = BMPEligibilityPool(
+            selection_pids=ctx.parcel_selection_ids,
+            bmp_cps=ctx.bmp_cps,
+            bmp_probabilities=ctx.bmp_selection_probs,
+            feedlot_bmp_cps=ctx.feedlot_bmp_cps,
+            afo_host_pids=(op["pid"] for op in (ctx.afo_inputs or {}).get("operations", [])),
+            parcel_probabilities=ctx.parcel_selection_probs,
+            deterministic_parcels=bool(cfg.get(CFG_DETERMINISTIC_PARCEL_ORDER, False)),
+            deterministic_bmps=bool(cfg.get(CFG_DETERMINISTIC_BMP_TYPE_ORDER, False)),
         )
         deterministic_bmp_cursor = 0
 
-        # Main loop
-        idle_tries = 0
-        max_idle_tries = max(100, len(ctx.parcel_selection_ids) * len(ctx.bmp_cps))
+        # Main loop: a parcel is sampled only while at least one CPS is selectable.
         while True:
             if limit_usd is not None and total_cost >= limit_usd:
+                logger.info("BMP placement stopped: cost limit reached.")
                 break
             if limit_n is not None and total_bmp >= limit_n:
+                logger.info("BMP placement stopped: count limit reached.")
                 break
 
-            selection_idx = ctx._sample_parcel_index()
+            active_indices = selection_pool.active_selection_indices()
+            if not len(active_indices):
+                logger.info("BMP placement stopped: no selectable parcel/CPS combinations remain.")
+                break
+            selection_idx = ctx._sample_parcel_index(eligible_indices=active_indices)
             parcel_idx = int(ctx.selection_source_idxs[selection_idx])
             pid = ctx.parcel_ids[parcel_idx]
-
-            # Filter CPS by what has already been applied to this parcel
-            already = applied_by_pid[str(pid)]
-            allowed_idx = [i for i, c in enumerate(ctx.bmp_cps) if int(c) not in already]
-
-            # If no CPS remain for this parcel, try another parcel; if globally exhausted, stop
-            if not allowed_idx:
-                idle_tries += 1
-                if idle_tries >= max_idle_tries:
-                    logger.info("No remaining CPS options across parcels; stopping early to avoid infinite loop.")
-                    break
-                continue
-            idle_tries = 0  # reset on a viable placement
-
-            if deterministic_bmp_types:
-                selected_cps, deterministic_bmp_cursor = _next_deterministic_bmp_type(
-                    deterministic_bmp_types,
-                    already,
-                    deterministic_bmp_cursor,
-                )
-                if selected_cps is None:
-                    idle_tries += 1
-                    if idle_tries >= max_idle_tries:
-                        logger.info("No remaining CPS options across parcels; stopping early to avoid infinite loop.")
-                        break
-                    continue
-                cps = selected_cps
-            else:
-                # Renormalize probabilities over the allowed CPS subset
-                probs_sub = ctx.bmp_selection_probs[allowed_idx]
-                probs_sum = float(np.sum(probs_sub))
-                if not np.isfinite(probs_sum) or probs_sum <= 0.0:
-                    idle_tries += 1
-                    if idle_tries >= max_idle_tries:
-                        logger.info("No selectable CPS probabilities remain across parcels; stopping early.")
-                        break
-                    logger.warning(
-                        f"Skipping parcel pid={pid}: remaining BMP probabilities are non-finite or sum to zero."
-                    )
-                    continue
-                probs_sub = probs_sub / probs_sum
-                sel = ctx.rng.choice(len(allowed_idx), p=probs_sub)
-                cps = int(ctx.bmp_cps[allowed_idx[sel]])
-
+            cps, deterministic_bmp_cursor = selection_pool.select_bmp(
+                str(pid), ctx.rng, deterministic_bmp_cursor
+            )
             # Scope each BMP placement for deeper indentation
             with log_scope(label=f"apply bmp cps={cps} pid={pid}", logger=logger):
                 eff_maps = [
@@ -837,12 +835,14 @@ def _run_one_scenario(
                 failed_flag = False
                 fr_cfg = ctx.cfg[CFG_BMP_FAIL_RATE]
                 fail_rate = float(fr_cfg if fr_cfg is not None else 0.0)
+                recovery_effect_scale = 1.0
                 if fail_rate > 0.0:
                     failed = int(ctx.rng.choice([0, 1], p=[1.0 - fail_rate, fail_rate]))
                     if failed == 1:
                         red_cfg = ctx.cfg[CFG_BMP_FAIL_REDUCTION]
                         reduction = float(red_cfg if red_cfg is not None else DEFAULT_BMP_FAIL_REDUCTION)
                         eff_maps = [{k: float(v) * reduction for k, v in emap.items()} for emap in eff_maps]
+                        recovery_effect_scale = reduction
                         failed_flag = True
                         ctx.logger.verbose(f"BMP failure triggered for cps={cps}; scaling efficiencies by {reduction:.2f}")
 
@@ -871,6 +871,14 @@ def _run_one_scenario(
                 # impacted parcels. This is especially important for wetlands.
                 pre_bmp_load_rates = load_rates.copy()
 
+                # Feedlot CPS treat feedlot source only; all other CPS treat
+                # agricultural/background loads, not the direct feedlot source.
+                ctx.current_bmp_targets_feedlot = bool(cps in getattr(ctx, "feedlot_bmp_cps", set()))
+                if ctx.current_bmp_targets_feedlot and not getattr(ctx, "afo_inputs", None):
+                    raise ValueError("feedlot-specific CPS requires configured AFO inputs")
+                if ctx.current_bmp_targets_feedlot and cps in (412, 656, 657):
+                    raise ValueError("Wetland/buffer CPS cannot be classified as feedlot-only")
+
                 # Apply BMP using sampled efficiency by flow pathway.
                 if cps in (656, 657):
                     ctx._simulate_wetland(parcel_idx, eff_maps, load_rates, bmp_rec, bmp_mass_rate_outputs)
@@ -882,22 +890,80 @@ def _run_one_scenario(
                     ctx._simulate_infield(parcel_idx, eff_maps, load_rates, bmp_rec, bmp_mass_rate_outputs)
                     quantity = float(ctx.parcel_area_ha[parcel_idx])
 
+                # A manure-capturing feedlot BMP can increase field application
+                # and therefore *increase* loading at different parcels. Count
+                # those signed changes in both net BMP mass and outlet impacts.
+                direct_bmp_removed = np.asarray(bmp_mass_rate_outputs[OUTPUT_REMOVED], dtype=float).copy()
+                manure_changes = (
+                    apply_afo_feedlot_manure_effect(
+                        ctx, str(pid), cps, load_rates,
+                        bmp_effect_scale=recovery_effect_scale,
+                    ) if ctx.current_bmp_targets_feedlot else []
+                )
+                for change in manure_changes:
+                    bmp_mass_rate_outputs[OUTPUT_REMOVED][change["pol_idx"]] -= change["added_export_kg"]
+                    if load_state is not None:
+                        # Keep PLET's equivalent manure concentration diagnostic
+                        # aligned with the reallocated surface nutrient mass.
+                        idx = change["parcel_idx"]
+                        pol = str(ctx.pollutants[change["pol_idx"]]).upper()
+                        runoff_mm = plet_annual_surface_runoff_in(load_state.parameters[idx])[3] * 25.4
+                        if runoff_mm > 0 and pol in load_state.concentrations[idx]:
+                            rate = change["added_export_kg"] / float(ctx.parcel_area_ha[idx])
+                            load_state.concentrations[idx][pol] += 100 * rate / runoff_mm
+                for pol_idx, pol in enumerate(ctx.pollutants):
+                    bmp_rec[f"induced_manure_{str(pol).lower()}_kg_yr"] = sum(
+                        ch["added_export_kg"] for ch in manure_changes if ch["pol_idx"] == pol_idx
+                    )
+
+                # Physical treatment extent remains defined by the BMP routines.
+                # For feedlot BMPs, however, cost quantities refer to the AFO
+                # footprint (or explicitly configured practice dimensions), not
+                # the full host parcel. Non-feedlot cost accounting is unchanged.
+                cost_area_ha = quantity
+                cost_length_m = None
+                if ctx.current_bmp_targets_feedlot:
+                    cost_area_ha, cost_length_m = feedlot_bmp_cost_quantities(
+                        ctx.afo_inputs, str(pid), cps
+                    )
                 # Costing and totals
-                cost_this = ctx._get_bmp_cost(cps, quantity)
+                cost_this = ctx._get_bmp_cost(
+                    cps, cost_area_ha,
+                    **({"feedlot": True, "cost_length_m": cost_length_m}
+                       if ctx.current_bmp_targets_feedlot else {}),
+                )
                 total_cost += cost_this
                 total_bmp += 1
 
                 # Mark CPS as applied for this parcel
-                applied_by_pid[str(pid)].add(int(cps))
+                selection_pool.record_placement(str(pid), int(cps))
 
                 # Finalize the BMP record using explicit mass fields. The current
                 # one-year timestep converts annual mass rates to timestep mass.
                 bmp_rec[OUTPUT_COST_USD] = cost_this
                 treated_mass_kg = np.asarray(bmp_mass_rate_outputs[OUTPUT_TREATED], dtype=float) * _CURRENT_TIMESTEP_YEARS
                 removed_mass_kg = np.asarray(bmp_mass_rate_outputs[OUTPUT_REMOVED], dtype=float) * _CURRENT_TIMESTEP_YEARS
-                baseline_mass_kg = _baseline_mass_before_bmp_kg(
-                    ctx, pre_bmp_load_rates, parcel_idx, bmp_rec
+                induced_receiver_indices = tuple(sorted({
+                    int(ch["parcel_idx"]) for ch in manure_changes
+                    if float(ch["added_export_kg"]) != 0.
+                }))
+                accounting_indices = sorted(
+                    set(_bmp_impacted_parcel_indices(ctx, parcel_idx, bmp_rec))
+                    | set(induced_receiver_indices)
                 )
+                # Distinguish the physically treated parcels from the wider
+                # accounting boundary used for net mass and its percentage.
+                bmp_rec["mass_accounting_pids"] = ",".join(
+                    str(ctx.parcel_ids[idx]) for idx in accounting_indices
+                )
+                baseline_mass_kg = _baseline_mass_before_bmp_kg(
+                    ctx, pre_bmp_load_rates, parcel_idx, bmp_rec,
+                    extra_parcel_indices=induced_receiver_indices,
+                )
+                for pol_idx, pol in enumerate(ctx.pollutants):
+                    bmp_rec[f"direct_bmp_removed_{pol}_kg_yr"] = float(
+                        direct_bmp_removed[pol_idx]
+                    )
                 _add_mass_metrics_to_bmp_record(
                     bmp_rec,
                     list(ctx.pollutants),
@@ -914,13 +980,25 @@ def _run_one_scenario(
                 # Delivered reductions for plots
                 oids = ctx._get_parcel_out_oids(parcel_idx)
                 for pol_idx, pol in enumerate(ctx.pollutants):
-                    removed_mass_rate_kg_per_yr = float(bmp_mass_rate_outputs[OUTPUT_REMOVED][pol_idx])
+                    # Host direct-feedlot reduction; redirected manure is
+                    # delivered from its actual receiving parcel below.
+                    removed_mass_rate_kg_per_yr = float(direct_bmp_removed[pol_idx])
                     for oid in oids:
                         dr = ctx._delivery_coeffs(pid, oid)
                         deliver = (
                             removed_mass_rate_kg_per_yr * dr[COL_SDR_F_TO_S] * dr[COL_SDR_S_TO_O]
                             if pol == "TSS"
                             else removed_mass_rate_kg_per_yr * dr[COL_NDR_F_TO_S] * dr[COL_NDR_S_TO_O]
+                        )
+                        cumul[pol][oid] += deliver
+                for change in manure_changes:
+                    rec_pid = change["receiving_pid"]
+                    pol = ctx.pollutants[change["pol_idx"]]
+                    for oid in ctx._get_parcel_out_oids(change["parcel_idx"]):
+                        dr = ctx._delivery_coeffs(rec_pid, oid)
+                        deliver = -change["added_export_kg"] * (
+                            dr[COL_SDR_F_TO_S] * dr[COL_SDR_S_TO_O] if pol == "TSS"
+                            else dr[COL_NDR_F_TO_S] * dr[COL_NDR_S_TO_O]
                         )
                         cumul[pol][oid] += deliver
 
@@ -941,6 +1019,86 @@ def _run_one_scenario(
                                 else:
                                     yval = 0.0
                                 records[(pol, oid, xax, yax)].append((sid, xval, yval))
+
+        # Realized operation-to-field allocations, independently auditable for
+        # deterministic and stochastic location assumptions.
+        if afo_assignments:
+            allocation_dir = outputs_dir / "afo_manure_assignments"
+            allocation_dir.mkdir(parents=True, exist_ok=True)
+            _write_parquet_atomic(
+                pd.DataFrame([dict(scenario=sid, **rec) for rec in afo_assignments]),
+                allocation_dir / f"s{sid}.parquet", logger=logger,
+            )
+
+        if manure_mass_ledger:
+            manure_dir = outputs_dir / "afo_mass_ledger"
+            manure_dir.mkdir(parents=True, exist_ok=True)
+            manure_df = pd.DataFrame([dict(scenario=sid, **rec) for rec in manure_mass_ledger])
+            _write_parquet_atomic(manure_df, manure_dir / f"s{sid}.parquet", logger=logger)
+            # One row per operation prevents accidentally summing replicated
+            # operation-wide excretion figures across multiple receiving fields.
+            budget_rows = []
+            for op_id, grouped in manure_df.groupby("afo_id", sort=True):
+                first = grouped.iloc[0]
+                budget = {"scenario": sid, "afo_id": op_id,
+                          "receiver_count": len(grouped)}
+                for source, target in (
+                    ("animal_n_produced_kg", "tn_produced_kg"),
+                    ("animal_p_produced_kg", "tp_produced_kg"),
+                    ("operation_available_tn_kg", "tn_available_kg"),
+                    ("operation_available_tp_kg", "tp_available_kg"),
+                ):
+                    budget[target] = float(first[source])
+                for key in ("tn_applied_kg", "tp_applied_kg",
+                            "tn_exported_kg", "tp_exported_kg"):
+                    budget[key] = float(grouped[key].sum())
+                op_state = getattr(ctx, "afo_bmp_operation_state", {}).get(op_id)
+                if op_state:
+                    for nutrient in ("tn", "tp"):
+                        full = op_state["available_full"][nutrient.upper()]
+                        budget[f"final_{nutrient}_available_kg"] = full * op_state["current_collection"]
+                        budget[f"final_{nutrient}_applied_kg"] = full * op_state["current_collection"]
+                        pol_idx = next(i for i, pol in enumerate(ctx.pollutants)
+                                       if str(pol).upper() == nutrient.upper())
+                        budget[f"final_{nutrient}_exported_kg"] = sum(
+                            src["current_rate"] * float(ctx.parcel_area_ha[src["parcel_idx"]])
+                            for src in op_state["sources"] if src["pol_idx"] == pol_idx
+                        )
+                for nutrient in ("tn", "tp"):
+                    if not np.isclose(budget[f"{nutrient}_available_kg"], budget[f"{nutrient}_applied_kg"], rtol=1e-10, atol=1e-8):
+                        raise AssertionError(f"AFO {op_id}: non-conserved {nutrient} allocation")
+                budget_rows.append(budget)
+            budgets_dir = outputs_dir / "afo_operation_budgets"
+            budgets_dir.mkdir(parents=True, exist_ok=True)
+            _write_parquet_atomic(pd.DataFrame(budget_rows), budgets_dir / f"s{sid}.parquet", logger=logger)
+            effects = getattr(ctx, "afo_bmp_effect_records", [])
+            if effects:
+                effects_dir = outputs_dir / "afo_manure_bmp_effects"
+                effects_dir.mkdir(parents=True, exist_ok=True)
+                _write_parquet_atomic(pd.DataFrame([dict(scenario=sid, **rec) for rec in effects]),
+                                      effects_dir / f"s{sid}.parquet", logger=logger)
+
+        # Direct feedlot and manure-field components retained independently
+        # through BMP application (kg/year) to enable source-specific auditing.
+        if afo_assignments:
+            component_rows = []
+            for idx, pid in enumerate(ctx.parcel_ids):
+                area_ha = float(ctx.parcel_area_ha[idx])
+                for pol_idx, pollutant in enumerate(ctx.pollutants):
+                    row = {"scenario": sid, "pid": str(pid), "pollutant": pollutant}
+                    for label, initial, final in (
+                        ("direct_feedlot", ctx.baseline_afo_feedlot_pathway_rates,
+                         ctx.current_afo_feedlot_pathway_rates),
+                        ("manure_field", ctx.baseline_afo_manure_pathway_rates,
+                         ctx.current_afo_manure_pathway_rates),
+                    ):
+                        for path_idx, path in enumerate(ctx.pathway_names):
+                            row[f"baseline_{label}_{path}_kg_yr"] = float(initial[idx, pol_idx, path_idx]) * area_ha
+                            row[f"final_{label}_{path}_kg_yr"] = float(final[idx, pol_idx, path_idx]) * area_ha
+                    component_rows.append(row)
+            component_dir = outputs_dir / "afo_load_components"
+            component_dir.mkdir(parents=True, exist_ok=True)
+            _write_parquet_atomic(pd.DataFrame(component_rows), component_dir / f"s{sid}.parquet", logger=logger)
 
         # Parcel-level before/after
         for parcel_idx, pid_i in enumerate(ctx.parcel_ids):
