@@ -194,6 +194,66 @@ def _bmp_impacted_parcel_indices(ctx: Any, parcel_idx: int, bmp_rec: Dict[str, A
     return [int(pid_to_index[pid]) for pid in pids if pid in pid_to_index]
 
 
+
+def _removed_mass_by_parcel_kg(
+    ctx: Any,
+    pre_bmp_load_rates: np.ndarray,
+    post_bmp_load_rates: np.ndarray,
+    parcel_idx: int,
+    bmp_rec: Dict[str, Any],
+    recorded_removed_mass_kg: np.ndarray,
+) -> List[Tuple[int, np.ndarray]]:
+    """Compute signed BMP mass changes on each affected parcel (kg/timestep).
+
+    These deltas are the canonical source for outlet trajectories: a wetland
+    can affect its host AND multiple upstream parcels, each of which has its
+    own parcel-to-outlet membership and delivery coefficients. The recorded
+    BMP removal must reconcile with these changes rather than being assigned
+    wholesale to the host's outlet and delivery factors.
+    """
+    changes: List[Tuple[int, np.ndarray]] = []
+    total = np.zeros(pre_bmp_load_rates.shape[1], dtype=float)
+    for idx in _bmp_impacted_parcel_indices(ctx, parcel_idx, bmp_rec):
+        change = (
+            np.asarray(pre_bmp_load_rates[idx, :] - post_bmp_load_rates[idx, :], dtype=float)
+            * float(ctx.parcel_area_ha[idx])
+            * _CURRENT_TIMESTEP_YEARS
+        )
+        changes.append((idx, change))
+        total += change
+    if not np.allclose(total, recorded_removed_mass_kg, rtol=1e-7, atol=1e-8):
+        raise RuntimeError(
+            'BMP removal mass does not reconcile with the affected parcel load changes: '
+            f'pid={ctx.parcel_ids[parcel_idx]}, cps={bmp_rec.get("cps")}, '
+            f'parcel_delta_kg={total.tolist()}, '
+            f'recorded_removed_kg={np.asarray(recorded_removed_mass_kg).tolist()}'
+        )
+    return changes
+
+
+def _accumulate_delivered_bmp_reductions(
+    ctx: Any,
+    changes: List[Tuple[int, np.ndarray]],
+    cumul: Dict[str, Dict[str, float]],
+) -> None:
+    """Credit each changed parcel's signed mass only to its linked outlets.
+
+    The parcel-level delivery convention applies the two sediment factors for
+    TSS and the two nutrient factors for other pollutants. A different wetland
+    transport model would require an explicitly different accounting contract.
+    """
+    for idx, removed_mass_kg in changes:
+        pid = str(ctx.parcel_ids[idx])
+        for oid in ctx._get_parcel_out_oids(idx):
+            dr = ctx._delivery_coeffs(pid, oid)
+            for pol_idx, pol in enumerate(ctx.pollutants):
+                if pol == 'TSS':
+                    factor = dr[COL_SDR_F_TO_S] * dr[COL_SDR_S_TO_O]
+                else:
+                    factor = dr[COL_NDR_F_TO_S] * dr[COL_NDR_S_TO_O]
+                cumul[pol][oid] += float(removed_mass_kg[pol_idx]) * factor
+
+
 def _baseline_mass_before_bmp_kg(
     ctx: Any,
     pre_bmp_load_rates: np.ndarray,
@@ -918,18 +978,15 @@ def _run_one_scenario(
                 # than from parcel areal-load-rate denominators or averaged efficiencies.
                 collector.add_bmp_record(bmp_rec)
 
-                # Delivered reductions for plots
-                oids = ctx._get_parcel_out_oids(parcel_idx)
-                for pol_idx, pol in enumerate(ctx.pollutants):
-                    removed_mass_rate_kg_per_yr = float(bmp_mass_rate_outputs[OUTPUT_REMOVED][pol_idx])
-                    for oid in oids:
-                        dr = ctx._delivery_coeffs(pid, oid)
-                        deliver = (
-                            removed_mass_rate_kg_per_yr * dr[COL_SDR_F_TO_S] * dr[COL_SDR_S_TO_O]
-                            if pol == "TSS"
-                            else removed_mass_rate_kg_per_yr * dr[COL_NDR_F_TO_S] * dr[COL_NDR_S_TO_O]
-                        )
-                        cumul[pol][oid] += deliver
+                # Outlet reductions use the actual load-rate change on EACH
+                # affected parcel, not the wetland host's delivery coefficients
+                # for the combined upstream mass. This also handles negative
+                # efficiencies and serial BMP stacking without double counting.
+                changes = _removed_mass_by_parcel_kg(
+                    ctx, pre_bmp_load_rates, load_rates, parcel_idx,
+                    bmp_rec, removed_mass_kg,
+                )
+                _accumulate_delivered_bmp_reductions(ctx, changes, cumul)
 
                 # Record current cumulative for each axis choice
                 for pol in ctx.pollutants:

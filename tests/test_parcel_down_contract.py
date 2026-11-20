@@ -113,9 +113,9 @@ def test_dem_coverage_rejects_partial_nodata_pixel_without_center(tmp_path):
     # intersects it; its center (0.5, 0.5) is outside the parcel.
     with rasterio.open(path) as ds:
         mask = read_mask(ds) > 0
-        with pytest.raises(ValueError, match='NoData in parcel area'):
+        with pytest.raises(ValueError, match='NoData or nonfinite elevations in parcel area'):
             validate_dem_coverage(parcels, ds, mask)
-        with pytest.raises(ValueError, match='NoData in parcel area'):
+        with pytest.raises(ValueError, match='NoData or nonfinite elevations in parcel area'):
             validate_dem_coverage(parcels, ds, mask, tolerance_m2=0.10)
         validate_dem_coverage(parcels, ds, mask, tolerance_m2=0.13)
 

@@ -153,8 +153,8 @@ def test_load_and_validate_all_accepts_mixed_case_plet_mode_and_builds_maps(monk
         "_load_parcel_outlets",
         lambda cfg, logger: pd.DataFrame(
             {
-                "pid": [1, 1, 2, 2],
-                "oid": ["O1", "O2", "O2", "O3"],
+                "pid": [1, 1, 2, 2, 2],
+                "oid": ["O1", "O2", "O1", "O2", "O3"],
             }
         ),
     )
@@ -186,8 +186,8 @@ def test_load_and_validate_all_accepts_mixed_case_plet_mode_and_builds_maps(monk
 
     outlet_rows = pd.DataFrame(
         {
-            "pid": [1, 1, 2, 2],
-            "oid": ["O1", "O2", "O2", "O3"],
+            "pid": [1, 1, 2, 2, 2],
+            "oid": ["O1", "O2", "O1", "O2", "O3"],
         }
     )
     parcel_out_map = {
@@ -195,7 +195,7 @@ def test_load_and_validate_all_accepts_mixed_case_plet_mode_and_builds_maps(monk
         for pid in [1, 2]
     }
     assert parcel_out_map[1] == ["O1", "O2"]
-    assert parcel_out_map[2] == ["O2", "O3"]
+    assert parcel_out_map[2] == ["O1", "O2", "O3"]
 
 def test_load_pollutant_concentrations_requires_and_preserves_plet_pathway(tmp_path) -> None:
     logger = DummyLogger()

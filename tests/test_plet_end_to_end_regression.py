@@ -303,5 +303,8 @@ def test_deterministic_plet_scenario_matches_golden_reference(
 
         count_record = records[(pol, "O1", "count", "total")]
         cost_record = records[(pol, "O1", "cost", "total")]
-        assert count_record == pytest.approx([(1, 1.0, removed[pol])])
-        assert cost_record == pytest.approx([(1, 50.0, removed[pol])])
+        assert len(count_record) == len(cost_record) == 1
+        assert count_record[0][:2] == (1, 1.0)
+        assert cost_record[0][:2] == (1, 50.0)
+        assert float(count_record[0][2]) == pytest.approx(removed[pol], rel=1e-10)
+        assert float(cost_record[0][2]) == pytest.approx(removed[pol], rel=1e-10)

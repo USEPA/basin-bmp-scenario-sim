@@ -8,7 +8,9 @@ The existing local-DEM path never makes network requests.
 """
 import argparse
 import logging
+import os
 import sys
+import tempfile
 from typing import Dict, Tuple
 
 import numpy as np
@@ -178,11 +180,20 @@ def read_parcels(parcels_path: str, id_field: str, layer: str | None = None) -> 
     if gdf.empty:
         raise ValueError("No parcel records found.")
     _reject_missing_parcel_geometries(gdf, id_field)
-    # Attempt to fix invalid geometries
-    if not gdf.geometry.is_valid.all():
-        logging.info("Fixing invalid parcel geometries with buffer(0)")
-        gdf["geometry"] = gdf.geometry.buffer(0)
-        _reject_missing_parcel_geometries(gdf, id_field)
+    # Never route using silently repaired geometry: buffer(0) can delete or
+    # reshape parts of the polygon while leaving the source GPKG untouched.
+    invalid = ~gdf.geometry.is_valid
+    if invalid.any():
+        from shapely.validation import explain_validity
+        sample = [
+            f"PID {row[id_field]}: {explain_validity(row.geometry)}"
+            for _, row in gdf.loc[invalid].head(12).iterrows()
+        ]
+        raise ValueError(
+            f"Invalid parcel geometry for {int(invalid.sum())} parcel(s): "
+            + '; '.join(sample)
+            + '. Repair the source parcel geometries before generating parcel_down.'
+        )
     return gdf
 
 
@@ -224,6 +235,34 @@ def rasterize_parcels(
         dtype=np.int32
     )
     return pid_raster, code_to_pid, pid_to_code
+
+
+
+def _stage_drainage_output_paths(destinations: Dict[str, "Path"]) -> Dict[str, "Path"]:
+    """Preflight and allocate temporary files beside final output destinations.
+
+    If any destination is not writable, fail before modifying the GeoPackage.
+    Each temporary file resides on the destination filesystem for replacement.
+    """
+    from pathlib import Path
+    resolved = [Path(p).resolve() for p in destinations.values()]
+    if len(set(resolved)) != len(resolved):
+        raise ValueError('Drainage diagnostics, CSV and manifest destinations must be distinct')
+    staged: Dict[str, Path] = {}
+    try:
+        for label, destination in destinations.items():
+            destination = Path(destination)
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            fd, path = tempfile.mkstemp(
+                prefix=f'.{destination.name}.', suffix='.staged', dir=destination.parent
+            )
+            os.close(fd)
+            staged[label] = Path(path)
+    except Exception:
+        for temp in staged.values():
+            temp.unlink(missing_ok=True)
+        raise
+    return staged
 
 
 def main():
@@ -381,36 +420,62 @@ def main():
     diagnostic_path = (Path(args.diagnostics_out) if args.diagnostics_out else
                        Path(args.parcels).with_name(Path(args.parcels).stem +
                        '_parcel_down_candidates.csv'))
-    write_candidate_diagnostics(diagnostic_path, diagnostics)
-    logging.info('Candidate drainage evidence written to %s', diagnostic_path)
-    edges = validate_direct_edges(edges, gdf[args.id_field].tolist())
-    logging.info('Computed %d acyclic, representative downstream connections', len(edges))
-
-    if is_gpkg and not args.no_gpkg_update:
-        count = write_gpkg_parcel_down(args.parcels, edges, gdf[args.id_field])
-        logging.info("Atomically replaced parcel_down in %s (%d rows)", args.parcels, count)
-    if args.out:
-        write_normalized_csv(args.out, edges)
-        logging.info("Wrote normalized immediate-edge CSV to %s", args.out)
-
     manifest_path = (Path(args.manifest_out) if args.manifest_out else
                      Path(args.parcels).with_name(Path(args.parcels).stem +
                      '_parcel_down_manifest.json'))
-    write_drainage_manifest(
-        manifest_path, parcels=gdf, id_field=args.id_field,
-        dem_path=dem_path, pointer_path=pointer_path,
-        edges=edges,
-        parameters={'whitebox_conditioning': conditioning,
-                    'whitebox_breach_dist': args.whitebox_breach_dist,
-                    'max_overlap_m2': args.max_overlap_m2,
-                    'dem_resolution': args.usgs_resolution,
-                    'whole_parcel_drainage': True},
-        summary={**summary, 'unrasterized_parcels': len(missing),
-                 'unrasterized_pids': [int(code_to_pid[c]) for c in missing]},
-        diagnostics_path=diagnostic_path,
-    )
-    logging.info('Drainage provenance manifest written to %s', manifest_path)
-    logging.info("Done.")
+    edges = validate_direct_edges(edges, gdf[args.id_field].tolist())
+    logging.info('Computed %d acyclic, representative downstream connections', len(edges))
+
+    destinations = {'diagnostics': diagnostic_path, 'manifest': manifest_path}
+    if args.out:
+        destinations['csv'] = Path(args.out)
+    # Never replace inputs with an auxiliary report accidentally.
+    protected = {Path(args.parcels).resolve(), dem_path, pointer_path.resolve()}
+    for label, destination in destinations.items():
+        if Path(destination).resolve() in protected:
+            raise ValueError(f'{label} output path collides with a drainage input: {destination}')
+
+    # Stage ALL auxiliary outputs before committing any change to the GPKG.
+    # The manifest references the final diagnostics path, not its staged name.
+    staged = _stage_drainage_output_paths(destinations)
+    gpkg_updated = False
+    try:
+        write_candidate_diagnostics(staged['diagnostics'], diagnostics)
+        if args.out:
+            write_normalized_csv(staged['csv'], edges)
+        write_drainage_manifest(
+            staged['manifest'], parcels=gdf, id_field=args.id_field,
+            dem_path=dem_path, pointer_path=pointer_path,
+            edges=edges,
+            parameters={'whitebox_conditioning': conditioning,
+                        'whitebox_breach_dist': args.whitebox_breach_dist,
+                        'max_overlap_m2': args.max_overlap_m2,
+                        'dem_resolution': args.usgs_resolution,
+                        'whole_parcel_drainage': True},
+            summary={**summary, 'unrasterized_parcels': len(missing),
+                     'unrasterized_pids': [int(code_to_pid[c]) for c in missing]},
+            diagnostics_path=diagnostic_path,
+        )
+        if is_gpkg and not args.no_gpkg_update:
+            count = write_gpkg_parcel_down(args.parcels, edges, gdf[args.id_field])
+            gpkg_updated = True
+            logging.info('Atomically replaced parcel_down in %s (%d rows)', args.parcels, count)
+        for label, destination in destinations.items():
+            os.replace(staged[label], destination)
+            logging.info('Published %s output to %s', label, destination)
+    except Exception as exc:
+        if gpkg_updated:
+            logging.error('parcel_down WAS updated in %s, but auxiliary output '
+                          'publication failed. Inspect the outputs and rerun if needed.', args.parcels)
+            raise RuntimeError(
+                f'parcel_down WAS updated in {args.parcels}, but an auxiliary '
+                f'output could not be published: {exc}'
+            ) from exc
+        raise
+    finally:
+        for temp in staged.values():
+            temp.unlink(missing_ok=True)
+    logging.info('Done.')
 
 if __name__ == "__main__":
     try:

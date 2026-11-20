@@ -5,6 +5,12 @@ import numpy as np
 from shapely.geometry import Polygon, box
 from rasterio.features import rasterize
 
+# Support both package imports and direct execution of create_parcel_down.py.
+try:
+    from .rasterio_compat import read_band
+except ImportError:
+    from rasterio_compat import read_band
+
 
 def validate_parcel_overlaps(parcels, id_field: str, *, tolerance_m2: float = 0.01,
                              linear_units_to_m: float = 1.) -> None:
@@ -58,6 +64,17 @@ def validate_dem_coverage(parcels, dem_dataset, valid_mask: np.ndarray,
                         transform=dem_dataset.transform, fill=0,
                         all_touched=True, dtype='uint8')
     potentially_missing = (covered > 0) & ~np.asarray(valid_mask, dtype=bool)
+    # Rasterio's validity mask may say a float pixel is valid even when its
+    # elevation is NaN or +/-infinity and no NoData metadata was supplied.
+    # Read one raster block at a time; only inspect blocks touching parcels.
+    # This avoids allocating another full-sized floating-point DEM array.
+    for _, window in dem_dataset.block_windows(1):
+        rows, cols = window.toslices()
+        in_parcel = covered[rows, cols] > 0
+        if not np.any(in_parcel):
+            continue
+        elevation = read_band(dem_dataset, 1, window=window, masked=False)
+        potentially_missing[rows, cols] |= in_parcel & ~np.isfinite(elevation)
     if not np.any(potentially_missing):
         return
 
@@ -81,7 +98,7 @@ def validate_dem_coverage(parcels, dem_dataset, valid_mask: np.ndarray,
         missing_pixels += 1
         if missing_area_m2 > tolerance_m2 + 1e-8:
             raise ValueError(
-                'DEM has NoData in parcel area: at least '
+                'DEM has NoData or nonfinite elevations in parcel area: at least '
                 f'{missing_area_m2:.6f} m² across {missing_pixels} '
                 'partly or fully intersected invalid pixel(s)'
             )

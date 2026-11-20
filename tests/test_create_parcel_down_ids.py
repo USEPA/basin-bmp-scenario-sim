@@ -89,10 +89,10 @@ def test_missing_or_empty_parcel_geometry_is_rejected_with_pid(tmp_path, bad_geo
         create_parcel_down.read_parcels(str(path), "pid")
 
 
-def test_invalid_geometry_repaired_to_empty_is_rejected(tmp_path):
+def test_invalid_geometry_is_rejected_without_repair(tmp_path):
     path = tmp_path / "collapsed_geometry.geojson"
-    # A zero-area degenerate polygon is nonempty before repair but buffer(0)
-    # produces an empty polygon. Do not silently exclude its PID.
+    # A zero-area degenerate polygon is nonempty but invalid. Reject it without
+    # silently running buffer(0) and altering its boundaries.
     degenerate = Polygon([(0, 0), (1, 0), (0, 0)])
     parcels = gpd.GeoDataFrame(
         {"pid": [11, 22]},
@@ -100,5 +100,7 @@ def test_invalid_geometry_repaired_to_empty_is_rejected(tmp_path):
         crs="EPSG:4326",
     )
     parcels.to_file(path, driver="GeoJSON")
-    with pytest.raises(ValueError, match=r"Missing or empty parcel geometries.*PID\(s\) 22"):
+    original = path.read_bytes()
+    with pytest.raises(ValueError, match=r"Invalid parcel geometry.*PID 22"):
         create_parcel_down.read_parcels(str(path), "pid")
+    assert path.read_bytes() == original

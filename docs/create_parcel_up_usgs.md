@@ -53,15 +53,41 @@ acceptance flag.
 
 Before running WhiteboxTools, the utility rejects significant overlapping
 parcel polygons (default threshold: `--max-overlap-m2 0.01`) and verifies
-full parcel geometry coverage by a valid-data DEM. A local DEM that covers
+full parcel geometry coverage by a valid-data DEM. Validity includes both
+Rasterio's NoData mask and **finite numeric elevation values** (no undeclared
+NaN or positive/negative infinity). Partially intersected invalid raster
+cells are checked by polygon-overlap area, not pixel-center inclusion. A local DEM that covers
 only a corner of a parcel is invalid. Full coverage is different from cell
 resolution: a fully covered parcel may still be too small to rasterize at
 30 m, and this is documented as unresolved in the candidate diagnostics.
+
+Missing, empty, or invalid parcel polygon geometries are rejected with
+PID-level diagnostics before hydrologic processing. The utility does **not**
+automatically `buffer(0)` or otherwise repair the input polygons, because
+that could route over different boundaries from those retained in the
+GeoPackage. Repair geometries explicitly in the source data and rerun.
 
 `--layer`, `--id-field`, `--dem-buffer-m`, `--max-dem-cells`,
 `--usgs-cache-dir`, and `--refresh-usgs-availability` remain available.
 A fully checked source does not guarantee the representative whole-parcel
 connection is the only real hydrologic route.
+
+## Output finalization and failure behavior
+
+The utility first generates and validates the connectivity graph, then stages
+the candidate diagnostics CSV, optional normalized CSV, and JSON manifest in
+temporary files beside their destinations. If staging fails, the existing
+GeoPackage `parcel_down` table remains unchanged. When staging succeeds, the
+GeoPackage table is updated transactionally and the staged reports are
+published to their final paths.
+
+The GeoPackage transaction and filesystem publication **cannot be one atomic
+transaction**. If publishing an auxiliary file fails after the GeoPackage
+commit, the command explicitly reports that `parcel_down WAS updated` and
+identifies the failing output. An error after the commit does not imply that
+the GeoPackage was rolled back; inspect the log and generated files before
+rerunning. Output paths must be distinct and cannot overwrite the parcel
+GeoPackage, DEM, or D8 pointer raster.
 
 ## Provenance
 

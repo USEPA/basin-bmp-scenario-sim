@@ -2032,6 +2032,38 @@ def _build_parcel_down_map(
     return downstream
 
 
+
+def _validate_parcel_outlet_topology(
+    parcel_down_map: Mapping[str, Optional[str]],
+    parcel_out_map: Mapping[str, Sequence[str]],
+) -> None:
+    """Check complete downstream outlet membership for the representative graph.
+
+    If p drains immediately to q, every modeled outlet downstream of q must
+    also receive p's load. Extra outlets for p are valid (nested gauges).
+    Parcels with no downstream neighbor may have any outlet membership.
+    The check uses the post-domain-clipping mappings, not source-wide edges.
+    """
+    violations: List[str] = []
+    for pid, downstream_pid in parcel_down_map.items():
+        if downstream_pid is None:
+            continue
+        source_outlets = set(map(str, parcel_out_map.get(str(pid), ())))
+        downstream_outlets = set(map(str, parcel_out_map.get(str(downstream_pid), ())))
+        missing = sorted(downstream_outlets - source_outlets)
+        if missing:
+            violations.append(
+                f'pid={pid} -> pid_down={downstream_pid}: missing downstream outlet(s) {missing}'
+            )
+    if violations:
+        raise ValueError(
+            'parcel_outlets is inconsistent with parcel_down: each upstream '
+            'parcel must list every modeled outlet associated with its '
+            'immediate downstream parcel. Example violation(s): '
+            + '; '.join(violations[:10])
+        )
+
+
 def _load_parcel_outlets(cfg: Dict[str, Any], logger: Any) -> pd.DataFrame:
     """Load normalized parcel-to-outlet edges from ``parcels.gpkg``."""
     return _read_gpkg_input_table(
@@ -2911,6 +2943,8 @@ def load_and_validate_all(cfg: Dict[str, Any], logger: Any) -> Dict[str, Any]:
             pid = str(int(getattr(row, COL_PID)))
             oid = str(getattr(row, COL_OID))
             parcel_out_map[pid].append(oid)
+
+        _validate_parcel_outlet_topology(parcel_down_map, parcel_out_map)
 
         pollutants = _load_pollutants(cfg)
         cps = _load_cps(cfg)

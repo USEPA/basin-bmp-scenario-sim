@@ -63,6 +63,24 @@ If `e` is negative, the same equation represents an increase in load rather than
 
 `parcel_outlets` inside the consolidated parcel GeoPackage associates parcels with modeled outlets. Optional delivery-ratio variables are stored in dedicated parcel/outlet-keyed `input_*` tables. The optional `outlet_stats` table inside the outlet GeoPackage stores target and mean-load reference values used for decision-relevant trajectory metrics.
 
+Outlet trajectory accounting uses the **actual signed before/after
+mass change for every parcel modified by each BMP**. The model applies that
+parcel's own `sdr_f_to_s × sdr_s_to_o` factors for TSS or
+`ndr_f_to_s × ndr_s_to_o` for other pollutants, and sums only across
+`parcel_outlets` memberships. This is particularly important for wetlands:
+a wetland may modify its host and multiple upstream parcels, which can have
+different delivery factors and different modeled outlet memberships. Using
+the host parcel's delivery factors for the combined removed mass would not
+reconcile with parcel-level output. A BMP's **removed mass** is therefore not
+necessarily the same as its **delivered outlet reduction**. Both may be signed,
+and the latter is used for cumulative count/cost trajectories and target/mean
+percentages.
+
+This evaluation is a parcel-associated delivery approximation, not an
+explicit mass routing calculation through a wetland structure. The network
+identifies eligible upstream parcels, while delivery factors remain specified
+by each parcel/outlet relationship.
+
 The load-generation mode determines how baseline parcel loads are established. It does not change the overall parcel-selection, BMP-selection, routing, and outlet-evaluation framework.
 
 ## What the model does not represent directly
