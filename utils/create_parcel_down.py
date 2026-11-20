@@ -104,6 +104,18 @@ def setup_logging(level: str):
     )
 
 
+def _reject_missing_parcel_geometries(gdf: gpd.GeoDataFrame, id_field: str) -> None:
+    """Never omit a parcel from drainage routing because its geometry is absent."""
+    missing = gdf.geometry.isna() | gdf.geometry.is_empty
+    if missing.any():
+        pids = gdf.loc[missing, id_field].astype(str).tolist()
+        sample = ', '.join(pids[:12]) + (' ...' if len(pids) > 12 else '')
+        raise ValueError(
+            f'Missing or empty parcel geometries for {len(pids)} parcel(s): '
+            f'PID(s) {sample}. Repair the parcel layer before generating parcel_down.'
+        )
+
+
 def read_parcels(parcels_path: str, id_field: str, layer: str | None = None) -> gpd.GeoDataFrame:
     """Read parcel geometries, including GeoPackage feature-ID primary keys.
 
@@ -163,14 +175,14 @@ def read_parcels(parcels_path: str, id_field: str, layer: str | None = None) -> 
         raise ValueError(f"Parcel ID field {id_field!r} contains null values")
     if gdf[id_field].astype(str).duplicated().any():
         raise ValueError(f"Parcel ID field {id_field!r} contains duplicate values")
-    # Drop null/empty geometries
-    gdf = gdf[~gdf.geometry.is_empty & gdf.geometry.notnull()].copy()
     if gdf.empty:
-        raise ValueError("No valid parcel geometries found.")
+        raise ValueError("No parcel records found.")
+    _reject_missing_parcel_geometries(gdf, id_field)
     # Attempt to fix invalid geometries
     if not gdf.geometry.is_valid.all():
         logging.info("Fixing invalid parcel geometries with buffer(0)")
         gdf["geometry"] = gdf.geometry.buffer(0)
+        _reject_missing_parcel_geometries(gdf, id_field)
     return gdf
 
 

@@ -4,7 +4,7 @@ from pathlib import Path
 
 import geopandas as gpd
 import pytest
-from shapely.geometry import box
+from shapely.geometry import Polygon, box
 
 pyogrio = pytest.importorskip("pyogrio")
 
@@ -71,3 +71,34 @@ def test_geojson_pid_attribute_still_works(tmp_path):
     )
     source.to_file(path, driver="GeoJSON")
     assert create_parcel_down.read_parcels(str(path), "pid")["pid"].tolist() == [11, 33]
+
+
+@pytest.mark.parametrize("bad_geometry", [None, Polygon()])
+def test_missing_or_empty_parcel_geometry_is_rejected_with_pid(tmp_path, bad_geometry):
+    path = tmp_path / "missing_geometry.gpkg"
+    parcels = gpd.GeoDataFrame(
+        {"pid": [11, 22, 33]},
+        geometry=[box(0, 0, 1, 1), bad_geometry, box(2, 0, 3, 1)],
+        crs="EPSG:4326",
+    )
+    pyogrio.write_dataframe(
+        parcels, path, driver="GPKG", layer="parcels",
+        layer_options={"FID": "pid"},
+    )
+    with pytest.raises(ValueError, match=r"Missing or empty parcel geometries.*PID\(s\) 22"):
+        create_parcel_down.read_parcels(str(path), "pid")
+
+
+def test_invalid_geometry_repaired_to_empty_is_rejected(tmp_path):
+    path = tmp_path / "collapsed_geometry.geojson"
+    # A zero-area degenerate polygon is nonempty before repair but buffer(0)
+    # produces an empty polygon. Do not silently exclude its PID.
+    degenerate = Polygon([(0, 0), (1, 0), (0, 0)])
+    parcels = gpd.GeoDataFrame(
+        {"pid": [11, 22]},
+        geometry=[box(2, 0, 3, 1), degenerate],
+        crs="EPSG:4326",
+    )
+    parcels.to_file(path, driver="GeoJSON")
+    with pytest.raises(ValueError, match=r"Missing or empty parcel geometries.*PID\(s\) 22"):
+        create_parcel_down.read_parcels(str(path), "pid")

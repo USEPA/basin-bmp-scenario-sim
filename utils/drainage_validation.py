@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 import numpy as np
-from shapely.geometry import box
+from shapely.geometry import Polygon, box
 from rasterio.features import rasterize
 
 
@@ -44,15 +44,44 @@ def validate_dem_coverage(parcels, dem_dataset, valid_mask: np.ndarray,
         if outside_m2 > tolerance_m2 + 1e-8:
             raise ValueError(f'DEM does not cover full parcel area: '
                              f'{outside_m2:.3f} m² outside raster bounds')
-    # Raster cells occupied by any parcel must be valid DEM data. Deliberately
-    # use a shared mask rather than reallocating arrays for each parcel.
-    covered = rasterize(((g,1) for g in parcels.geometry),
+    if tolerance_m2 < 0 or not np.isfinite(tolerance_m2):
+        raise ValueError('DEM coverage tolerance must be finite and nonnegative')
+    if linear_units_to_m <= 0 or not np.isfinite(linear_units_to_m):
+        raise ValueError('DEM linear unit conversion must be finite and positive')
+
+    # A default (cell-center) rasterization misses invalid cells that overlap
+    # only a narrow or irregular portion of a parcel. Find candidate cells
+    # using all_touched=True, then check their *actual intersection area* to
+    # avoid rejecting parcels that merely share a pixel boundary.
+    covered = rasterize(((g, 1) for g in parcels.geometry),
                         out_shape=dem_dataset.shape,
-                        transform=dem_dataset.transform, fill=0, dtype='uint8')
-    missing = (covered > 0) & ~valid_mask
-    if np.any(missing):
-        cell_area_m2 = abs(dem_dataset.transform.a * dem_dataset.transform.e -
-                           dem_dataset.transform.b * dem_dataset.transform.d) * linear_units_to_m**2
-        raise ValueError(f'DEM has NoData in parcel area: '
-                         f'{int(missing.sum())} invalid pixel(s), '
-                         f'approximately {missing.sum()*cell_area_m2:.3f} m²')
+                        transform=dem_dataset.transform, fill=0,
+                        all_touched=True, dtype='uint8')
+    potentially_missing = (covered > 0) & ~np.asarray(valid_mask, dtype=bool)
+    if not np.any(potentially_missing):
+        return
+
+    transform = dem_dataset.transform
+    spatial_index = parcels.sindex
+    missing_area_m2 = 0.0
+    missing_pixels = 0
+    for row, col in np.argwhere(potentially_missing):
+        # This also works with rotated or sheared pixel grids.
+        pixel = Polygon((transform * (col, row),
+                         transform * (col + 1, row),
+                         transform * (col + 1, row + 1),
+                         transform * (col, row + 1)))
+        cell_overlap = sum(
+            parcels.geometry.iloc[int(i)].intersection(pixel).area
+            for i in spatial_index.query(pixel, predicate='intersects')
+        ) * linear_units_to_m**2
+        if cell_overlap <= 0:
+            continue  # shared boundary/corner, not missing parcel area
+        missing_area_m2 += cell_overlap
+        missing_pixels += 1
+        if missing_area_m2 > tolerance_m2 + 1e-8:
+            raise ValueError(
+                'DEM has NoData in parcel area: at least '
+                f'{missing_area_m2:.6f} m² across {missing_pixels} '
+                'partly or fully intersected invalid pixel(s)'
+            )

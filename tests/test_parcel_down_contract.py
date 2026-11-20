@@ -104,6 +104,31 @@ def test_dem_coverage_rejects_nodata_inside(tmp_path):
             validate_dem_coverage(parcels,ds,read_mask(ds)>0)
 
 
+def test_dem_coverage_rejects_partial_nodata_pixel_without_center(tmp_path):
+    """A narrow parcel can cross a NoData cell without containing its center."""
+    path = tmp_path / 'partial_nodata.tif'
+    _dem(path, size=(1, 2), transform=from_origin(0, 1, 1, 1), nodata=-9999)
+    parcels = _parcels(box(0.8, 0.2, 1.2, 0.8))
+    # The left pixel is NoData. Only 0.2 m * 0.6 m of the parcel
+    # intersects it; its center (0.5, 0.5) is outside the parcel.
+    with rasterio.open(path) as ds:
+        mask = read_mask(ds) > 0
+        with pytest.raises(ValueError, match='NoData in parcel area'):
+            validate_dem_coverage(parcels, ds, mask)
+        with pytest.raises(ValueError, match='NoData in parcel area'):
+            validate_dem_coverage(parcels, ds, mask, tolerance_m2=0.10)
+        validate_dem_coverage(parcels, ds, mask, tolerance_m2=0.13)
+
+
+def test_dem_coverage_accepts_boundary_only_contact_with_nodata(tmp_path):
+    """all_touched candidate cells must not cause false-positive NoData."""
+    path = tmp_path / 'boundary_nodata.tif'
+    _dem(path, size=(1, 2), transform=from_origin(0, 1, 1, 1), nodata=-9999)
+    parcels = _parcels(box(1.0, 0.2, 1.2, 0.8))
+    with rasterio.open(path) as ds:
+        validate_dem_coverage(parcels, ds, read_mask(ds) > 0)
+
+
 def test_overlap_detection_is_independent_of_feature_order():
     first=box(0,0,2,2);second=box(1,0,3,2)
     for polygons in [(first,second),(second,first)]:
