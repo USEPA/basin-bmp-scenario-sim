@@ -24,16 +24,14 @@ from .constants import (
     OUTPUT_COST_USD,
     OUTPUT_TOTAL_COST_USD,
     OUTPUT_BMP_FAILED,
+    BASELINE_MASS_PREFIX,
+    TREATED_BASELINE_MASS_PREFIX,
+    REMOVED_MASS_PREFIX,
+    MASS_SUFFIX,
+    TREATMENT_EXPOSURE_PREFIX,
+    REALIZED_EFFICIENCY_PREFIX,
+    OVERALL_REDUCTION_PREFIX,
 )
-
-
-BASELINE_MASS_PREFIX = "baseline_mass_"
-TREATED_BASELINE_MASS_PREFIX = "treated_baseline_mass_"
-REMOVED_MASS_PREFIX = "removed_mass_"
-MASS_SUFFIX = "_kg"
-TREATMENT_EXPOSURE_PREFIX = "treatment_exposure_fraction_"
-REALIZED_EFFICIENCY_PREFIX = "realized_efficiency_"
-OVERALL_REDUCTION_PREFIX = "overall_reduction_fraction_"
 
 
 def _compute_statistics(values: np.ndarray) -> Dict[str, float]:

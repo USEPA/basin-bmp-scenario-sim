@@ -89,6 +89,22 @@ def test_resolve_config_paths_preserves_absolute_paths(tmp_path) -> None:
     assert Path(cfg[CFG_BMP_EFFICIENCY]) == absolute
 
 
+def test_excretion_factors_path_is_relative_to_yaml_and_case_insensitive(tmp_path, monkeypatch) -> None:
+    cfg = normalize_config({
+        "manure_loading": {"METHOD": "mass_based", "EXCRETION_FACTORS": "../inputs/rates.csv"}
+    })
+    monkeypatch.chdir(tmp_path)
+    resolve_config_paths(cfg, tmp_path / "config" / "model.yaml")
+    assert cfg["manure_loading"]["method"] == "mass_based"
+    assert Path(cfg["manure_loading"]["excretion_factors"]) == tmp_path / "inputs" / "rates.csv"
+
+
+def test_excretion_factors_default_does_not_depend_on_config_directory(tmp_path) -> None:
+    cfg = normalize_config({"manure_loading": {"method": "mass_based"}})
+    resolve_config_paths(cfg, tmp_path / "config" / "model.yaml")
+    assert "excretion_factors" not in cfg["manure_loading"]
+
+
 def test_run_from_config_resolves_paths_before_model_is_constructed(tmp_path, monkeypatch) -> None:
     import run_model
 

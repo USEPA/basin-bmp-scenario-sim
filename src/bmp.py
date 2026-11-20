@@ -17,6 +17,7 @@ if TYPE_CHECKING:
     from .model import Model
 
 from .constants import (
+    FT_TO_M,
     CFG_BUFFER_DEPTH_FT,
     CFG_DETERMINISTIC_BMP_DESIGN_PARAMETERS,
     BMP_CPS_NAME_MAP,
@@ -40,9 +41,6 @@ from .input_config import load_bmp_selection_probabilities
 
 ParcelRecordFn = Callable[[Union[int, str]], pd.Series]
 ParcelUpListFn = Callable[[Union[int, str]], List[str]]
-
-FT_TO_M = 0.3048  # meters per foot
-
 
 def _active_pathways(self: "Model") -> List[str]:
     """Return the model's active pathways, using the configured pathways or the standard three-path default.
@@ -84,6 +82,10 @@ def _get_pathway_load_rates(self: "Model", parcel_idx: int, pol_idx: int, total_
     pathway_load_rates = getattr(self, "current_pathway_load_rates", None)
     if pathway_load_rates is not None:
         values = pathway_load_rates[parcel_idx, pol_idx, :]
+        feedlot = getattr(self, "current_afo_feedlot_pathway_rates", None)
+        if feedlot is not None:
+            direct = feedlot[parcel_idx, pol_idx, :]
+            values = direct if getattr(self, "current_bmp_targets_feedlot", False) else values - direct
         return {pathways[i]: float(values[i]) for i in range(len(pathways))}
 
     fractions = dict(
@@ -165,7 +167,14 @@ def _apply_pathway_reduction(
 
     removed_load_rate = 0.0
     for path_idx, path in enumerate(_active_pathways(self)):
-        current_load_rate = float(pathway_load_rates[parcel_idx, pol_idx, path_idx])
+        total_load_rate = float(pathway_load_rates[parcel_idx, pol_idx, path_idx])
+        direct_component = getattr(self, "current_afo_feedlot_pathway_rates", None)
+        if direct_component is None:
+            current_load_rate = total_load_rate
+        elif getattr(self, "current_bmp_targets_feedlot", False):
+            current_load_rate = float(direct_component[parcel_idx, pol_idx, path_idx])
+        else:
+            current_load_rate = total_load_rate - float(direct_component[parcel_idx, pol_idx, path_idx])
         eff = float(eff_map[path])
         if current_load_rate < 0.0:
             raise RuntimeError("Current pathway load rate cannot be negative")
@@ -175,7 +184,23 @@ def _apply_pathway_reduction(
             raise RuntimeError("BMP efficiency must not exceed 1 after input validation")
         new_value = current_load_rate * (1.0 - treatment_fraction * eff)
         removed_load_rate += current_load_rate - new_value
-        pathway_load_rates[parcel_idx, pol_idx, path_idx] = new_value
+        if direct_component is not None and getattr(self, "current_bmp_targets_feedlot", False):
+            direct_component[parcel_idx, pol_idx, path_idx] = new_value
+        if direct_component is not None and not getattr(self, "current_bmp_targets_feedlot", False):
+            multiplier = 1.0 - treatment_fraction * eff
+            manure = getattr(self, "current_afo_manure_pathway_rates", None)
+            if manure is not None:
+                manure[parcel_idx, pol_idx, path_idx] *= multiplier
+            for source in getattr(self, "afo_bmp_sources_by_parcel", {}).get(parcel_idx, []):
+                if source["pol_idx"] == pol_idx and source["path_idx"] == path_idx:
+                    source["full_rate"] *= multiplier
+                    source["current_rate"] *= multiplier
+        if direct_component is None:
+             pathway_load_rates[parcel_idx, pol_idx, path_idx] = new_value
+        elif getattr(self, "current_bmp_targets_feedlot", False):
+             pathway_load_rates[parcel_idx, pol_idx, path_idx] = (total_load_rate - current_load_rate) + new_value
+        else:
+             pathway_load_rates[parcel_idx, pol_idx, path_idx] = float(direct_component[parcel_idx, pol_idx, path_idx]) + new_value
     return float(removed_load_rate)
 
 

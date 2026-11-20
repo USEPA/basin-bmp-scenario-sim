@@ -56,6 +56,7 @@ from .constants import (
     LOAD_CONCENTRATIONS,
     LOAD_GROUNDWATER_CONCENTRATIONS,
     LOAD_GROUNDWATER_LOADS,
+    LOAD_GENERATION_PATH_KEYS as _LOAD_GENERATION_PATH_KEYS,
     LOAD_TREAT_GROUNDWATER_WITH_BMPS,
     COL_CPS,
     COL_COST_COMPONENT,
@@ -70,6 +71,7 @@ from .constants import (
     COL_PATHWAY,
     PATHWAY_VALUES,
     PLET_PATHWAY_VALUES,
+    PLET_HYDROLOGY_LABEL as _PLET_HYDROLOGY_LABEL,
     DEFAULT_BMP_FAIL_REDUCTION,
     DEFAULT_BUFFER_DEPTH_FT,
     COL_SDR_F_TO_S,
@@ -92,6 +94,7 @@ from .constants import (
     GPKG_INPUT_SURFACE_CONCENTRATION,
     GPKG_INPUT_SUBSURFACE_CONCENTRATION,
     GPKG_DELIVERY_RATIO_TABLES,
+    CONFIG_PATH_KEYS as _CONFIG_PATH_KEYS,
     RUSLE_PARAMETER_NAMES,
     COL_HUC12,
     COL_AREA_FRACTION,
@@ -139,9 +142,6 @@ from .input_schema import (
     KNOWN_INPUT_TABLES,
     required_input_tables,
 )
-
-
-_PLET_HYDROLOGY_LABEL = "plet_hydrology_inputs"
 
 
 def _normalize_integer_identifier_value(
@@ -1099,21 +1099,6 @@ def apply_config_defaults(cfg: Dict[str, Any]) -> None:
     _set_case_insensitive_default(cfg, CFG_LOAD_GENERATION, {})
 
 
-_CONFIG_PATH_KEYS = (
-    CFG_DOMAIN,
-    CFG_PARCELS,
-    CFG_PLET_FORCING,
-    CFG_HUC_PARAMETERS,
-    CFG_OUTLETS,
-    CFG_BMP_EFFICIENCY,
-    CFG_BMP_COST,
-    CFG_BMP_SEL,
-    CFG_OUTPUTS,
-)
-
-_LOAD_GENERATION_PATH_KEYS: tuple[str, ...] = ()
-
-
 def _resolve_config_path_value(value: Any, base_dir: Path) -> Any:
     """Resolve one configured filesystem path relative to a config directory.
 
@@ -1172,6 +1157,16 @@ def resolve_config_paths(cfg: Dict[str, Any], config_path: Union[str, Path]) -> 
                 load_generation[key] = _resolve_config_path_value(
                     load_generation[key], base_dir
                 )
+
+    manure_loading = ci_get(cfg, "manure_loading")
+    if isinstance(manure_loading, dict):
+        normalized_manure_loading = {str(key).lower(): value for key, value in manure_loading.items()}
+        manure_loading.clear()
+        manure_loading.update(normalized_manure_loading)
+        if manure_loading.get("excretion_factors") is not None:
+            manure_loading["excretion_factors"] = _resolve_config_path_value(
+                manure_loading["excretion_factors"], base_dir
+            )
 
     return cfg
 
@@ -3105,6 +3100,64 @@ def load_and_validate_all(cfg: Dict[str, Any], logger: Any) -> Dict[str, Any]:
                 bmp_eff, cps, pollutants, pathways
             )
 
+        # Optional dedicated AFO GeoPackage keeps operation-to-field relations
+        # separate from canonical per-variable parcel input_* tables.
+        afo_inputs = None
+        feedlot_bmp_cps = []
+        afo_path = ci_get(cfg, "animal_operations")
+        if afo_path is not None:
+            manure_cfg = ci_get(cfg, "manure_loading") or {}
+            if not isinstance(manure_cfg, dict):
+                raise ValueError("manure_loading must be a mapping")
+            method = str(ci_get(manure_cfg, "method") or "concentration_increment").lower()
+            surface_pathway = str(ci_get(manure_cfg, "surface_pathway") or "surface")
+            if method == "concentration_increment" and load_mode != LOAD_MODE_PLET_RUSLE:
+                raise ValueError("concentration_increment manure loading is PLET-only; use mass_based with statistical mode")
+            if method == "mass_based" and not {"TN", "TP"}.issubset(set(pollutants)):
+                raise ValueError("mass_based manure loading requires both TN and TP pollutants")
+            excretion_path = ci_get(manure_cfg, "excretion_factors")
+            if excretion_path is not None and method != "mass_based":
+                raise ValueError("manure_loading.excretion_factors requires method: mass_based")
+            if excretion_path is not None and (
+                not isinstance(excretion_path, (str, Path)) or not str(excretion_path).strip()
+            ):
+                raise ValueError("manure_loading.excretion_factors must be a nonblank CSV path")
+            feedlot_bmp_cps = [int(c) for c in (ci_get(cfg, "feedlot_bmp_cps") or [])]
+            if len(set(feedlot_bmp_cps)) != len(feedlot_bmp_cps) or not set(feedlot_bmp_cps).issubset(set(cps)):
+                raise ValueError("feedlot_bmp_cps must be distinct CPS codes present in cps")
+            if set(feedlot_bmp_cps).intersection({412, 656, 657}):
+                raise ValueError("feedlot_bmp_cps cannot include buffer or wetland CPS")
+            from .afo import load_afo_inputs
+            afo_inputs = load_afo_inputs(
+                afo_path, parcels, pollutants, method=method, mode=load_mode,
+                pathways=pathways, surface_pathway=surface_pathway,
+                parcel_path=ci_get(cfg, CFG_PARCELS),
+                excretion_factors_path=excretion_path,
+                runoff_adjusted_export=ci_get(manure_cfg, "runoff_adjusted_export")
+                if "runoff_adjusted_export" in manure_cfg else False,
+                reference_runoff_mm=ci_get(manure_cfg, "reference_runoff_mm"),
+                feedlot_bmp_cps=feedlot_bmp_cps,
+            )
+            # Reject incomplete feedlot length-based costing at input load time,
+            # before a Monte Carlo worker ever selects the practice.
+            if bmp_cost is not None and not bmp_cost.empty and feedlot_bmp_cps:
+                from .cost import _canonical_cost_unit
+                for c in feedlot_bmp_cps:
+                    cost_rows = bmp_cost[bmp_cost["cps"].astype(int) == c]
+                    if not any(_canonical_cost_unit(row.get("unit")) == "usd/m"
+                               for _, row in cost_rows.iterrows()):
+                        continue
+                    dims = afo_inputs.get("feedlot_cost_dimensions", {})
+                    for operation in afo_inputs["operations"]:
+                        if "cost_length_m" not in dims.get((str(operation["afo_id"]), c), {}):
+                            raise ValueError(
+                                f"Feedlot CPS {c} uses USD/m costs: "
+                                f"afo_feedlot_bmp_cost_dimensions requires cost_length_m "
+                                f"for operation {operation['afo_id']!r}"
+                            )
+        elif ci_get(cfg, "feedlot_bmp_cps") or ci_get(cfg, "manure_loading"):
+            raise ValueError("feedlot_bmp_cps and manure_loading require animal_operations")
+
         delivery_ratios = _load_delivery_ratios(cfg, logger, **input_kwargs)
         delivery_ratios = _complete_delivery_ratio_defaults(delivery_ratios, parcel_out_map)
 
@@ -3115,6 +3168,8 @@ def load_and_validate_all(cfg: Dict[str, Any], logger: Any) -> Dict[str, Any]:
 
     return dict(
         parcels=parcels,
+        afo_inputs=afo_inputs,
+        feedlot_bmp_cps=feedlot_bmp_cps,
         parcel_p=sel,
         parcel_down_map=parcel_down_map,
         parcel_out_map=parcel_out_map,

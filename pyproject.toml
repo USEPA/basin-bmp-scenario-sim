@@ -38,3 +38,10 @@ hydrology = ["whitebox>=2.3"]
 testpaths = ["tests"]
 addopts = "-q"
 python_files = ["test_*.py"]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["src"]
+
+[tool.setuptools.package-data]
+src = ["data/afo/manure_excretion_reference.csv"]
