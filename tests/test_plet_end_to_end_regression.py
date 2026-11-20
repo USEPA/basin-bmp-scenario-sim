@@ -303,8 +303,13 @@ def test_deterministic_plet_scenario_matches_golden_reference(
 
         count_record = records[(pol, "O1", "count", "total")]
         cost_record = records[(pol, "O1", "cost", "total")]
-        assert count_record == pytest.approx([(1, 1.0, removed[pol])])
-        assert cost_record == pytest.approx([(1, 50.0, removed[pol])])
+        assert len(count_record) == len(cost_record) == 1
+        assert count_record[0][:2] == (1, 1.0)
+        assert cost_record[0][:2] == (1, 50.0)
+        assert float(count_record[0][2]) == pytest.approx(removed[pol], rel=1e-10)
+        assert float(cost_record[0][2]) == pytest.approx(removed[pol], rel=1e-10)
+        assert count_record[0] == pytest.approx((1, 1.0, removed[pol]))
+        assert cost_record[0] == pytest.approx((1, 50.0, removed[pol]))
 
 
 def test_afo_integrated_scenario_keeps_feedlot_and_field_bmps_separate(
@@ -429,3 +434,75 @@ def test_mass_based_integrated_baseline_bmp_and_outputs(tmp_path, monkeypatch, s
     assert tn.final_manure_field_surface_kg_yr==pytest.approx(tn.baseline_manure_field_surface_kg_yr)
     assert tn.final_direct_feedlot_surface_kg_yr==pytest.approx(.5*tn.baseline_direct_feedlot_surface_kg_yr)
     assert ("parcels", "s1.parquet") in written
+
+
+def test_merge_accounting_includes_induced_manure_receiving_parcels():
+    """Feedlot treatment and manure transfer use their own outlet memberships."""
+    from collections import defaultdict
+    from types import SimpleNamespace
+    from src.model import (
+        _accumulate_delivered_bmp_reductions,
+        _removed_mass_by_parcel_kg,
+    )
+
+    ratios = {
+        ("P1", "O1"): dict(ndr_f_to_s=0.5, ndr_s_to_o=1.0,
+                           sdr_f_to_s=0.5, sdr_s_to_o=1.0),
+        ("P2", "O2"): dict(ndr_f_to_s=0.2, ndr_s_to_o=1.0,
+                           sdr_f_to_s=0.2, sdr_s_to_o=1.0),
+    }
+    ctx = SimpleNamespace(
+        parcel_ids=["P1", "P2"],
+        pid_to_index={"P1": 0, "P2": 1},
+        parcel_area_ha=np.asarray([1.0, 1.0]),
+        pollutants=["TN"],
+        _get_parcel_out_oids=lambda idx: [["O1"], ["O2"]][idx],
+        _delivery_coeffs=lambda pid, oid: ratios[(pid, oid)],
+    )
+    before = np.asarray([[10.0], [10.0]])
+    after = np.asarray([[8.0], [11.0]])  # 2 kg removed, 1 kg induced
+    changes = _removed_mass_by_parcel_kg(
+        ctx, before, after, 0, {"cps": 340}, np.asarray([1.0]),
+        extra_parcel_indices=(1,),
+    )
+    cumulative = defaultdict(lambda: defaultdict(float))
+    _accumulate_delivered_bmp_reductions(ctx, changes, cumulative)
+    assert cumulative["TN"]["O1"] == pytest.approx(1.0)
+    assert cumulative["TN"]["O2"] == pytest.approx(-0.2)
+
+
+def test_merge_wetland_reductions_use_upstream_parcel_delivery_factors():
+    """An upstream wetland change cannot be delivered using host-only factors."""
+    from collections import defaultdict
+    from types import SimpleNamespace
+    from src.model import (
+        _accumulate_delivered_bmp_reductions,
+        _removed_mass_by_parcel_kg,
+    )
+
+    coeffs = {
+        ("P1", "O1"): .1,
+        ("P2", "O1"): .2,
+        ("P3", "O1"): 1.,
+    }
+    ctx = SimpleNamespace(
+        parcel_ids=["P1", "P2", "P3"],
+        pid_to_index={"P1": 0, "P2": 1, "P3": 2},
+        parcel_area_ha=np.ones(3),
+        pollutants=["TN"],
+        _get_parcel_out_oids=lambda idx: ["O1"],
+        _delivery_coeffs=lambda pid, oid: dict(
+            ndr_f_to_s=coeffs[(pid, oid)], ndr_s_to_o=1.0,
+            sdr_f_to_s=coeffs[(pid, oid)], sdr_s_to_o=1.0,
+        ),
+    )
+    before = np.asarray([[10.0], [10.0], [10.0]])
+    after = np.asarray([[5.0], [5.8], [6.8]])
+    changes = _removed_mass_by_parcel_kg(
+        ctx, before, after, 2,
+        {"cps": 656, "impacted_pids": "P1,P2,P3"},
+        np.asarray([12.4]),
+    )
+    cumul = defaultdict(lambda: defaultdict(float))
+    _accumulate_delivered_bmp_reductions(ctx, changes, cumul)
+    assert cumul["TN"]["O1"] == pytest.approx(4.54)

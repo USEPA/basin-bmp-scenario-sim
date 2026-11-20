@@ -17,6 +17,7 @@ import geopandas as gpd
 import numpy as np
 import pandas as pd
 
+from .parcel_graph import validate_acyclic_downstream_map
 from .constants import (
     CFG_BMP_COST,
     CFG_BMP_SEL,
@@ -62,7 +63,7 @@ from .constants import (
     COL_MEAN,
     COL_OID,
     COL_PID,
-    COL_PID_UP,
+    COL_PID_DOWN,
     COL_POLLUTANT,
     COL_PROBABILITY,
     COL_TARGET,
@@ -78,7 +79,7 @@ from .constants import (
     COL_NDR_F_TO_S,
     COL_NDR_S_TO_O,
     GPKG_PARCELS_LAYER,
-    GPKG_PARCEL_UP_TABLE,
+    GPKG_PARCEL_DOWN_TABLE,
     GPKG_PARCEL_OUTLETS_TABLE,
     GPKG_PARCEL_HUC12_TABLE,
     GPKG_PLET_HUC12_LAYER,
@@ -209,7 +210,7 @@ def _normalize_identifier_columns(
     for column in columns:
         if column not in out.columns:
             continue
-        if column in {COL_PID, COL_PID_UP}:
+        if column in {COL_PID, COL_PID_DOWN}:
             allow_null = allow_null_pid and column == COL_PID
             values = [
                 _normalize_integer_identifier_value(
@@ -344,7 +345,7 @@ def _validate_input_package_schema(
                 "and does not use a separate fid column"
             )
 
-        editable_tables = (set(KNOWN_INPUT_TABLES) | {GPKG_PARCEL_UP_TABLE, GPKG_PARCEL_OUTLETS_TABLE, GPKG_PARCEL_HUC12_TABLE, "parcel_huc"}) & table_names
+        editable_tables = (set(KNOWN_INPUT_TABLES) | {GPKG_PARCEL_DOWN_TABLE, GPKG_PARCEL_OUTLETS_TABLE, GPKG_PARCEL_HUC12_TABLE, "parcel_huc"}) & table_names
         for table_name in sorted(editable_tables):
             info = read_geopackage_table_info(package, table_name)
             metadata = {row["name"].lower(): row for row in info}
@@ -352,7 +353,7 @@ def _validate_input_package_schema(
                 raise ValueError(
                     f"GeoPackage schema v3 requires {table_name!r} to have an integer primary-key row ID so it is editable in QGIS"
                 )
-            for pid_column in (COL_PID, COL_PID_UP):
+            for pid_column in (COL_PID, COL_PID_DOWN):
                 if pid_column in metadata and "INT" not in metadata[pid_column]["type"].upper():
                     raise ValueError(
                         f"GeoPackage schema v3 requires {table_name}.{pid_column} to use INTEGER storage"
@@ -450,7 +451,7 @@ def _read_gpkg_input_table(
     if technical_ids:
         frame = frame.drop(columns=technical_ids)
     require_columns(frame, required_cols, f"{label} ({package}:{table_name})", logger)
-    identifier_cols = [column for column in (COL_PID, COL_PID_UP, COL_OID) if column in frame.columns]
+    identifier_cols = [column for column in (COL_PID, COL_PID_DOWN, COL_OID) if column in frame.columns]
     if identifier_cols:
         spec = INPUT_VARIABLE_SPECS.get(table_name)
         # Schema-v3 renamed ``wildcard_allowed`` to ``default_row_allowed``
@@ -1939,43 +1940,44 @@ def _merge_huc12_plet_concentrations(
 
 
 def _load_parcel_graph(cfg: Dict[str, Any], logger: Any) -> pd.DataFrame:
-    """Load optional normalized parcel-to-parcel upstream edges from ``parcels.gpkg``."""
+    """Load required ``parcel_down(pid,pid_down)``; no legacy fallback."""
     package = ci_get(cfg, CFG_PARCELS)
     try:
         return _read_gpkg_input_table(
             package,
-            GPKG_PARCEL_UP_TABLE,
-            [COL_PID, COL_PID_UP],
-            GPKG_PARCEL_UP_TABLE,
+            GPKG_PARCEL_DOWN_TABLE,
+            [COL_PID, COL_PID_DOWN],
+            GPKG_PARCEL_DOWN_TABLE,
             logger,
         )
-    except MissingInputTableError:
-        logger.verbose(
-            "parcel_up table not present; treating all parcels as having no upstream parcels"
-        )
-        return pd.DataFrame(columns=[COL_PID, COL_PID_UP])
+    except MissingInputTableError as exc:
+        raise ValueError(
+            f"Required 'parcel_down(pid,pid_down)' table missing from {package}. "
+            "Legacy parcel_up is not supported. Regenerate the drainage table "
+            "using utils/create_parcel_down.py, or migrate the GeoPackage. "
+            "An empty parcel_down table is valid when all parcels are outlets."
+        ) from exc
 
-def _build_parcel_up_map(
-    upstream_rows: pd.DataFrame,
+
+def _build_parcel_down_map(
+    downstream_rows: pd.DataFrame,
     parcel_ids: Sequence[str],
     source_parcel_ids: Optional[Sequence[str]] = None,
     logger: Any = None,
-) -> Dict[str, List[str]]:
-    """Build the modeled parcel graph, filtering relationships clipped by the domain.
+) -> Dict[str, Optional[str]]:
+    """Validate one immediate downstream PID per source, filtering clipped edges.
 
-    References to IDs that exist in the source parcel layer but fall outside the
-    modeled domain are omitted. References to IDs that never existed in the
-    source layer remain hard errors, which distinguishes clipping from typos.
+    The GeoPackage stores ``source pid -> pid_down``. The model derives the
+    reverse immediate-upstream adjacency in memory for wetland catchments.
+    Unmodeled-domain links are filtered only *after* all source IDs have been
+    checked, so missing/typo IDs do not masquerade as domain clipping.
     """
     ordered_pids = [str(pid).strip() for pid in parcel_ids]
-    valid_pids = set(ordered_pids)
-    source_pids = (
-        {str(pid).strip() for pid in source_parcel_ids}
-        if source_parcel_ids is not None
-        else set(valid_pids)
-    )
-    parcel_up_map: Dict[str, List[str]] = {pid: [] for pid in ordered_pids}
-    seen_by_pid = {pid: set() for pid in ordered_pids}
+    modeled = set(ordered_pids)
+    source = ({str(pid).strip() for pid in source_parcel_ids}
+              if source_parcel_ids is not None else modeled)
+    downstream: Dict[str, Optional[str]] = {pid: None for pid in ordered_pids}
+    source_to_target: dict[str,str] = {}
     unknown: set[str] = set()
     clipped_edges = 0
 
@@ -1987,42 +1989,75 @@ def _build_parcel_up_map(
             text = str(int(value))
         return text
 
-    for row_idx, row in upstream_rows.iterrows():
+    for row_idx, row in downstream_rows.iterrows():
         pid = normalize_pid(row[COL_PID])
-        pid_up = normalize_pid(row[COL_PID_UP])
-        if not pid or not pid_up:
-            raise ValueError(
-                f"{GPKG_PARCEL_UP_TABLE} row {row_idx} must contain nonblank pid and pid_up"
-            )
-        if pid == "*" or pid_up == "*" or "," in pid or "," in pid_up:
-            raise ValueError(
-                f"{GPKG_PARCEL_UP_TABLE} uses normalized one-edge-per-row relationships; "
-                "wildcards and comma-separated IDs are not supported"
-            )
-        if pid not in source_pids:
+        pid_down = normalize_pid(row[COL_PID_DOWN])
+        if not pid or not pid_down:
+            raise ValueError(f"parcel_down row {row_idx} requires nonblank pid and pid_down")
+        if (pid == '*' or pid_down == '*' or ',' in pid or ',' in pid_down):
+            raise ValueError("parcel_down requires a single integer pid_down per row; "
+                             "wildcards and comma-separated values are invalid")
+        if pid == pid_down:
+            raise ValueError(f"parcel_down contains a self-link / directed cycle: {pid} -> {pid}")
+        if pid not in source:
             unknown.add(pid)
-            continue
-        if pid_up not in source_pids:
-            unknown.add(pid_up)
-            continue
-        if pid not in valid_pids or pid_up not in valid_pids:
+        if pid_down not in source:
+            unknown.add(pid_down)
+        if pid in source_to_target:
+            raise ValueError(f"parcel_down contains more than one downstream "
+                             f"relationship for pid {pid}")
+        source_to_target[pid] = pid_down
+        if pid in modeled and pid_down in modeled:
+            downstream[pid] = pid_down
+        else:
             clipped_edges += 1
-            continue
-        if pid_up not in seen_by_pid[pid]:
-            parcel_up_map[pid].append(pid_up)
-            seen_by_pid[pid].add(pid_up)
-
     if unknown:
-        values = sorted(unknown)
-        raise ValueError(
-            "parcel_up references parcel IDs not found in the source parcels layer: "
-            f"{values[:10]}"
-        )
+        raise ValueError("parcel_down references parcel IDs absent from source "
+                         f"parcels: {sorted(unknown)[:10]}")
     if clipped_edges and logger is not None:
-        logger.verbose(
-            f"Filtered {clipped_edges} parcel_up relationship(s) involving parcels outside the modeled domain"
+        logger.verbose(f"Filtered {clipped_edges} parcel_down link(s) outside modeled domain")
+
+    # Check acyclicity after domain clipping. The reverse graph is used only
+    # for validation and wetland traversal; the stored table is downstream.
+    upstream: Dict[str, List[str]] = {pid: [] for pid in ordered_pids}
+    for pid, to in downstream.items():
+        if to is not None:
+            upstream[to].append(pid)
+    validate_acyclic_downstream_map(downstream)
+    return downstream
+
+
+
+def _validate_parcel_outlet_topology(
+    parcel_down_map: Mapping[str, Optional[str]],
+    parcel_out_map: Mapping[str, Sequence[str]],
+) -> None:
+    """Check complete downstream outlet membership for the representative graph.
+
+    If p drains immediately to q, every modeled outlet downstream of q must
+    also receive p's load. Extra outlets for p are valid (nested gauges).
+    Parcels with no downstream neighbor may have any outlet membership.
+    The check uses the post-domain-clipping mappings, not source-wide edges.
+    """
+    violations: List[str] = []
+    for pid, downstream_pid in parcel_down_map.items():
+        if downstream_pid is None:
+            continue
+        source_outlets = set(map(str, parcel_out_map.get(str(pid), ())))
+        downstream_outlets = set(map(str, parcel_out_map.get(str(downstream_pid), ())))
+        missing = sorted(downstream_outlets - source_outlets)
+        if missing:
+            violations.append(
+                f'pid={pid} -> pid_down={downstream_pid}: missing downstream outlet(s) {missing}'
+            )
+    if violations:
+        raise ValueError(
+            'parcel_outlets is inconsistent with parcel_down: each upstream '
+            'parcel must list every modeled outlet associated with its '
+            'immediate downstream parcel. Example violation(s): '
+            + '; '.join(violations[:10])
         )
-    return parcel_up_map
+
 
 def _load_parcel_outlets(cfg: Dict[str, Any], logger: Any) -> pd.DataFrame:
     """Load normalized parcel-to-outlet edges from ``parcels.gpkg``."""
@@ -2878,7 +2913,7 @@ def load_and_validate_all(cfg: Dict[str, Any], logger: Any) -> Dict[str, Any]:
         source_parcel_ids = [
             int(pid) for pid in parcels.attrs.get("source_pid_universe", parcel_ids)
         ]
-        parcel_up_map = _build_parcel_up_map(
+        parcel_down_map = _build_parcel_down_map(
             up, parcel_ids, source_parcel_ids=source_parcel_ids, logger=logger
         )
 
@@ -2903,6 +2938,8 @@ def load_and_validate_all(cfg: Dict[str, Any], logger: Any) -> Dict[str, Any]:
             pid = str(int(getattr(row, COL_PID)))
             oid = str(getattr(row, COL_OID))
             parcel_out_map[pid].append(oid)
+
+        _validate_parcel_outlet_topology(parcel_down_map, parcel_out_map)
 
         pollutants = _load_pollutants(cfg)
         cps = _load_cps(cfg)
@@ -3134,7 +3171,7 @@ def load_and_validate_all(cfg: Dict[str, Any], logger: Any) -> Dict[str, Any]:
         afo_inputs=afo_inputs,
         feedlot_bmp_cps=feedlot_bmp_cps,
         parcel_p=sel,
-        parcel_up_map=parcel_up_map,
+        parcel_down_map=parcel_down_map,
         parcel_out_map=parcel_out_map,
         pollutants=pollutants,
         cps=cps,

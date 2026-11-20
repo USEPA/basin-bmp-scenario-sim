@@ -20,7 +20,7 @@ from .constants import (
     COL_PID,
     CFG_DETERMINISTIC_PARCEL_ORDER,
     DATA_PARCELS,
-    DATA_PARCEL_UP_MAP,
+    DATA_PARCEL_DOWN_MAP,
 )
 
 
@@ -147,7 +147,8 @@ def _get_parcel_up_list(self: "Model", pid: Union[int, str]) -> List[str]:
             Upstream parcel identifiers.
         
     """
-    return list(self.data[DATA_PARCEL_UP_MAP][str(pid)])
+    # Reverse adjacency has already been derived from parcel_down in Model.
+    return [self.parcel_ids[index] for index in self.parcel_up_idxs[self.pid_to_index[str(pid)]]]
 
 
 def _get_parcel_out_oids(self: "Model", parcel_idx: int) -> List[str]:

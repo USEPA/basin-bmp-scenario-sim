@@ -36,6 +36,7 @@ from .constants import (
     PATHWAY_VALUES,
 )
 from .logging_utils import log_scope
+from .parcel_graph import iter_full_upstream_by_distance
 from .input_config import load_bmp_selection_probabilities
 
 ParcelRecordFn = Callable[[Union[int, str]], pd.Series]
@@ -354,8 +355,13 @@ def _simulate_wetland(
         )
         total_available_ha = float(self.parcel_area_ha[parcel_idx])
 
-        for up_idx in self.parcel_up_idxs[parcel_idx]:
-            if deterministic_design and total_available_ha >= impacted_area_ha:
+        # Walk the complete upstream DAG, nearest (fewest graph edges) first.
+        # On a tie, process ascending PID. Only the first upstream parcels
+        # needed to reach the sampled treatment catchment are included.
+        for up_idx in iter_full_upstream_by_distance(
+            parcel_idx, self.parcel_up_idxs, self.parcel_ids
+        ):
+            if total_available_ha >= impacted_area_ha:
                 break
             if up_idx not in impacted_idxs:
                 impacted_idxs.append(up_idx)

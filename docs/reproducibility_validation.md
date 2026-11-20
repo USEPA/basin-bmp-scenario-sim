@@ -64,8 +64,26 @@ Scientific model development should maintain tests covering at least:
 - signed BMP efficiencies
 - BMP failure behavior
 - output and reporting compatibility
+- signed BMP removal mass reconciliation against per-parcel before/after loads
+- wetland outlet trajectories using each impacted parcel's own delivery ratios
+- serial BMP stacking without double counting at an outlet
+- nested versus independent outlet memberships consistent with `parcel_down`
 
 Code-level unit tests demonstrate implementation consistency; they do not by themselves establish scientific validity for a particular watershed.
+
+## Outlet-accounting validation
+
+The unit regression tests include a synthetic three-parcel wetland whose
+removed mass is 12.4 kg but whose parcel-weighted delivered reduction is
+4.54 kg for the specified parcel-to-outlet coefficients. They also check
+signed (negative) removals, BMP stacking, differing sediment/nutrient delivery
+factors, and routing to independent versus nested monitoring outlets.
+
+This is an implementation consistency check under the current **parcel-level
+load reduction and delivery-factor convention**. It is **not** an empirical
+validation of wetland interception, nor a mechanistic routing model. A real
+watershed should separately validate the assumed parcel-to-outlet delivery
+factors and outlet memberships against its physical drainage structure.
 
 ## Scientific validation
 

@@ -67,7 +67,71 @@ This is an important structural assumption. It is most natural where later pract
 
 ## Parcel connectivity and wetlands
 
-Where applicable, the `parcel_up` table inside the parcel GeoPackage supplies upstream parcel relationships used by BMP logic that depends on contributing drainage area. The table is normalized: each row is one `pid` → `pid_up` relationship; comma-separated relationship lists are not supported.
+The required `parcel_down` table stores one immediate *downstream* recipient
+per source parcel as `(pid, pid_down)`. Its `pid` key is unique; an outlet or
+unresolved parcel has no row, and many upstream parcels may share one
+recipient. `parcel_down` is acyclic, and it cannot represent split routing.
+The model reverses these links in memory to build immediate-upstream
+adjacency, then traverses all reachable ancestors in shortest-distance order.
+Legacy `parcel_up` input is not accepted. The graph is a whole-parcel routing
+approximation, not a fraction-aware catchment model.
+
+For sampled wetland designs, the simulation traverses the **full transitive
+upstream network** from the wetland host, starting with the host itself and
+adding upstream parcels by shortest graph distance (number of immediate
+connections). Parcels tied in distance are considered in ascending PID order
+(numerically for numeric IDs and lexicographically otherwise). Each upstream
+parcel can contribute only once, even if reachable by multiple routes.
+Traversal stops as soon as the wetland's sampled treatment area is covered or
+the upstream network is exhausted; partial treatment of the last selected
+parcel is preserved. Parcels are considered from the complete hydrologic
+universe, including those excluded from random BMP placement.
+
+### BMP removal and outlet-delivered reductions
+
+The scenario reports two **different mass quantities**, both calculated for
+an annual timestep:
+
+1. **BMP removed mass** (`removed_mass_{pollutant}_kg` in the per-BMP table)
+   is the signed change in pollutant mass across the parcels affected by the
+   BMP *before* applying parcel-to-outlet delivery factors. For a wetland it
+   includes the host parcel and every selected upstream parcel, including
+   partial treatment of the last parcel. Negative efficiency can produce a
+   negative removal (an increase in loading).
+2. **Delivered reduction at an outlet** (the cumulative `total` outlet
+   trajectory) is the sum of each affected parcel's **own** signed before/after
+   load change times its delivery factors for that outlet. A source parcel
+   contributes to a trajectory only when that outlet is listed for the parcel
+   in `parcel_outlets`.
+
+For parcel `p`, pollutant `k`, and annual timestep `Δt=1 year`, the change is
+
+    ΔM[p,k] = (load_rate_before[p,k] - load_rate_after[p,k]) × area_ha[p] × Δt
+
+For outlet `o` the reported change is
+
+    ΔM_delivered[o,k] = Σ[p with (p,o) in parcel_outlets] ΔM[p,k] × D[p,o,k]
+
+where `D` is `sdr_f_to_s × sdr_s_to_o` for TSS and
+`ndr_f_to_s × ndr_s_to_o` for other pollutants. The model checks that
+per-parcel signed changes sum to the BMP's recorded removed mass. Changes are
+computed *at each placement* on the current load state, preventing double
+counting when BMPs stack serially. `target` and `mean` outlet trajectories
+are percentages of the corresponding configured positive reference values,
+using this **delivered** cumulative reduction as the numerator.
+
+**Interpretation limitation:** Wetland removal is represented by reductions
+assigned to contributing parcels, then passed through their parcel-to-outlet
+delivery factors. This is a parcel-level accounting convention, **not** an
+explicit calculation of pollutant transport to a wetland, treatment there,
+and transport from the wetland to its outlet. The representative `parcel_down`
+network controls which parcels are eligible for wetland treatment; it does not
+replace the user-supplied parcel-to-outlet delivery coefficients.
+
+The existing deterministic-design assumption is intentionally unchanged:
+`deterministic_bmp_design_parameters: true` treats only the wetland-host parcel.
+No wetland efficiency, delivery, cost, or cumulative-cost stopping assumptions
+are changed by the graph-traversal fix.
 
 ## Cost and stopping conditions
 

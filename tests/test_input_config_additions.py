@@ -51,22 +51,20 @@ def test_apply_config_defaults_disables_deterministic_parcel_order() -> None:
     assert cfg[CFG_DETERMINISTIC_BMP_DESIGN_PARAMETERS] is False
 
 
-def test_build_parcel_up_map_trims_normalized_edge_ids() -> None:
+def test_build_parcel_down_map_trims_normalized_edge_ids() -> None:
     upstream = pd.DataFrame(
         [
-            {"pid": " 10 ", "pid_up": " 1 "},
-            {"pid": "10", "pid_up": "2"},
-            {"pid": "10", "pid_up": "3"},
+            {"pid": " 10 ", "pid_down": " 1 "},
         ]
     )
-    result = input_config._build_parcel_up_map(upstream, ["1", "2", "3", "10"])
-    assert result["10"] == ["1", "2", "3"]
+    result = input_config._build_parcel_down_map(upstream, ["1", "2", "3", "10"])
+    assert result["10"] == "1"
 
 
-def test_build_parcel_up_map_unknown_upstream_pid_raises() -> None:
-    upstream = pd.DataFrame([{"pid": "10", "pid_up": "999"}])
+def test_build_parcel_down_map_unknown_upstream_pid_raises() -> None:
+    upstream = pd.DataFrame([{"pid": "10", "pid_down": "999"}])
     with pytest.raises(ValueError, match="999"):
-        input_config._build_parcel_up_map(upstream, ["1", "10"])
+        input_config._build_parcel_down_map(upstream, ["1", "10"])
 
 
 
@@ -88,7 +86,7 @@ def test_load_and_validate_all_rejects_non_mapping_load_generation(monkeypatch, 
     monkeypatch.setattr(input_config, "log_scope", lambda logger=None: _NullScope())
     monkeypatch.setattr(input_config, "_load_domain", lambda cfg, logger: object())
     monkeypatch.setattr(input_config, "_load_parcels", lambda cfg, domain, logger: pd.DataFrame({"pid": [1]}))
-    monkeypatch.setattr(input_config, "_load_parcel_graph", lambda cfg, logger: pd.DataFrame(columns=["pid", "pid_up"]))
+    monkeypatch.setattr(input_config, "_load_parcel_graph", lambda cfg, logger: pd.DataFrame(columns=["pid", "pid_down"]))
     monkeypatch.setattr(input_config, "_load_parcel_outlets", lambda cfg, logger: pd.DataFrame({"pid": [1], "oid": ["O1"]}))
     monkeypatch.setattr(input_config, "_load_parcel_selection", lambda cfg, parcels, logger: pd.DataFrame({"pid": [1], "probability": [1.0]}))
     monkeypatch.setattr(input_config, "_load_pollutants", lambda cfg: ["TN"])
@@ -114,7 +112,7 @@ def test_load_and_validate_all_rejects_unsupported_load_generation_mode(monkeypa
     monkeypatch.setattr(input_config, "log_scope", lambda logger=None: _NullScope())
     monkeypatch.setattr(input_config, "_load_domain", lambda cfg, logger: object())
     monkeypatch.setattr(input_config, "_load_parcels", lambda cfg, domain, logger: pd.DataFrame({"pid": [1]}))
-    monkeypatch.setattr(input_config, "_load_parcel_graph", lambda cfg, logger: pd.DataFrame(columns=["pid", "pid_up"]))
+    monkeypatch.setattr(input_config, "_load_parcel_graph", lambda cfg, logger: pd.DataFrame(columns=["pid", "pid_down"]))
     monkeypatch.setattr(input_config, "_load_parcel_outlets", lambda cfg, logger: pd.DataFrame({"pid": [1], "oid": ["O1"]}))
     monkeypatch.setattr(input_config, "_load_parcel_selection", lambda cfg, parcels, logger: pd.DataFrame({"pid": [1], "probability": [1.0]}))
     monkeypatch.setattr(input_config, "_load_pollutants", lambda cfg: ["TN"])
@@ -148,15 +146,15 @@ def test_load_and_validate_all_accepts_mixed_case_plet_mode_and_builds_maps(monk
     monkeypatch.setattr(
         input_config,
         "_load_parcel_graph",
-        lambda cfg, logger: pd.DataFrame({"pid": [2], "pid_up": [1]}),
+        lambda cfg, logger: pd.DataFrame({"pid": [2], "pid_down": [1]}),
     )
     monkeypatch.setattr(
         input_config,
         "_load_parcel_outlets",
         lambda cfg, logger: pd.DataFrame(
             {
-                "pid": [1, 1, 2, 2],
-                "oid": ["O1", "O2", "O2", "O3"],
+                "pid": [1, 1, 2, 2, 2],
+                "oid": ["O1", "O2", "O1", "O2", "O3"],
             }
         ),
     )
@@ -181,15 +179,15 @@ def test_load_and_validate_all_accepts_mixed_case_plet_mode_and_builds_maps(monk
     assert cfg[CFG_LOAD_GENERATION]["mode"] == "PLeT_RuSlE"
     assert any("Loading and validating input datasets" in msg for msg in logger.infos)
 
-    upstream = pd.DataFrame({"pid": [2], "pid_up": [1]})
-    parcel_up_map = input_config._build_parcel_up_map(upstream, [1, 2])
-    assert parcel_up_map["1"] == []
-    assert parcel_up_map["2"] == ["1"]
+    upstream = pd.DataFrame({"pid": [2], "pid_down": [1]})
+    parcel_down_map = input_config._build_parcel_down_map(upstream, [1, 2])
+    assert parcel_down_map["1"] is None
+    assert parcel_down_map["2"] == "1"
 
     outlet_rows = pd.DataFrame(
         {
-            "pid": [1, 1, 2, 2],
-            "oid": ["O1", "O2", "O2", "O3"],
+            "pid": [1, 1, 2, 2, 2],
+            "oid": ["O1", "O2", "O1", "O2", "O3"],
         }
     )
     parcel_out_map = {
@@ -197,7 +195,7 @@ def test_load_and_validate_all_accepts_mixed_case_plet_mode_and_builds_maps(monk
         for pid in [1, 2]
     }
     assert parcel_out_map[1] == ["O1", "O2"]
-    assert parcel_out_map[2] == ["O2", "O3"]
+    assert parcel_out_map[2] == ["O1", "O2", "O3"]
 
 def test_load_pollutant_concentrations_requires_and_preserves_plet_pathway(tmp_path) -> None:
     logger = DummyLogger()

@@ -28,17 +28,36 @@ Model variables may be stored at parcel, HUC, or domain scale. GeoPackage files 
 - `pid` — unique integer parcel identifier and the GeoPackage feature/primary key (`INTEGER PRIMARY KEY`). There is no separate `fid` parcel identifier.
 - geometry — polygon/multipolygon geometry.
 
-All parcel references in other GeoPackage tables (`pid`, `pid_up`) are integers. Non-spatial attribute tables use a technical integer `id` primary key where QGIS needs a stable editable row identifier; the model ignores that `id`.
+All parcel references in other GeoPackage tables (`pid`, `pid_down`) are integers. Non-spatial attribute tables use a technical integer `id` primary key where QGIS needs a stable editable row identifier; the model ignores that `id`.
 
 Parcel area and perimeter are derived from geometry after clipping to the domain.
 
-`parcel_up` is an optional attribute table with one upstream edge per row:
+**`parcel_down` is required**, even when it contains zero rows. Each row
+contains one source parcel PID and its **immediate downstream** parcel PID:
 
 ```text
-pid | pid_up
-3   | 1
-3   | 2
+pid | pid_down
+1   | 3
+2   | 3
+3   | 4
 ```
+
+Every `pid` appears **at most once**; a parcel with no downstream neighbor,
+including a watershed outlet, has **no row**. Multiple sources may flow to one
+recipient. Every referenced PID must exist in the parcel geometry layer and
+self-links or directed cycles are invalid. The source-to-downstream graph is
+reversed **in memory** to find the complete upstream catchment of a wetland.
+The model cannot read the old `parcel_up` table and provides no runtime
+conversion or fallback. Convert old datasets using the explicit migration tool
+`python utils/migrate_parcel_down.py --help`, or regenerate links with Whitebox.
+
+The representative link uses the largest share of runoff originating in the
+source parcel, even when less than half of that parcel drains to the recipient.
+Exactly tied shares use the lower numerical downstream PID. The simplification
+routes the **entire modeled parcel** through the chosen link. It does not split
+parcel pollutant mass among downstream branches. Some parcels will have no
+selected connection because water leaves the parcel study area or a link would
+form a cycle. Those cases are logged and do not prohibit automatic update.
 
 `parcel_outlets` is required and contains one parcel-to-outlet relationship per row:
 
@@ -47,6 +66,18 @@ pid | oid
 1   | O1
 1   | O2
 ```
+
+For an immediate connection `pid = p` to `pid_down = q`, the
+`parcel_outlets` assignments must be consistent with downstream routing:
+**every modeled outlet associated with `q` must also be associated with `p`**.
+Thus `outlets(q) ⊆ outlets(p)`. This allows nested monitoring outlets (an
+upstream parcel may have additional gauges) and separate watershed outlets,
+but rejects a connection between incompatible outlet-membership sets.
+Parcels without a selected downstream neighbor are not constrained by this
+rule. These relationships are validated after parcel-domain clipping, before
+Monte Carlo simulation; the error reports the offending PIDs and outlet IDs.
+When building `parcel_outlets`, include *all* modeled downstream monitoring
+outlets that receive each parcel's load, not merely its nearest gauge.
 
 The structural tables do not contain modeled input variables.
 
@@ -312,3 +343,24 @@ Below the configured `outputs` directory, the model writes:
 - `scenario_metrics/s{scenario}.parquet`
 - `outlet_trajectories/all_scenarios.parquet`
 - logs and summary plots
+
+### Distinction between BMP removal and outlet trajectories
+
+`bmps/s{scenario}.parquet` includes the signed, pre-delivery
+`removed_mass_{pollutant}_kg` for each placement, summing actual changes in
+load from **all** treated parcels. The annual unit is kg per one-year model
+timestep, not kg/ha/yr; the pre-/post- parcel load-rate columns in
+`parcels/s{scenario}.parquet` use kg/ha/yr.
+
+In `outlet_trajectories/all_scenarios.parquet`, `total` means the **cumulative
+signed change in delivered outlet mass** (kg per annual timestep), not the
+cumulative unadjusted BMP mass removed. Each affected parcel's change is
+multiplied by its own two-factor TSS or nutrient delivery coefficients, and is
+credited only to its mapped outlets. For `target` and `mean` trajectory types,
+the cumulative delivered reduction is divided by the corresponding configured
+positive outlet reference load and multiplied by 100 (%). A negative
+trajectory value represents an increase in delivered loading.
+
+The accounting is a parcel-level delivery convention and does not explicitly
+transport loads into and back out of a wetland. It is common to statistical
+and PLET/RUSLE load generation and handles serial BMP stacking.

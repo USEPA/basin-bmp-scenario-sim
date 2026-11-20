@@ -770,7 +770,7 @@ def validate_config(cfg: Dict[str, Any]) -> None:
         is required, or outside its allowed physical range.
     """
     legacy_top_level = {
-        "outlet_loc", "parcel_out", "parcel_up", "parcel_p",
+        "outlet_loc", "parcel_out", "parcel_down", "parcel_p",
         "pollutant_load_rate", "delivery_ratios", "outlet_target", "outlet_mean",
     }
     supplied_legacy = sorted(key for key in legacy_top_level if ci_get(cfg, key) is not None)

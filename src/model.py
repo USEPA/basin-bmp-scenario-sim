@@ -89,7 +89,7 @@ from src.constants import (
     DATA_OUTLET_TARGET,
     DATA_PARCEL_OUT_MAP,
     DATA_PARCEL_P,
-    DATA_PARCEL_UP_MAP,
+    DATA_PARCEL_DOWN_MAP,
     DATA_PARCELS,
     DATA_POLLUTANT_LOAD_RATE,
     DATA_LOAD_GENERATION,
@@ -137,7 +137,7 @@ def _safe_mass_ratio(numerator: float, denominator: float) -> Optional[float]:
         -------
         Optional[float]
             Dimensionless ratio, or ``None`` when the denominator is not positive or finite.
-        
+
     """
     numerator = float(numerator)
     denominator = float(denominator)
@@ -179,7 +179,7 @@ def _bmp_impacted_parcel_indices(ctx: Any, parcel_idx: int, bmp_rec: Dict[str, A
         -------
         List[int]
             Indices of parcels represented by the BMP placement.
-        
+
     """
     pids: List[str] = [str(ctx.parcel_ids[parcel_idx])]
     raw = str(bmp_rec.get(OUTPUT_IMPACTED_PIDS) or "")
@@ -191,6 +191,71 @@ def _bmp_impacted_parcel_indices(ctx: Any, parcel_idx: int, bmp_rec: Dict[str, A
         str(pid): idx for idx, pid in enumerate(ctx.parcel_ids)
     }
     return [int(pid_to_index[pid]) for pid in pids if pid in pid_to_index]
+
+
+def _removed_mass_by_parcel_kg(
+    ctx: Any,
+    pre_bmp_load_rates: np.ndarray,
+    post_bmp_load_rates: np.ndarray,
+    parcel_idx: int,
+    bmp_rec: Dict[str, Any],
+    recorded_removed_mass_kg: np.ndarray,
+    *,
+    extra_parcel_indices: Tuple[int, ...] = (),
+) -> List[Tuple[int, np.ndarray]]:
+    """Compute signed BMP mass changes on each affected parcel (kg/timestep).
+
+    Optional extra indices capture manure-receiving parcels affected by AFO
+    feedlot BMPs, even when they are not physically treated by the BMP.
+    These deltas are the canonical source for outlet trajectories: a wetland
+    can affect its host AND multiple upstream parcels, each of which has its
+    own parcel-to-outlet membership and delivery coefficients. The recorded
+    BMP removal must reconcile with these changes rather than being assigned
+    wholesale to the host's outlet and delivery factors.
+    """
+    changes: List[Tuple[int, np.ndarray]] = []
+    total = np.zeros(pre_bmp_load_rates.shape[1], dtype=float)
+    accounted_indices = set(_bmp_impacted_parcel_indices(ctx, parcel_idx, bmp_rec))
+    accounted_indices.update(int(idx) for idx in extra_parcel_indices)
+    for idx in sorted(accounted_indices):
+        change = (
+            np.asarray(pre_bmp_load_rates[idx, :] - post_bmp_load_rates[idx, :], dtype=float)
+            * float(ctx.parcel_area_ha[idx])
+            * _CURRENT_TIMESTEP_YEARS
+        )
+        changes.append((idx, change))
+        total += change
+    if not np.allclose(total, recorded_removed_mass_kg, rtol=1e-7, atol=1e-8):
+        raise RuntimeError(
+            'BMP removal mass does not reconcile with the affected parcel load changes: '
+            f'pid={ctx.parcel_ids[parcel_idx]}, cps={bmp_rec.get("cps")}, '
+            f'parcel_delta_kg={total.tolist()}, '
+            f'recorded_removed_kg={np.asarray(recorded_removed_mass_kg).tolist()}'
+        )
+    return changes
+
+
+def _accumulate_delivered_bmp_reductions(
+    ctx: Any,
+    changes: List[Tuple[int, np.ndarray]],
+    cumul: Dict[str, Dict[str, float]],
+) -> None:
+    """Credit each changed parcel's signed mass only to its linked outlets.
+
+    The parcel-level delivery convention applies the two sediment factors for
+    TSS and the two nutrient factors for other pollutants. A different wetland
+    transport model would require an explicitly different accounting contract.
+    """
+    for idx, removed_mass_kg in changes:
+        pid = str(ctx.parcel_ids[idx])
+        for oid in ctx._get_parcel_out_oids(idx):
+            dr = ctx._delivery_coeffs(pid, oid)
+            for pol_idx, pol in enumerate(ctx.pollutants):
+                if pol == 'TSS':
+                    factor = dr[COL_SDR_F_TO_S] * dr[COL_SDR_S_TO_O]
+                else:
+                    factor = dr[COL_NDR_F_TO_S] * dr[COL_NDR_S_TO_O]
+                cumul[pol][oid] += float(removed_mass_kg[pol_idx]) * factor
 
 
 def _baseline_mass_before_bmp_kg(
@@ -225,7 +290,7 @@ def _baseline_mass_before_bmp_kg(
         -------
         np.ndarray
             Pre-BMP pollutant masses for the represented parcels, in kilograms.
-        
+
     """
     n_pol = int(pre_bmp_load_rates.shape[1])
     mass = np.zeros(n_pol, dtype=float)
@@ -258,7 +323,7 @@ def _add_mass_metrics_to_bmp_record(
             Pollutant masses subjected to BMP treatment, in kilograms.
         removed_mass_kg : np.ndarray
             Pollutant masses removed by the BMP, in kilograms.
-        
+
     """
     bmp_rec["mass_timestep_years"] = float(_CURRENT_TIMESTEP_YEARS)
     for pol_idx, pol in enumerate(pollutants):
@@ -379,8 +444,21 @@ class Model:
             # Parcel outlet and up-gradient mappings
             po_map = self.data[DATA_PARCEL_OUT_MAP]
             self.parcel_out_oids = [[str(x) for x in po_map[pid]] for pid in self.parcel_ids]
-            pu_map = self.data[DATA_PARCEL_UP_MAP]
-            self.parcel_up_idxs = [[self.pid_to_index[u] for u in pu_map[pid] if u in self.pid_to_index] for pid in self.parcel_ids]
+            pd_map = self.data[DATA_PARCEL_DOWN_MAP]
+            # parcel_down stores source -> at most one downstream parcel.
+            # Reverse these edges in memory to support upstream wetland traversal.
+            self.upstream_by_pid = {pid: [] for pid in self.parcel_ids}
+            for pid, downstream_pid in pd_map.items():
+                if (
+                    downstream_pid is not None
+                    and pid in self.pid_to_index
+                    and downstream_pid in self.upstream_by_pid
+                ):
+                    self.upstream_by_pid[downstream_pid].append(pid)
+            self.parcel_up_idxs = [
+                [self.pid_to_index[u] for u in self.upstream_by_pid[pid]]
+                for pid in self.parcel_ids
+            ]
 
             # Parcel selection probabilities
             sel = self.data[DATA_PARCEL_P]
@@ -977,31 +1055,20 @@ def _run_one_scenario(
                 # than from parcel areal-load-rate denominators or averaged efficiencies.
                 collector.add_bmp_record(bmp_rec)
 
-                # Delivered reductions for plots
-                oids = ctx._get_parcel_out_oids(parcel_idx)
-                for pol_idx, pol in enumerate(ctx.pollutants):
-                    # Host direct-feedlot reduction; redirected manure is
-                    # delivered from its actual receiving parcel below.
-                    removed_mass_rate_kg_per_yr = float(direct_bmp_removed[pol_idx])
-                    for oid in oids:
-                        dr = ctx._delivery_coeffs(pid, oid)
-                        deliver = (
-                            removed_mass_rate_kg_per_yr * dr[COL_SDR_F_TO_S] * dr[COL_SDR_S_TO_O]
-                            if pol == "TSS"
-                            else removed_mass_rate_kg_per_yr * dr[COL_NDR_F_TO_S] * dr[COL_NDR_S_TO_O]
-                        )
-                        cumul[pol][oid] += deliver
-                for change in manure_changes:
-                    rec_pid = change["receiving_pid"]
-                    pol = ctx.pollutants[change["pol_idx"]]
-                    for oid in ctx._get_parcel_out_oids(change["parcel_idx"]):
-                        dr = ctx._delivery_coeffs(rec_pid, oid)
-                        deliver = -change["added_export_kg"] * (
-                            dr[COL_SDR_F_TO_S] * dr[COL_SDR_S_TO_O] if pol == "TSS"
-                            else dr[COL_NDR_F_TO_S] * dr[COL_NDR_S_TO_O]
-                        )
-                        cumul[pol][oid] += deliver
-
+                # Attribute actual signed load changes to the affected parcel's
+                # outlets and delivery factors, not just the BMP host. Wetlands
+                # may change several upstream parcels, while feedlot recovery
+                # may increase manure export on separate receiving parcels.
+                changes = _removed_mass_by_parcel_kg(
+                    ctx,
+                    pre_bmp_load_rates,
+                    load_rates,
+                    parcel_idx,
+                    bmp_rec,
+                    removed_mass_kg,
+                    extra_parcel_indices=induced_receiver_indices,
+                )
+                _accumulate_delivered_bmp_reductions(ctx, changes, cumul)
                 # Record current cumulative for each axis choice
                 for pol in ctx.pollutants:
                     for oid in ctx.outlet_oids:
