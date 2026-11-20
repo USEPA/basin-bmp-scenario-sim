@@ -30,8 +30,7 @@ def _mass_package(tmp_path, *, weight=False):
             con.execute("UPDATE afo_manure_fields SET weight=2 WHERE pid=1")
             con.execute("UPDATE afo_manure_fields SET weight=1 WHERE pid=3")
         pd.DataFrame([dict(pid=1, eligible=1), dict(pid=3, eligible=1)]).to_sql('afo_field_eligibility', con, index=False)
-        pd.DataFrame([dict(pid=None, annual_runoff_mm=200, annual_precip_mm=1000,
-                           feedlot_runoff_mm=300)]).to_sql('afo_hydrology', con, index=False)
+        pd.DataFrame([dict(pid=None, annual_runoff_mm=200, annual_precip_mm=1000)]).to_sql('afo_hydrology', con, index=False)
     return path
 
 
@@ -158,9 +157,9 @@ def test_statistical_huc_hydrology_inheritance(tmp_path):
     with sqlite3.connect(package) as conn:
         conn.execute('DROP TABLE afo_hydrology')
         pd.DataFrame([
-            dict(pid=None, huc12=None, annual_runoff_mm=100., annual_precip_mm=800., feedlot_runoff_mm=200.),
-            dict(pid=None, huc12='050900000001', annual_runoff_mm=250., annual_precip_mm=1100., feedlot_runoff_mm=350.),
-            dict(pid=3, huc12=None, annual_runoff_mm=400., annual_precip_mm=1200., feedlot_runoff_mm=500.),
+            dict(pid=None, huc12=None, annual_runoff_mm=100., annual_precip_mm=800.),
+            dict(pid=None, huc12='050900000001', annual_runoff_mm=250., annual_precip_mm=1100.),
+            dict(pid=3, huc12=None, annual_runoff_mm=400., annual_precip_mm=1200.),
         ]).to_sql('afo_hydrology', conn, index=False)
     parcel_package = tmp_path / 'parcels.gpkg'
     with sqlite3.connect(parcel_package) as conn:
@@ -175,11 +174,11 @@ def test_statistical_huc_hydrology_inheritance(tmp_path):
     assert loaded['hydrology']['1'] is loaded['hydrology']['2']
 
 
-def test_statistical_invalid_missing_feedlot_runoff_is_rejected(tmp_path):
+def test_statistical_missing_precipitation_is_rejected(tmp_path):
     package = _mass_package(tmp_path)
     with sqlite3.connect(package) as conn:
-        conn.execute('UPDATE afo_hydrology SET feedlot_runoff_mm=NULL')
-    with pytest.raises(ValueError, match='feedlot_runoff_mm'):
+        conn.execute('UPDATE afo_hydrology SET annual_precip_mm=NULL')
+    with pytest.raises(ValueError, match='annual_precip_mm'):
         _load(package,mode='statistical')
 
 

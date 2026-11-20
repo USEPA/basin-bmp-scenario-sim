@@ -220,10 +220,30 @@ Uses the existing PLET pollutant-specific feedlot animal-equivalence and
 manure-pack concentration method. Feedlot wetland/land-cover background loads
 are displaced over each feedlot footprint to avoid double counting. In PLET,
 feedlot runoff is calculated using the documented 91–94 feedlot CN and the
-existing PLET event climate. In **statistical** mode, it uses a separate,
-user-supplied `feedlot_runoff_mm` (annual); this is a runoff-depth substitution,
-not an independent event-CN simulation. Direct feedlot surface loads and
-manure-applied-field loads remain separate BMP components. The animal-excretion
+existing PLET event climate. In **statistical** mode, annual feedlot runoff is **always derived from**
+`afo_hydrology.annual_precip_mm` with the same PLET curve-number formula and
+feedlot imperviousness CN table (91, 92, 93, or 94). It uses PLET's zero
+initial abstraction, 120 rainy days/year by default (optional `rain_days`
+fixed or distribution override in `afo_hydrology`), a rainfall correction
+fraction of 0.90, and a runoff-day fraction of 0.50. These are transparent
+**screening-level assumptions**, *not* universal spatial PLET defaults.
+PLET ordinarily derives rain-day and correction values from local precipitation
+data. Replace the assumed `rain_days` with local values where available and
+interpret runoff sensitivity accordingly. `feedlot_runoff_mm` is no longer
+accepted as an input. Derived annual runoff is necessarily no greater than
+annual precipitation with the specified PLET factors. Direct feedlot surface loads and
+manure-applied-field loads remain separate BMP components.
+
+**Sediment/TSS limitation (applies to both AFO methods):** The feedlot
+occupies land that previously generated parcel background load, so the model
+reduces *all* background pollutants/pathways by the occupied area fraction.
+The replacement direct-feedlot routine currently estimates TN/TP (and BOD
+where enabled), **not TSS**. Consequently, the feedlot footprint contributes
+no direct sediment source, and baseline TSS can appear to decrease when AFOs
+are added. Do not treat the resulting TSS load as a complete feedlot sediment
+estimate or interpret that decrease as a real environmental benefit. A
+mechanistic feedlot sediment export module is outside the scope of this PR.
+ The animal-excretion
 factors and feedlot animal-equivalence factors are **not interchangeable**.
 **`animal_days` scales annual excreted nutrient mass but does not scale direct
 feedlot loading**: the latter uses the realized `count`, feedlot area, and
@@ -246,15 +266,20 @@ when `method: mass_based`. New/extended fields:
 | `afo_operations` | `manure_months` | Ignored for `mass_based`; retained only for legacy concentration-increment runs |
 | `afo_manure_fields` | `weight` | Optional positive allocation weight: specify for **all** receivers of an operation or none |
 | `afo_field_eligibility` | `pid`, `eligible` (0/1) | **Statistical only**, receiver eligibility for a parcel; no PLET land-cover input required |
-| `afo_hydrology` | `pid`, optional `huc12`, `annual_precip_mm`, `annual_runoff_mm`, `feedlot_runoff_mm` | **Statistical only**: feedlot host must have precipitation and feedlot runoff; receiving fields need annual surface runoff only when Option B is enabled |
+| `afo_hydrology` | `pid`, optional `huc12`, required host `annual_precip_mm`, optional `rain_days`, `annual_runoff_mm` | **Statistical only**: feedlot runoff is computed from precipitation using PLET CN and documented climate assumptions; receiving fields need `annual_runoff_mm` only when Option B is enabled |
 
 When in statistical mode, `afo_hydrology` rows may use an exact integer
 `pid`, a `huc12` (with NULL pid), or NULL `pid`/`huc12` as the domain default;
 precedence is **parcel > HUC12 > domain**. HUC12 associations come from the
 canonical `parcels.gpkg/parcel_huc12` mapping if present; otherwise use parcel
 or domain rows. At least one eligible agricultural parcel and valid hydrology
-for receivers and operation hosts are required. `feedlot_runoff_mm` must be
-provided for each operation host. User-supplied Q/P must satisfy 0 ≤ Q ≤ P.
+for receivers and operation hosts are required. Host `annual_precip_mm`
+accepts the usual fixed/distribution statistics; the optional `rain_days`
+parameter can be fixed or distributed in the range 1–366. The obsolete
+`feedlot_runoff_mm` input and all its distribution columns are rejected,
+including when null. Host feedlot runoff is derived internally and satisfies
+0 ≤ Q ≤ annual precipitation; user-supplied `annual_runoff_mm` remains a
+separate, optional field-only input for Option B, not a feedlot runoff override.
 
 ### Feedlot-specific BMP costing (all AFO methods)
 

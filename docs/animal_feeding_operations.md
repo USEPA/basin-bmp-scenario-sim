@@ -94,9 +94,11 @@ collection and field loading in addition to source-specific runoff reductions.
 The amount recovered must be supplied explicitly rather than inferred from a CPS.
 
 Wetland/buffer CPS 412, 656, 657 cannot be flagged as feedlot-only. Other
-legacy BMP designs and selection probabilities remain in force; all BMPs are
-scored with the existing full-parcel-cost assumptions, including a feedlot-only
-BMP. BMP failure and signed efficiency conventions are unchanged.
+legacy BMP designs and selection probabilities remain in force. Feedlot-only
+BMPs use actual feedlot footprint area for area-based costing unless explicitly
+overridden by `afo_feedlot_bmp_cost_dimensions`; length-based costing requires
+a supplied practice length. Ordinary non-feedlot BMP costing is unchanged.
+BMP failure and signed efficiency conventions are unchanged.
 
 ## Annotated AFO example GeoPackages
 
@@ -261,3 +263,14 @@ calibrated or validated. Replace them with vetted project data before interpreti
   https://www.epa.gov/system/files/documents/2024-10/user-guide-oct-24-update_final_508-full.pdf
 - EPA. *BMP Efficiency References for PLET* (2023), Table 3:
   https://ordspub.epa.gov/ords/grts/r/grtsadm/files/static/v287/BMP%20Efficiency%20References%20Doc%20082023.pdf
+
+## Feedlot sediment modeling limitation
+
+AFO feedlot footprints replace the preexisting background parcel land cover.
+The model scales down all background pathway loads accordingly, but its
+direct-feedlot calculation currently supplies TN, TP and (when enabled) BOD,
+**not TSS/sediment**. As a result, adding feedlot area can artificially lower
+modeled TSS by removing background TSS without replacing it with a feedlot
+sediment source. This does not demonstrate a sediment reduction and should not
+be used to interpret complete feedlot TSS loading. Modeling feedlot sediment
+is outside this implementation's scope.

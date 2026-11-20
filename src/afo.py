@@ -29,6 +29,29 @@ _EXCRETION_PARAMETERS = (
     "representative_mass_kg", "tn_kg_1000kg_day", "tp_kg_1000kg_day",
 )
 
+# Statistical-mode feedlot climate assumptions, NOT universal PLET defaults.
+# PLET's spatial rainfall inputs vary by location; in their absence we use a
+# documented screening-level rainy-day count and correction factors. Users may
+# override rain_days per parcel/HUC/domain; the correction factors remain fixed.
+STAT_FEEDLOT_RAIN_DAYS = 120.0
+STAT_FEEDLOT_RAIN_CORRECTION = 0.90
+STAT_FEEDLOT_RUNOFF_DAY_FRACTION = 0.50
+
+
+def _afo_id(value: Any, label: str) -> str:
+    """Normalize operation IDs once, rejecting missing and whitespace-only IDs."""
+    if value is None or pd.isna(value):
+        raise ValueError(f"{label} must contain nonblank AFO IDs")
+    normalized = str(value).strip()
+    if not normalized:
+        raise ValueError(f"{label} must contain nonblank AFO IDs")
+    return normalized
+
+
+def _normalize_afo_ids(frame: pd.DataFrame, label: str) -> None:
+    if "afo_id" in frame.columns:
+        frame["afo_id"] = frame["afo_id"].map(lambda value: _afo_id(value, label))
+
 
 def _animal_species(value: Any) -> str:
     species = str(value).strip().lower()
@@ -171,14 +194,19 @@ def load_afo_inputs(path: str | Path, parcels: pd.DataFrame, pollutants: Sequenc
         _need_columns(recovery, "afo_feedlot_manure_effects", ["afo_id", "cps"])
     if operations.empty:
         raise ValueError("AFO package requires at least one operation")
-    operations["afo_id"] = operations["afo_id"].astype(str).str.strip()
+    for table, label in ((operations, "afo_operations.afo_id"),
+                         (animals, "afo_animals.afo_id"),
+                         (fields, "afo_manure_fields.afo_id"),
+                         (management, "afo_manure_management.afo_id"),
+                         (recovery, "afo_feedlot_manure_effects.afo_id"),
+                         (cost_dimensions, "afo_feedlot_bmp_cost_dimensions.afo_id")):
+        _normalize_afo_ids(table, label)
     operations["pid"] = operations["pid"].astype(object)
-    if operations["afo_id"].eq("").any() or operations["afo_id"].duplicated().any():
+    if operations["afo_id"].duplicated().any():
         raise ValueError("afo_operations.afo_id must contain distinct nonblank IDs")
     op_ids = set(operations["afo_id"])
     if not recovery.empty:
         cps_allowed = {int(c) for c in feedlot_bmp_cps}
-        recovery["afo_id"] = recovery["afo_id"].astype(str).str.strip()
         cps_normalized = []
         for _, row in recovery.iterrows():
             op_id = row["afo_id"]
@@ -271,7 +299,6 @@ def load_afo_inputs(path: str | Path, parcels: pd.DataFrame, pollutants: Sequenc
     for pid, total in host_area.items():
         if total > area_by_pid[pid] + 1e-8:
             raise ValueError(f"Combined feedlot footprints exceed parcel area for pid {pid}")
-    animals["afo_id"] = animals["afo_id"].astype(str).str.strip()
     for op_id in op_ids:
         if not animals["afo_id"].eq(op_id).any():
             raise ValueError(f"Operation {op_id} has no animal inventory")
@@ -296,16 +323,19 @@ def load_afo_inputs(path: str | Path, parcels: pd.DataFrame, pollutants: Sequenc
             _require_fixed_parameter(row, factor, f"afo_animals[{op_id}/{row['species']}]")
     if fields.empty and "afo_id" not in fields:
         fields = pd.DataFrame(columns=["afo_id", "pid"])
-    fields["afo_id"] = fields["afo_id"].astype(str).str.strip()
     fields["pid"] = fields["pid"].astype(object)
-    if fields.duplicated(["afo_id", "pid"]).any():
-        raise ValueError("Duplicate operation-to-receiving-parcel relation")
+    # Check relations after canonical integer PID and AFO-ID conversion: 1,
+    # 1.0, and " 1 " all represent the same parcel, not distinct receivers.
     for k, row in fields.iterrows():
         op_id = row["afo_id"]
         pid = _integer_pid(row["pid"], "afo_manure_fields.pid")
         if op_id not in op_ids or pid not in pid_set:
             raise ValueError(f"Invalid manure field reference {op_id}/{pid}")
         fields.at[k, "pid"] = pid
+    if fields.duplicated(["afo_id", "pid"]).any():
+        raise ValueError("Duplicate operation-to-receiving-parcel relation")
+    for _, row in fields.iterrows():
+        op_id, pid = row["afo_id"], row["pid"]
         if validate_named_parameter_stats(
             row, "weight", f"afo_manure_fields[{op_id}/{pid}]",
             low=0., exclusive_low=True,
@@ -326,6 +356,19 @@ def load_afo_inputs(path: str | Path, parcels: pd.DataFrame, pollutants: Sequenc
             raise ValueError("Manure concentration increments apply only to cropland/pastureland")
         if not set(increments["pollutant"]).issubset(set(map(str.upper, pollutants))):
             raise ValueError("Manure concentration increments reference unknown pollutants")
+        # PLET land cover can vary between realizations. Before simulation,
+        # require coverage for both possible agricultural receiver classes and
+        # every active pollutant with a modeled manure concentration increment.
+        incremental_pollutants = {str(pol).upper() for pol in pollutants} & {"TN", "TP", "BOD"}
+        required_pairs = {(cover, pol) for cover in ("cropland", "pastureland")
+                          for pol in incremental_pollutants}
+        present_pairs = set(zip(increments["land_cover"], increments["pollutant"]))
+        missing_pairs = sorted(required_pairs - present_pairs)
+        if missing_pairs:
+            raise ValueError(
+                "afo_manure_concentration_increments is missing required "
+                f"land_cover/pollutant combinations: {missing_pairs}"
+            )
         for index, row in increments.iterrows():
             stats = stats_from_row(row, {"land_cover", "pollutant", "sample_group", "units"})
             if not stats:
@@ -415,6 +458,16 @@ def load_afo_inputs(path: str | Path, parcels: pd.DataFrame, pollutants: Sequenc
                     huc_col = "huc_id" if "huc_id" in cols else "huc12"
                     mapping = {str(int(pid)): str(huc) for pid, huc in
                                con.execute(f"SELECT pid,{huc_col} FROM parcel_huc12")}
+        # The legacy runoff override has been removed. Reject even a NULL
+        # column to prevent silently retaining an obsolete GeoPackage schema.
+        unsupported = [column for column in hydrology.columns
+                       if column == "feedlot_runoff_mm" or column.startswith("feedlot_runoff_mm_")]
+        if unsupported:
+            raise ValueError(
+                "afo_hydrology no longer accepts feedlot_runoff_mm; remove "
+                f"obsolete column(s) {unsupported}. Feedlot runoff is derived "
+                "from annual_precip_mm with the PLET curve-number method."
+            )
         by_pid, by_huc, default = {}, {}, None
         for _, row in hydrology.iterrows():
             rec = row.to_dict()
@@ -438,17 +491,20 @@ def load_afo_inputs(path: str | Path, parcels: pd.DataFrame, pollutants: Sequenc
                 if default is not None:
                     raise ValueError("Duplicate default AFO hydrology row")
                 default = rec
-            for name in ("annual_runoff_mm", "annual_precip_mm", "feedlot_runoff_mm"):
+            for name in ("annual_runoff_mm", "annual_precip_mm"):
                 validate_named_parameter_stats(
                     row, name, f"afo_hydrology row {row.name}", low=0.,
                 )
+            validate_named_parameter_stats(
+                row, "rain_days", f"afo_hydrology row {row.name}", low=1., high=366.,
+            )
         for pid in pid_set:
             rec = by_pid.get(pid) or by_huc.get(mapping.get(pid, "")) or default
             if rec is not None:
                 hydrology_by_pid[pid] = rec
         active_hosts = {str(op["pid"]) for op in operations.to_dict("records")}
         # Constant-export mode needs no receiving-field hydrology. Direct
-        # feedlot loading still needs precipitation and feedlot runoff at hosts.
+        # feedlot loading only needs precipitation at operation hosts.
         required_pids = active_hosts | ({pid for pid, yes in eligible_by_pid.items() if yes} if runoff_adjusted_export else set())
         for pid in required_pids:
             if pid not in hydrology_by_pid:
@@ -456,7 +512,7 @@ def load_afo_inputs(path: str | Path, parcels: pd.DataFrame, pollutants: Sequenc
             row = hydrology_by_pid[pid]
             required = ["annual_runoff_mm"] if runoff_adjusted_export and eligible_by_pid.get(pid) else []
             if pid in active_hosts:
-                required.extend(("annual_precip_mm", "feedlot_runoff_mm"))
+                required.append("annual_precip_mm")
             for name in required:
                 if not (name in row and pd.notna(row[name])) and not any(
                     k.startswith(name + "_") and pd.notna(v) for k,v in row.items()
@@ -1007,21 +1063,19 @@ def mass_afo_realization(
                 op, realized_animals, state.parameters[host_idx], ctx.pollutants
             )
         else:
-            _, host_precip_mm, feedlot_runoff_mm = _hydrology(
+            _, host_precip_mm, rain_days = _hydrology(
                 inputs, host, state, host_idx, ctx
             )
-            if feedlot_runoff_mm is None:
-                raise ValueError(f"Statistical AFO host {host} requires feedlot_runoff_mm")
-            if feedlot_runoff_mm > host_precip_mm:
-                raise ValueError(
-                    f"Statistical AFO feedlot runoff exceeds annual precipitation for host {host}"
-                )
-            direct_kg = {
-                str(pol).upper(): feedlot_runoff_mm * 10000 / 1e6
-                * op["feedlot_area_ha"]
-                * _feedlot_concentration(op, realized_animals, str(pol).upper())
-                for pol in ctx.pollutants
-            }
+            # Reuse exactly the PLET feedlot CN and concentration calculations
+            # already used in PLET/RUSLE mode; no independent runoff input.
+            direct_kg = _feedlot_runoff_kg(
+                op, realized_animals,
+                {"annual_precip_in": host_precip_mm / 25.4,
+                 "rain_days": STAT_FEEDLOT_RAIN_DAYS if rain_days is None else rain_days,
+                 "rain_correction_fraction": STAT_FEEDLOT_RAIN_CORRECTION,
+                 "runoff_day_fraction": STAT_FEEDLOT_RUNOFF_DAY_FRACTION},
+                ctx.pollutants,
+            )
         for pol_idx, pol in enumerate(ctx.pollutants):
             feedlot[host_idx, pol_idx, surface_idx] += (
                 direct_kg.get(str(pol).upper(), 0.) / areas[host]
@@ -1079,7 +1133,7 @@ def _hydrology(
             cache[key] = (
                 optional_draw("annual_runoff_mm"),
                 optional_draw("annual_precip_mm"),
-                optional_draw("feedlot_runoff_mm"),
+                optional_draw("rain_days"),
             )
         return cache[key]
     params = state.parameters[idx]

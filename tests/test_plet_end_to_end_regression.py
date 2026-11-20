@@ -378,7 +378,7 @@ def _single_mass_afo_payload(*, statistical: bool) -> dict:
                          "tp_surface_export_fraction": .04}],
         "eligible": {"P1": True},
         "hydrology": {"P1": {"annual_precip_mm": 1000., "annual_runoff_mm": 200.,
-                              "feedlot_runoff_mm": 300.}},
+                              "rain_days": 120.}},
         "surface_pathway": "surface",
         "geometry": {"P1": box(0,0,100,100)}, "area_ha": {"P1": 1.},
     }

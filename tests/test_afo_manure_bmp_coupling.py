@@ -158,7 +158,7 @@ def test_recovery_field_load_is_delivered_from_receiver_not_host(tmp_path, monke
     payload['afo_inputs']['area_ha']['P2'] = 1.0
     payload['afo_inputs']['eligible']['P2'] = True
     payload['afo_inputs']['hydrology']['P2'] = {
-        'annual_precip_mm': 1000., 'annual_runoff_mm': 200., 'feedlot_runoff_mm': 300.}
+        'annual_precip_mm': 1000., 'annual_runoff_mm': 200.}
     payload['parcel_ids'] = ['P1', 'P2']
     payload['pid_to_index'] = {'P1': 0, 'P2': 1}
     payload['parcel_area_ha'] = np.array([1., 1.])

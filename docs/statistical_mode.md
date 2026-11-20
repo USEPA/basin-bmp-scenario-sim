@@ -76,7 +76,9 @@ Optional parcel-selection weights are stored in `input_selection_weight`, not on
 with animal-based N/P production, nutrient allocation to parcels, annual
 manure surface export fractions and separate direct-feedlot surface loading.
 By default, the receiving fields need no hydrology: feedlot hosts still need
-annual precipitation and feedlot runoff. If `runoff_adjusted_export: true`,
+annual precipitation (`annual_precip_mm`). Direct feedlot runoff is computed
+with the PLET curve-number method using documented rain-day/correction
+assumptions; no `feedlot_runoff_mm` input is permitted. If `runoff_adjusted_export: true`,
 receiving fields additionally require `afo_hydrology.annual_runoff_mm` and
 `manure_loading.reference_runoff_mm` must be positive. The configured
 `manure_loading.surface_pathway` (default `surface`) must match an active
@@ -89,6 +91,6 @@ AFO method is PLET-only.
 
 The checked-in statistical AFO demonstration uses its own minimal
 `examples/east_fork/inputs/afo/afo_mass_statistical_example.gpkg`. For default
-Option A it supplies precipitation and direct-feedlot runoff, but no annual
-receiving-field runoff. The separate PLET example has no statistical AFO tables.
+Option A it supplies annual precipitation only (feedlot runoff is calculated),
+but no annual receiving-field runoff. The separate PLET example has no statistical AFO tables.
 See [AFO example GeoPackage reference](afo_example_geopackage_reference.md).

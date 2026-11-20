@@ -34,8 +34,10 @@ def _package(path, allocation="explicit", selection="nearest", **overrides):
                       "factor_tn": 1., "factor_tp": 1., "factor_bod": 1.}]).to_sql("afo_animals", conn, index=False)
         pd.DataFrame([{"afo_id": "A1", "pid": 1}, {"afo_id": "A1", "pid": 3}]
                      if allocation == "explicit" else [], columns=["afo_id", "pid"]).to_sql("afo_manure_fields", conn, index=False)
-        pd.DataFrame([{"land_cover": "cropland", "pollutant": "TN", "value": 8.},
-                      {"land_cover": "cropland", "pollutant": "TP", "value": .8}]).to_sql("afo_manure_concentration_increments", conn, index=False)
+        pd.DataFrame([{"land_cover": cover, "pollutant": pol, "value": value}
+                      for cover in ("cropland", "pastureland")
+                      for pol, value in (("TN", 8.), ("TP", .8))]
+                     ).to_sql("afo_manure_concentration_increments", conn, index=False)
     return path
 
 

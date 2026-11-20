@@ -41,10 +41,12 @@ this is **not** enough Monte Carlo realizations for stable uncertainty estimates
   applied nutrient budget and are intentionally retained.
 - **Statistical only**: `afo_field_eligibility` has `pid`, `eligible`; all four
   synthetic parcels are eligible. `afo_hydrology` has `pid`,
-  `annual_precip_mm`, `feedlot_runoff_mm`: a single NULL-pid domain-default
-  row covers the feedlot hosts. The Option A manure-field export does not
-  require `annual_runoff_mm` or HUC12 IDs; neither column is included. Direct
-  feedlot loading **does** require annual precipitation and feedlot runoff.
+  `annual_precip_mm`: a single NULL-pid domain-default row covers the
+  feedlot hosts. A PLET-style annual feedlot runoff is derived from that
+  precipitation using the CN corresponding to paved percentage and documented
+  default rain-day/correction assumptions. The Option A manure-field export
+  does not require `annual_runoff_mm` or HUC12 IDs; neither is included.
+  `feedlot_runoff_mm` is not an accepted input.
 
 All packages omit the old unrelated `example_marker` layer. Instead,
 `afo_operations` is an actual spatial POINT feature layer in EPSG:4326. Its
